@@ -5,7 +5,7 @@ After=getty@tty2.service
 
 [Service]
 Type=simple
-ExecStart=/bin/ly
+ExecStart=/usr/bin/ly
 StandardInput=tty
 TTYPath=/dev/tty2
 TTYReset=yes

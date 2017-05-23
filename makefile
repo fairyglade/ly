@@ -3,10 +3,10 @@ ly :
 	cc -std=c99 -pedantic -Wall -I src -L/usr/lib/security -lform -lncurses -lpam -lpam_misc -lX11 -l:pam_loginuid.so -o build/ly src/main.c src/utils.c src/login.c src/ncui.c src/desktop.c
 	
 install : ly
-	cp build/ly /bin/ly
-	mkdir -p /etc/ly
-	cp ly.service /lib/systemd/system/ly.service
-	ln -sf /usr/lib/security/pam_loginuid.so /lib/pam_loginuid.so
+	install -d ${DESTDIR}/etc/ly
+	install -D build/ly -t ${DESTDIR}/usr/bin
+	install -D ly.service -t ${DESTDIR}/usr/lib/systemd/system
+	ln -sf /usr/lib/security/pam_loginuid.so ${DESTDIR}/usr/lib/pam_loginuid.so
 	
 all : install
 
