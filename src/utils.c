@@ -51,19 +51,6 @@ char* trim(char* s)
 	return s;
 }
 
-char* strdup(const char* src)
-{
-	size_t len = strlen(src) + 1;
-	char* s = malloc(len);
-
-	if(!s)
-	{
-		return NULL;
-	}
-
-	return (char*)memcpy(s, src, len);
-}
-
 void error_init(WINDOW* win, int width, const char* s)
 {
 	static WINDOW* win_stack = NULL;
