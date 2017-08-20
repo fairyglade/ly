@@ -8,7 +8,7 @@
 /* array sizes */
 #define LY_LIM_LINE_FILE 256
 #define LY_LIM_LINE_CONSOLE 256
-#define LY_LIM_PATH 256
+#define LY_LIM_PATH 512
 #define LY_LIM_CMD 256
 
 /* behaviour */
