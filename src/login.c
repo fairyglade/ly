@@ -339,8 +339,12 @@ const char* de_command, enum deserv_t display_server)
 				break;
 
 			case xorg:
+				launch_xorg(pwd, login_handle, de_command, display_name, vt, 0);
+				break;
+
+			case xinitrc:
 			default :
-				launch_xorg(pwd, login_handle, de_command, display_name, vt);
+				launch_xorg(pwd, login_handle, de_command, display_name, vt, 1);
 				break;
 		}
 
@@ -430,7 +434,7 @@ const char* de_command, enum deserv_t display_server)
 }
 
 void launch_xorg(struct passwd* pwd, pam_handle_t* pam_handle,
-const char* de_command, const char* display_name, const char* vt)
+const char* de_command, const char* display_name, const char* vt, int xinitrc)
 {
 	FILE* file;
 	pid_t xauth_pid;
@@ -455,7 +459,7 @@ const char* de_command, const char* display_name, const char* vt)
 	reset_terminal(pwd);
 	/* starts session */
 	snprintf(cmd, sizeof(cmd),
-	"exec xinit /usr/bin/%s -- %s %s %s -auth %s", de_command, LY_CMD_X,
+	"exec xinit %s%s -- %s %s %s -auth %s", xinitrc ? "~/" : "/usr/bin/", de_command, LY_CMD_X,
 	display_name, vt, getenv("XAUTHORITY"));
 	execl(pwd->pw_shell, pwd->pw_shell, "-c", cmd, NULL);
 	exit(0);

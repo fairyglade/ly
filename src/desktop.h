@@ -1,7 +1,7 @@
 #ifndef _DESKTOP_H_
 #define _DESKTOP_H_
 
-enum deserv_t {shell, xorg, wayland};
+enum deserv_t {shell, xorg, xinitrc, wayland};
 
 struct deprops_t
 {

@@ -98,7 +98,7 @@ struct delist_t* init_list(int count)
 	list->props[0].cmd = strdup("");
 	list->props[0].type = shell;
 	list->props[1].cmd = strdup(LY_CMD_XINITRC);
-	list->props[1].type = xorg;
+	list->props[1].type = xinitrc;
 	return list;
 }
 
