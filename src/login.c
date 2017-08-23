@@ -434,11 +434,12 @@ const char* de_command, enum deserv_t display_server)
 }
 
 void launch_xorg(struct passwd* pwd, pam_handle_t* pam_handle,
-const char* de_command, const char* display_name, const char* vt, int xinitrc)
+const char* de_command, const char* display_name, const char* vt,
+int xinitrc)
 {
 	FILE* file;
-	pid_t xauth_pid;
-	int xauth_status;
+	pid_t child;
+	int status;
 	char cmd[LY_LIM_CMD];
 	/* updates cookie */
 	snprintf(cmd, sizeof(cmd), "exec xauth add %s . `%s`", display_name,
@@ -447,22 +448,38 @@ const char* de_command, const char* display_name, const char* vt, int xinitrc)
 	file = fopen(getenv("XAUTHORITY"), "ab+");
 	fclose(file);
 	/* generates the cookie */
-	xauth_pid = fork();
+	child = fork();
 
-	if(xauth_pid == 0)
+	if(child == 0)
 	{
 		execl(pwd->pw_shell, pwd->pw_shell, "-c", cmd, NULL);
 		exit(0);
 	}
 
-	waitpid(xauth_pid, &xauth_status, 0);
-	reset_terminal(pwd);
-	/* starts session */
-	snprintf(cmd, sizeof(cmd),
-	"exec xinit %s%s -- %s %s %s -auth %s", xinitrc ? "~/" : "/usr/bin/", de_command, LY_CMD_X,
-	display_name, vt, getenv("XAUTHORITY"));
-	execl(pwd->pw_shell, pwd->pw_shell, "-c", cmd, NULL);
-	exit(0);
+	waitpid(child, &status, 0);
+	/* starts X */
+	child = fork();
+
+	if(child == 0)
+	{
+		reset_terminal(pwd);
+		/* starts session */
+		snprintf(cmd, sizeof(cmd),
+		"exec xinit %s%s -- %s %s %s -auth %s", xinitrc ? "" : "/usr/bin/",
+		de_command, LY_CMD_X,
+		display_name, vt, getenv("XAUTHORITY"));
+		execl(pwd->pw_shell, pwd->pw_shell, "-c", cmd, NULL);
+		exit(0);
+	}
+	else
+	{
+		/* handles DBus */
+		snprintf(cmd, sizeof(cmd),
+		"exec dbus-launch --exit-with-session %s", de_command);
+		waitpid(child, &status, 0);
+		execl(pwd->pw_shell, "-c", cmd, NULL);
+		exit(0);
+	}
 }
 
 void launch_wayland(struct passwd* pwd, pam_handle_t* pam_handle,
