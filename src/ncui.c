@@ -53,7 +53,7 @@ void init_form(struct ncform* form, char** list, int max_de, int* de_id)
 	{
 		if(fgets(line, sizeof(line), file))
 		{
-			snprintf(user, sizeof(file), "%s", line);
+			strcpy(user, line);
 		}
 
 		if(fgets(line, sizeof(line), file))
