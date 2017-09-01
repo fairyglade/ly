@@ -206,26 +206,25 @@ const char* de_command, enum deserv_t display_server)
 		return 1;
 	}
 
-    /* Initialise user groups */
-        /* Get pwd structure for the user to get his group id */
-    struct passwd* pw = getpwnam(username);
-    if (!pw) 
-    {
-        error_print(strerror(errno));
+	/* Initialise user groups */
+	/* Get pwd structure for the user to get his group id */
+	struct passwd* pw = getpwnam(username);
 
+	if(!pw)
+	{
+		error_print(strerror(errno));
 		pam_end(login_handle, pam_result);
 		return 1;
-    }
+	}
 
-    int grp_result = initgroups(username, pw->pw_gid);
+	int grp_result = initgroups(username, pw->pw_gid);
 
-    if (grp_result == -1)
-    {
-        error_print(strerror(errno));
-
+	if(grp_result == -1)
+	{
+		error_print(strerror(errno));
 		pam_end(login_handle, pam_result);
 		return 1;
-    }
+	}
 
 	/* pam_setcred and error handling */
 	pam_result = pam_setcred(login_handle, PAM_ESTABLISH_CRED);
