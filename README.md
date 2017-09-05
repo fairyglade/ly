@@ -45,6 +45,11 @@ disable getty on Ly's tty to prevent "login" from spawning on top of it:
 sudo systemctl disable getty@tty2.service
 ```
 
+### Controls
+Use the up and down arrow keys to change the current field, and the
+left and right arrow keys to change the target desktop environment
+while on the desktop field (above the username field).
+
 ### Additionnal informations
 The name "Ly" is a tribute to the fairy from the game Rayman.
 Ly was tested by oxodao, who is some seriously awesome dude. (you rock!)
