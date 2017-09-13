@@ -9,6 +9,7 @@
 #include <sys/ioctl.h>
 #include <linux/vt.h>
 #include <unistd.h>
+#include <signal.h>
 /* ncurses */
 #include <form.h>
 /* pam */
