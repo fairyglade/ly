@@ -463,6 +463,8 @@ int xinitrc)
 	pid_t child;
 	int status;
 	char cmd[LY_LIM_CMD];
+	char* argv[] = {pwd->pw_shell, "-c", cmd, NULL};
+	extern char** environ;
 	/* updates cookie */
 	snprintf(cmd, sizeof(cmd), "exec xauth add %s . `%s`", display_name,
 	LY_CMD_MCOOKIE);
@@ -479,29 +481,13 @@ int xinitrc)
 	}
 
 	waitpid(child, &status, 0);
-	/* starts X */
-	child = fork();
-
-	if(child == 0)
-	{
-		reset_terminal(pwd);
-		/* starts session */
-		snprintf(cmd, sizeof(cmd),
-		"exec xinit %s%s -- %s %s %s -auth %s", xinitrc ? "" : "/usr/bin/",
-		de_command, LY_CMD_X,
-		display_name, vt, getenv("XAUTHORITY"));
-		execl(pwd->pw_shell, pwd->pw_shell, "-c", cmd, NULL);
-		exit(0);
-	}
-	else
-	{
-		/* handles DBus */
-		snprintf(cmd, sizeof(cmd),
-		"exec dbus-launch --exit-with-session %s", de_command);
-		waitpid(child, &status, 0);
-		execl(pwd->pw_shell, "-c", cmd, NULL);
-		exit(0);
-	}
+	reset_terminal(pwd);
+	snprintf(cmd, sizeof(cmd),
+	"exec xinit %s%s -- %s %s %s -auth %s", xinitrc ? "" : "/usr/bin/",
+	de_command, LY_CMD_X,
+	display_name, vt, getenv("XAUTHORITY"));
+	execve(pwd->pw_shell, argv, environ);
+	exit(0);
 }
 
 void launch_wayland(struct passwd* pwd, pam_handle_t* pam_handle,
@@ -537,6 +523,7 @@ enum deserv_t display_server)
 	setenv("XDG_SESSION_CLASS", "user", 0);
 	setenv("XDG_SEAT", "seat0", 0);
 	setenv("XDG_VTNR", tty_id, 0);
+	setenv("XDG_RUNTIME_DIR", LY_PATH_RUNTIME_DIR, 0);
 	setenv("DISPLAY", display_name, 1);
 
 	switch(display_server)
