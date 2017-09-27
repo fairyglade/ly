@@ -10,7 +10,8 @@ struct pam_response** resp, void* appdata_ptr);
 int start_env(const char* username, const char* password,
 const char* de_command, enum deserv_t display_server);
 void launch_xorg(struct passwd* pwd, pam_handle_t* pam_handle,
-const char* de_command, const char* display_name, const char* vt, int xinitrc);
+const char* de_command, const char* display_name, const char* vt,
+int xinitrc);
 void launch_wayland(struct passwd* pwd, pam_handle_t* pam_handle,
 const char* de_command);
 void launch_shell(struct passwd* pwd, pam_handle_t* pam_handle);

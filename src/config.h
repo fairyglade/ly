@@ -28,6 +28,7 @@
 #define LY_CMD_HALT "/sbin/shutdown"
 #define LY_CMD_XINITRC "~/.xinitrc"
 #define LY_CMD_MCOOKIE "/usr/bin/mcookie"
+#define LY_CMD_XSETUP "/etc/ly/xsetup.sh"
 #define LY_XAUTHORITY ".lyxauth"
 
 /* paths */

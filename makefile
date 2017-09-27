@@ -5,6 +5,7 @@ build/ly :
 install : build/ly
 	install -d ${DESTDIR}/etc/ly
 	install -D build/ly -t ${DESTDIR}/usr/bin
+	install -D xsetup.sh -t ${DESTDIR}/etc/ly
 	install -D ly.service -t ${DESTDIR}/usr/lib/systemd/system
 	ln -sf /usr/lib/security/pam_loginuid.so ${DESTDIR}/usr/lib/pam_loginuid.so
 	

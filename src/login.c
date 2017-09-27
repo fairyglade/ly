@@ -483,7 +483,9 @@ int xinitrc)
 	waitpid(child, &status, 0);
 	reset_terminal(pwd);
 	snprintf(cmd, sizeof(cmd),
-	"exec xinit %s%s -- %s %s %s -auth %s", xinitrc ? "" : "/usr/bin/",
+	"exec xinit %s %s%s -- %s %s %s -auth %s",
+	LY_CMD_XSETUP,
+	xinitrc ? "" : "/usr/bin/",
 	de_command, LY_CMD_X,
 	display_name, vt, getenv("XAUTHORITY"));
 	execve(pwd->pw_shell, argv, environ);
