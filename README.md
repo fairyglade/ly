@@ -44,6 +44,14 @@ disable getty on Ly's tty to prevent "login" from spawning on top of it:
 ```
 sudo systemctl disable getty@tty2.service
 ```
+If messages from other services pops-up over the login prompt, you have to edit the service in order to run it last. In order to do this, simply edit the following file:
+```
+/usr/lib/systemd/system/ly.service
+```
+Just under the "After getty", add another one with your last-launching service. Example on my computer:
+```
+After=tlp.service
+```
 
 ### Controls
 Use the up and down arrow keys to change the current field, and the
