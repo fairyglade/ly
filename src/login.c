@@ -463,7 +463,7 @@ int xinitrc)
 	pid_t child;
 	int status;
 	char cmd[LY_LIM_CMD];
-	char* argv[] = {pwd->pw_shell, "-c", cmd, NULL};
+	char* argv[] = {pwd->pw_shell, "-l", "-c", cmd, NULL};
 	extern char** environ;
 	/* updates cookie */
 	snprintf(cmd, sizeof(cmd), "exec xauth add %s . `%s`", display_name,
@@ -525,7 +525,6 @@ enum deserv_t display_server)
 	setenv("XDG_SESSION_CLASS", "user", 0);
 	setenv("XDG_SEAT", "seat0", 0);
 	setenv("XDG_VTNR", tty_id, 0);
-	setenv("XDG_RUNTIME_DIR", LY_PATH_RUNTIME_DIR, 0);
 	setenv("DISPLAY", display_name, 1);
 
 	switch(display_server)

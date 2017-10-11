@@ -34,7 +34,6 @@
 /* paths */
 #define LY_PATH "/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/env"
 #define LY_PATH_XSESSIONS "/usr/share/xsessions"
-#define LY_PATH_RUNTIME_DIR "/run/user/1000"
 
 /* console */
 #define LY_CONSOLE_DEV "/dev/console"
