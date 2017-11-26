@@ -12,7 +12,6 @@ INCD := src
 BIND := build
 OBJD := obj
 DEPD := dep
-LIBD := lib
 LIBS := -lform -lncurses -lpam -lpam_misc -lX11
 LIBSUSR = -L/usr/lib/security -l:pam_loginuid.so
 
@@ -25,7 +24,7 @@ OBJS := $(patsubst $(SRCD)/%.c,$(OBJD)/%.o,$(SRCS))
 DEPS := $(patsubst $(SRCD)/%.c,$(DEPD)/%.d,$(SRCS))
 
 CXXFLAGS := -Wall -g -I$(INCD)
-LDDFLAGS := -L$(LIBD) $(LIBS)
+LDDFLAGS := $(LIBS)
 
 .PHONY: all install uninstall clean distclean
 .PRECIOUS: $(DEPD)/%.d
