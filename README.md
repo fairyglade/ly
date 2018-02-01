@@ -12,6 +12,8 @@ Ly tries not to reinvent the wheel and uses linux-utils and xorg-xinit
 instead of providing heavy, incomplete and outdated implementations.
 Make sure all the following tools and libraries are available on your
 distribution before going further:
+- make
+- a c99 compiler
 - systemd
 - linux-pam
 - ncurses
