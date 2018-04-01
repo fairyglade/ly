@@ -30,7 +30,7 @@ void init_ncurses(FILE* desc)
 	ioctl(filedesc, VT_WAITACTIVE, LY_CONSOLE_TTY);
 	/* ncurses startup */
 	initscr();
-	cbreak();
+	raw();
 	noecho();
 }
 
