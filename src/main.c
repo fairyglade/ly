@@ -22,8 +22,7 @@
 #include "desktop.h"
 #include "ncui.h"
 
-#define KEY_ENTER_ASCII 10
-#define KEY_BACKSPACE_ASCII 127
+#define KEY_CTRL(c) ((c) & 0x1f)
 
 int main(void)
 {
@@ -86,7 +85,8 @@ int main(void)
 
 		switch(input_key)
 		{
-			case KEY_ENTER_ASCII:
+			case KEY_CTRL('J'): // Enter
+			case KEY_CTRL('M'): // Return
 				if(form.active == form.fields[4])
 				{
 					/* checks for buffer errors */
@@ -140,16 +140,20 @@ int main(void)
 				}
 
 			case KEY_DOWN:
+			case KEY_CTRL('I'): // Tab
+			case KEY_CTRL('N'):
 				form_driver(form.form, REQ_NEXT_FIELD);
 				form_driver(form.form, REQ_END_LINE);
 				break;
 
 			case KEY_UP:
+			case KEY_CTRL('P'):
 				form_driver(form.form, REQ_PREV_FIELD);
 				form_driver(form.form, REQ_END_LINE);
 				break;
 
 			case KEY_RIGHT:
+			case KEY_CTRL('F'):
 				if(form.active == form.fields[0])
 				{
 					de_id = ((de_id + 1) == de_count) ? 0 : de_id + 1;
@@ -163,6 +167,7 @@ int main(void)
 				break;
 
 			case KEY_LEFT:
+			case KEY_CTRL('B'):
 				if(form.active == form.fields[0])
 				{
 					de_id = (de_id == 0) ? (de_count - 1) : de_id - 1;
@@ -175,14 +180,27 @@ int main(void)
 
 				break;
 
-			case KEY_BACKSPACE_ASCII:
 			case KEY_BACKSPACE:
+			case KEY_CTRL('H'): // Backspace
 				form_driver(form.form, REQ_DEL_PREV);
-				form_driver(form.form, REQ_END_LINE);
 				break;
 
 			case KEY_DC:
+			case KEY_CTRL('D'):
 				form_driver(form.form, REQ_DEL_CHAR);
+				break;
+
+			case KEY_CTRL('C'):
+			case KEY_CTRL('U'):
+				form_driver(form.form, REQ_CLR_FIELD);
+				break;
+
+			case KEY_CTRL('A'):
+				form_driver(form.form, REQ_BEG_LINE);
+				break;
+
+			case KEY_CTRL('E'):
+				form_driver(form.form, REQ_END_LINE);
 				break;
 
 			case KEY_F(1):
