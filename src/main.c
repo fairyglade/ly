@@ -21,6 +21,7 @@
 #include "desktop.h"
 #include "ncui.h"
 
+#define KEY_TAB_ASCII 8
 #define KEY_ENTER_ASCII 10
 #define KEY_BACKSPACE_ASCII 127
 
@@ -135,11 +136,13 @@ int main(void)
 					break;
 				}
 
+			case KEY_TAB_ASCII:
 			case KEY_DOWN:
 				form_driver(form.form, REQ_NEXT_FIELD);
 				form_driver(form.form, REQ_END_LINE);
 				break;
 
+			case KEY_BTAB:
 			case KEY_UP:
 				form_driver(form.form, REQ_PREV_FIELD);
 				form_driver(form.form, REQ_END_LINE);
