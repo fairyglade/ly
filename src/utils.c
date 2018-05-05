@@ -20,22 +20,29 @@ void kernel_log(int mode)
 	pid_t pid;
 	int status;
 	pid = fork();
+	if(pid < 0) {
+		perror("fork");
+		exit(1);
+	}
 
 	if(pid == 0)
 	{
 		if(mode)
 		{
-			execl("dmesg", "-E", NULL);
+			execl("/bin/dmesg", "/bin/dmesg", "-E", NULL);
 		}
 		else
 		{
-			execl("dmesg", "-D", NULL);
+			execl("/bin/dmesg", "/bin/dmesg", "-D", NULL);
 		}
-
-		exit(0);
+		/* execl should not return */
+		perror("execl");
+		exit(1);
 	}
 
 	waitpid(pid, &status, 0);
+	if(!WIFEXITED(status) || WEXITSTATUS(status))
+		exit(1);
 }
 
 char* trim(char* s)
