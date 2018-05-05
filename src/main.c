@@ -9,7 +9,6 @@
 #include <sys/ioctl.h>
 #include <linux/vt.h>
 #include <unistd.h>
-#include <signal.h>
 /* ncurses */
 #include <form.h>
 /* pam */
@@ -46,9 +45,6 @@ int main(void)
 	char* username;
 	char* password;
 	char* cmd;
-	/* prevents CTRL+C from killing the process */
-	signal(SIGINT, SIG_IGN);
-	signal(SIGHUP, SIG_IGN);
 	/* gets desktop entries */
 	de_list = list_de();
 	de_props = de_list->props;
