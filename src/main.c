@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE
 
 /* stdlib */
+#include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 /* linux */
@@ -102,6 +103,7 @@ int main(void)
 					/* saves the username and DE if enabled */
 					if(LY_CFG_WRITE_SAVE)
 					{
+						assert(LY_CFG_SAVE);
 						FILE* file = fopen(LY_CFG_SAVE, "ab+");
 						file = fopen(LY_CFG_SAVE, "wb");
 						fprintf(file, "%s\n%d", username, de_id);
