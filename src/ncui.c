@@ -107,6 +107,7 @@ void init_form(struct ncform* form, char** list, int max_de, int* de_id)
 	form->fields[5] = NULL;
 	/* generates the form */
 	form->form = new_form(form->fields);
+	form_opts_off(form->form, O_BS_OVERLOAD);
 	scale_form(form->form, &(form->height), &(form->width));
 }
 
