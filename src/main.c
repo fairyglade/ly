@@ -60,7 +60,7 @@ int main(void)
 	{
 		fprintf(stderr, "%s\n", LY_ERR_FD_CONSOLE);
 		fprintf(stderr, "%s\n", LY_ERR_FD_CONSOLE_ADVICE);
-		return 0;
+		return EXIT_FAILURE;
 	}
 
 	/* create LY_CFG_SAVE if it doesn't exist yet */
@@ -68,7 +68,7 @@ int main(void)
 	if (!cfg_save)
 	{
 		fprintf(stderr, "%s: %s\n", LY_ERR_FD_CFG_SAVE, LY_CFG_SAVE);
-		return 0;
+		return EXIT_FAILURE;
 	}
 	fclose(cfg_save);
 
@@ -217,5 +217,5 @@ int main(void)
 	free_list(de_list);
 	end_form(&form);
 	endwin();
-	return 0;
+	return EXIT_SUCCESS;
 }

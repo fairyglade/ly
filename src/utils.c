@@ -22,7 +22,7 @@ void kernel_log(int mode)
 	pid = fork();
 	if(pid < 0) {
 		perror("fork");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	if(pid == 0)
@@ -37,12 +37,12 @@ void kernel_log(int mode)
 		}
 		/* execl should not return */
 		perror("execl");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	waitpid(pid, &status, 0);
 	if(!WIFEXITED(status) || WEXITSTATUS(status))
-		exit(1);
+		exit(EXIT_FAILURE);
 }
 
 char* trim(char* s)
