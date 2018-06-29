@@ -13,8 +13,9 @@
 #define LY_LANG_PASSWORD "password : "
 
 /* ioctl */
-#define LY_ERR_FD "Failed to create the console file descriptor"
-#define LY_ERR_FD_ADVICE "(ly probably wasn't run with enough privileges)"
+#define LY_ERR_FD_CONSOLE "Failed to create the console file descriptor"
+#define LY_ERR_FD_CONSOLE_ADVICE "(ly probably wasn't run with enough privileges)"
+#define LY_ERR_FD_CFG_SAVE "Failed to create the config file"
 
 /* pam */
 #define LY_ERR_PAM_BUF "Memory buffer error"

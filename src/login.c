@@ -370,7 +370,7 @@ const char* de_command, enum deserv_t display_server)
 				break;
 		}
 
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 
 	/* waits for the de/shell to exit */
@@ -477,7 +477,7 @@ int xinitrc)
 	if(child == 0)
 	{
 		execl(pwd->pw_shell, pwd->pw_shell, "-c", cmd, NULL);
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 
 	waitpid(child, &status, 0);
@@ -489,7 +489,7 @@ int xinitrc)
 	de_command, LY_CMD_X,
 	display_name, vt, getenv("XAUTHORITY"));
 	execve(pwd->pw_shell, argv, environ);
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 void launch_wayland(struct passwd* pwd, pam_handle_t* pam_handle,
@@ -507,7 +507,7 @@ void launch_shell(struct passwd* pwd, pam_handle_t* pam_handle)
 	strncpy(args + 1, ((pos = strrchr(pwd->pw_shell,
 	'/')) ? pos + 1 : pwd->pw_shell), sizeof(args) - 1);
 	execl(pwd->pw_shell, args, NULL);
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 void destroy_env(void)
@@ -594,7 +594,7 @@ void reset_terminal(struct passwd* pwd)
 	if(pid == 0)
 	{
 		execl(pwd->pw_shell, pwd->pw_shell, "-c", cmd, NULL);
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 
 	waitpid(pid, &status, 0);

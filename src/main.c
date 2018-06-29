@@ -58,10 +58,19 @@ int main(void)
 
 	if(!console)
 	{
-		fprintf(stderr, "%s\n", LY_ERR_FD);
-		fprintf(stderr, "%s\n", LY_ERR_FD_ADVICE);
-		return 0;
+		fprintf(stderr, "%s\n", LY_ERR_FD_CONSOLE);
+		fprintf(stderr, "%s\n", LY_ERR_FD_CONSOLE_ADVICE);
+		return EXIT_FAILURE;
 	}
+
+	/* create LY_CFG_SAVE if it doesn't exist yet */
+	FILE* cfg_save = fopen(LY_CFG_SAVE, "ab+");
+	if (!cfg_save)
+	{
+		fprintf(stderr, "%s: %s\n", LY_ERR_FD_CFG_SAVE, LY_CFG_SAVE);
+		return EXIT_FAILURE;
+	}
+	fclose(cfg_save);
 
 	kernel_log(0);
 	/* initializes ncurses UI */
@@ -102,8 +111,7 @@ int main(void)
 					/* saves the username and DE if enabled */
 					if(LY_CFG_WRITE_SAVE)
 					{
-						FILE* file = fopen(LY_CFG_SAVE, "ab+");
-						file = fopen(LY_CFG_SAVE, "wb");
+						FILE* file = fopen(LY_CFG_SAVE, "wb");
 						fprintf(file, "%s\n%d", username, de_id);
 						fclose(file);
 					}
@@ -209,5 +217,5 @@ int main(void)
 	free_list(de_list);
 	end_form(&form);
 	endwin();
-	return 0;
+	return EXIT_SUCCESS;
 }

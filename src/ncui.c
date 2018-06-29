@@ -40,9 +40,7 @@ void init_form(struct ncform* form, char** list, int max_de, int* de_id)
 	char line[LY_LIM_LINE_FILE];
 	char user[LY_LIM_LINE_FILE];
 	int de;
-	/* creates the file if it can't be found */
-	file = fopen(LY_CFG_SAVE, "ab+");
-	fclose(file);
+
 	/* opens the file */
 	file = fopen(LY_CFG_SAVE, "rb");
 	memset(user, '\0', LY_LIM_LINE_FILE);
