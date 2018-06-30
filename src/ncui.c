@@ -39,7 +39,10 @@ void init_form(struct ncform* form, char** list, int max_de, int* de_id)
 	FILE* file;
 	char line[LY_LIM_LINE_FILE];
 	char user[LY_LIM_LINE_FILE];
+	char* arrow_left;
+	char arrow_right[3] = " >";
 	int de;
+	int i;
 
 	/* opens the file */
 	file = fopen(LY_CFG_SAVE, "rb");
@@ -63,46 +66,66 @@ void init_form(struct ncform* form, char** list, int max_de, int* de_id)
 	fclose(file);
 	/* computes input padding from labels text */
 	form->label_pad = max(strlen(LY_LANG_LOGIN), strlen(LY_LANG_PASSWORD));
+	arrow_left = malloc((form->label_pad + 1) * (sizeof (char)));
+	/* adds the left arrow */
+	i = 0;
+	form->fields[i] = new_field(1, form->label_pad, 0, 0, 0, 0);
+	memset(arrow_left, ' ', form->label_pad);
+	arrow_left[form->label_pad - 2] = '<';
+	arrow_left[form->label_pad] = '\0';
+	set_field_buffer(form->fields[i], 0, arrow_left);
+	set_field_opts(form->fields[i], O_VISIBLE | O_PUBLIC | O_AUTOSKIP);
 	/* DE list */
-	form->fields[0] = new_field(1, 32, 0, form->label_pad, 0, 0);
-	set_field_type(form->fields[0], TYPE_ENUM, list);
+	++i;
+	form->fields[i] = new_field(1, 32, 0, form->label_pad, 0, 0);
+	set_field_type(form->fields[i], TYPE_ENUM, list);
 
 	if(de < max_de)
 	{
-		set_field_buffer(form->fields[0], 0, list[de]);
+		set_field_buffer(form->fields[i], 0, list[de]);
 		*de_id = de;
 	}
 	else
 	{
-		set_field_buffer(form->fields[0], 0, list[0]);
+		set_field_buffer(form->fields[i], 0, list[0]);
 		*de_id = 0;
 	}
 
-	set_field_opts(form->fields[0],
+	set_field_opts(form->fields[i],
 	O_VISIBLE | O_PUBLIC | O_EDIT | O_ACTIVE);
+	/* adds the right arrow */
+	++i;
+	form->fields[i] = new_field(1, 2, 0, form->label_pad + 32, 0, 0);
+	set_field_buffer(form->fields[i], 0, arrow_right);
+	set_field_opts(form->fields[i], O_VISIBLE | O_PUBLIC | O_AUTOSKIP);
 	/* login label */
-	form->fields[1] = new_field(1, form->label_pad, 2, 0, 0, 0);
-	set_field_buffer(form->fields[1], 0, LY_LANG_LOGIN);
-	set_field_opts(form->fields[1], O_VISIBLE | O_PUBLIC | O_AUTOSKIP);
+	++i;
+	form->fields[i] = new_field(1, form->label_pad, 2, 0, 0, 0);
+	set_field_buffer(form->fields[i], 0, LY_LANG_LOGIN);
+	set_field_opts(form->fields[i], O_VISIBLE | O_PUBLIC | O_AUTOSKIP);
 	/* login field */
-	form->fields[2] = new_field(1, 32, 2, form->label_pad, 0, 0);
+	++i;
+	form->fields[i] = new_field(1, 32, 2, form->label_pad, 0, 0);
 
 	if(*user)
 	{
-		set_field_buffer(form->fields[2], 0, user);
+		set_field_buffer(form->fields[i], 0, user);
 	}
 
-	set_field_opts(form->fields[2],
+	set_field_opts(form->fields[i],
 	O_VISIBLE | O_PUBLIC | O_EDIT | O_ACTIVE);
 	/* password label */
-	form->fields[3] = new_field(1, form->label_pad, 4, 0, 0, 0);
-	set_field_buffer(form->fields[3], 0, LY_LANG_PASSWORD);
-	set_field_opts(form->fields[3], O_VISIBLE | O_PUBLIC | O_AUTOSKIP);
+	++i;
+	form->fields[i] = new_field(1, form->label_pad, 4, 0, 0, 0);
+	set_field_buffer(form->fields[i], 0, LY_LANG_PASSWORD);
+	set_field_opts(form->fields[i], O_VISIBLE | O_PUBLIC | O_AUTOSKIP);
 	/* password field */
-	form->fields[4] = new_field(1, 32, 4, form->label_pad, 0, 0);
-	set_field_opts(form->fields[4], O_VISIBLE | O_EDIT | O_ACTIVE);
+	++i;
+	form->fields[i] = new_field(1, 32, 4, form->label_pad, 0, 0);
+	set_field_opts(form->fields[i], O_VISIBLE | O_EDIT | O_ACTIVE);
 	/* bound */
-	form->fields[5] = NULL;
+	++i;
+	form->fields[i] = NULL;
 	/* generates the form */
 	form->form = new_form(form->fields);
 	form_opts_off(form->form, O_BS_OVERLOAD);
@@ -162,4 +185,6 @@ void end_form(struct ncform* form)
 	free_field(form->fields[2]);
 	free_field(form->fields[3]);
 	free_field(form->fields[4]);
+	free_field(form->fields[5]);
+	free_field(form->fields[6]);
 }

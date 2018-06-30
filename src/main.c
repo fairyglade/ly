@@ -83,7 +83,7 @@ int main(void)
 	/* enables insertion mode */
 	form_driver(form.form, REQ_INS_MODE);
 	/* makes the password field active by default */
-	set_current_field(form.form, form.fields[4]);
+	set_current_field(form.form, form.fields[6]);
 	form_driver(form.form, REQ_END_LINE);
 
 	while((input_key = wgetch(win.win)))
@@ -93,7 +93,7 @@ int main(void)
 		switch(input_key)
 		{
 			case KEY_ENTER_ASCII:
-				if(form.active == form.fields[4])
+				if(form.active == form.fields[6])
 				{
 					/* checks for buffer errors */
 					if(form_driver(form.form, REQ_VALIDATION) != E_OK)
@@ -103,8 +103,8 @@ int main(void)
 					}
 
 					/* stores the user inputs in processing buffers */
-					username = trim(field_buffer(form.fields[2], 0));
-					password = trim(field_buffer(form.fields[4], 0));
+					username = trim(field_buffer(form.fields[4], 0));
+					password = trim(field_buffer(form.fields[6], 0));
 					cmd = de_props[de_id].cmd;
 					type = de_props[de_id].type;
 
@@ -119,7 +119,7 @@ int main(void)
 					/* logs in and suspends ncurses mode if successful */
 					fail = start_env(username, password, cmd, type);
 					/* clears the password */
-					set_field_buffer(form.fields[4], 0, "");
+					set_field_buffer(form.fields[6], 0, "");
 
 					if(fail)
 					{
@@ -133,14 +133,14 @@ int main(void)
 					else if(LY_CFG_CLR_USR)
 					{
 						/* clears the username */
-						set_field_buffer(form.fields[2], 0, "");
+						set_field_buffer(form.fields[4], 0, "");
 						/* sets cursor to the login field */
-						set_current_field(form.form, form.fields[2]);
+						set_current_field(form.form, form.fields[4]);
 						break;
 					}
 
 					/* sets cursor to the password field */
-					set_current_field(form.form, form.fields[4]);
+					set_current_field(form.form, form.fields[6]);
 					break;
 				}
 
@@ -157,7 +157,7 @@ int main(void)
 				break;
 
 			case KEY_RIGHT:
-				if(form.active == form.fields[0])
+				if(form.active == form.fields[1])
 				{
 					de_id = ((de_id + 1) == de_count) ? 0 : de_id + 1;
 					form_driver(form.form, REQ_NEXT_CHOICE);
@@ -170,7 +170,7 @@ int main(void)
 				break;
 
 			case KEY_LEFT:
-				if(form.active == form.fields[0])
+				if(form.active == form.fields[1])
 				{
 					de_id = (de_id == 0) ? (de_count - 1) : de_id - 1;
 					form_driver(form.form, REQ_PREV_CHOICE);

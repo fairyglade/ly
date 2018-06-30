@@ -16,7 +16,7 @@ struct ncwin
 struct ncform
 {
 	FORM* form;
-	FIELD* fields[6];
+	FIELD* fields[8];
 	FIELD* active;
 	int height;
 	int width;
