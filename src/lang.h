@@ -2,7 +2,6 @@
 #define _LANG_H_
 
 /* UI strings */
-#define LY_LANG_GREETING "Welcome to ly !"
 #define LY_LANG_VALID_CREDS "Logged In"
 #define LY_LANG_LOGOUT "Logged out"
 #define LY_LANG_SHELL "shell"

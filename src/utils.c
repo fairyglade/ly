@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE 500
-
+#define _DEFAULT_SOURCE
+#define _POSIX_C_SOURCE 200809L
 /* std lib */
 #include <string.h>
 #include <stdlib.h>
@@ -14,6 +15,11 @@
 #include <ctype.h>
 #include <time.h>
 #include <unistd.h>
+/* sockets */
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 void kernel_log(int mode)
 {
@@ -56,6 +62,36 @@ char* trim(char* s)
 
 	*(end + 1) = '\0';
 	return s;
+}
+
+
+
+void hostname(char** out) {
+	struct addrinfo hints;
+	struct addrinfo *info;
+	char hostname[1024];
+	char* dot;
+	int result;
+
+	hostname[1023] = '\0';
+	gethostname(hostname, 1023);
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_CANONNAME;
+	result = getaddrinfo(hostname, "http", &hints, &info);
+
+	if(result == 0 && info != NULL)
+	{
+		dot = strchr(info->ai_canonname, '.');
+		*out = strndup(info->ai_canonname, dot - info->ai_canonname);
+	}
+	else
+	{
+		*out = strdup("");
+	}
+
+	freeaddrinfo(info);
 }
 
 void error_init(WINDOW* win, int width, const char* s)

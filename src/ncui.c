@@ -160,10 +160,12 @@ void init_scene(struct ncwin* win, struct ncform* form)
 void init_draw(struct ncwin* win, struct ncform* form)
 {
 	char line[LY_LIM_LINE_CONSOLE];
+	char *greeting;
 	/* frame */
 	box(win->win, 0, 0);
 	/* initializes error output and prints greeting message */
-	error_init(win->win, win->width, LY_LANG_GREETING);
+	hostname(&greeting);
+	error_init(win->win, win->width, greeting);
 	/* prints shutdown & reboot hints */
 	snprintf(line, sizeof(line), "F1 %s    F2 %s", LY_LANG_SHUTDOWN,
 	LY_LANG_REBOOT);
@@ -174,6 +176,7 @@ void init_draw(struct ncwin* win, struct ncform* form)
 	post_form(form->form);
 	/* dumps window buffer */
 	wrefresh(win->win);
+	free(greeting);
 }
 
 void end_form(struct ncform* form)
