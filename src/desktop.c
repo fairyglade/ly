@@ -11,8 +11,8 @@
 #define LY_XSESSION_EXEC "Exec="
 #define LY_XSESSION_NAME "Name="
 
-/* returns a list containing all the DE for all the display servers */
-struct delist_t* list_de(void)
+// searches a folder
+void get_desktops(char* sessions_dir, struct delist_t* list, int* remote_count, short x)
 {
 	/* xsession */
 	FILE* file;
@@ -22,18 +22,17 @@ struct delist_t* list_de(void)
 	char path[LY_LIM_PATH];
 	char* name;
 	char* command;
-	/* de list */
-	int count = 2;
-	struct delist_t* list = init_list(count);
+	int count = *remote_count;
+
 	/* reads xorg's desktop environments entries */
-	dir = opendir(LY_PATH_XSESSIONS);
+	dir = opendir(sessions_dir);
 
 	/* exits if the folder can't be read */
 	if(!dir)
 	{
 		error_print(LY_ERR_DELIST);
 		end_list(list, count);
-		return NULL;
+		return;
 	}
 
 	/* cycles through the folder */
@@ -46,7 +45,7 @@ struct delist_t* list_de(void)
 		}
 
 		/* opens xsession file */
-		snprintf(path, sizeof(path), "%s/%s", LY_PATH_XSESSIONS,
+		snprintf(path, sizeof(path), "%s/%s", sessions_dir,
 		dir_info->d_name);
 		file = fopen(path, "r");
 
@@ -77,12 +76,24 @@ struct delist_t* list_de(void)
 		list->props = realloc(list->props,
 		(count + 1) * (sizeof * (list->props)));
 		list->props[count].cmd = command;
-		list->props[count].type = xorg;
+		list->props[count].type = x ? xorg : wayland;
 		++count;
 		fclose(file);
 	}
 
 	closedir(dir);
+	*remote_count = count;
+}
+
+/* returns a list containing all the DE for all the display servers */
+struct delist_t* list_de(void)
+{
+	/* de list */
+	int count = 2;
+	struct delist_t* list = init_list(count);
+
+	get_desktops(LY_PATH_XSESSIONS, list, &count, true);
+	get_desktops(LY_PATH_WSESSIONS, list, &count, false);
 	end_list(list, count);
 	return list;
 }

@@ -495,7 +495,13 @@ int xinitrc)
 void launch_wayland(struct passwd* pwd, pam_handle_t* pam_handle,
 const char* de_command)
 {
-	exit(EXIT_FAILURE);
+	char cmd[32];
+	extern char** environ;
+	char* argv[] = {pwd->pw_shell, "-l", "-c", cmd, NULL};
+	snprintf(cmd, 32, "exec %s", de_command);
+	reset_terminal(pwd);
+	execve(pwd->pw_shell, argv, environ);
+	exit(EXIT_SUCCESS);
 }
 
 void launch_shell(struct passwd* pwd, pam_handle_t* pam_handle)

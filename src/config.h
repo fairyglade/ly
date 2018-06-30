@@ -34,6 +34,7 @@
 /* paths */
 #define LY_PATH "/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/env"
 #define LY_PATH_XSESSIONS "/usr/share/xsessions"
+#define LY_PATH_WSESSIONS "/usr/share/wayland-sessions"
 
 /* console */
 #define LY_CONSOLE_DEV "/dev/console"
