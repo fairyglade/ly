@@ -92,7 +92,7 @@ void init_form(struct ncform* form, char** list, int max_de, int* de_id)
 	}
 
 	set_field_opts(form->fields[i],
-	O_VISIBLE | O_PUBLIC | O_EDIT | O_ACTIVE);
+	O_VISIBLE | O_PUBLIC | O_ACTIVE);
 	/* adds the right arrow */
 	++i;
 	form->fields[i] = new_field(1, 2, 0, form->label_pad + 32, 0, 0);
