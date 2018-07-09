@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "lang.h"
 #include "config.h"
@@ -12,7 +13,7 @@
 #define LY_XSESSION_NAME "Name="
 
 // searches a folder
-void get_desktops(char* sessions_dir, struct delist_t* list, int* remote_count, short x)
+short get_desktops(char* sessions_dir, struct delist_t* list, int* remote_count, short x)
 {
 	/* xsession */
 	FILE* file;
@@ -24,6 +25,11 @@ void get_desktops(char* sessions_dir, struct delist_t* list, int* remote_count, 
 	char* command;
 	int count = *remote_count;
 
+	if(access(sessions_dir, F_OK) == -1 )
+	{
+		return -1;
+	}
+
 	/* reads xorg's desktop environments entries */
 	dir = opendir(sessions_dir);
 
@@ -32,7 +38,7 @@ void get_desktops(char* sessions_dir, struct delist_t* list, int* remote_count, 
 	{
 		error_print(LY_ERR_DELIST);
 		end_list(list, count);
-		return;
+		return -2;
 	}
 
 	/* cycles through the folder */
@@ -83,6 +89,8 @@ void get_desktops(char* sessions_dir, struct delist_t* list, int* remote_count, 
 
 	closedir(dir);
 	*remote_count = count;
+
+	return 0;
 }
 
 /* returns a list containing all the DE for all the display servers */
@@ -90,10 +98,23 @@ struct delist_t* list_de(void)
 {
 	/* de list */
 	int count = 2;
+	short errors = 0;
 	struct delist_t* list = init_list(count);
 
-	get_desktops(LY_PATH_XSESSIONS, list, &count, true);
-	get_desktops(LY_PATH_WSESSIONS, list, &count, false);
+	if(get_desktops(LY_PATH_XSESSIONS, list, &count, true) != 0)
+	{
+		++errors;
+	}
+
+	if(get_desktops(LY_PATH_WSESSIONS, list, &count, false))
+	{
+		++errors;
+	}
+
+	if(errors > 1) {
+		return NULL;
+	}
+
 	end_list(list, count);
 	return list;
 }

@@ -48,6 +48,11 @@ int main(void)
 	char* cmd;
 	/* gets desktop entries */
 	de_list = list_de();
+
+	if(de_list == NULL) {
+		return EXIT_FAILURE;
+	}
+
 	de_props = de_list->props;
 	de_names = de_list->names;
 	de_count = de_list->count;
