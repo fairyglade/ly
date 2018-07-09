@@ -1,6 +1,6 @@
 ### Ly - ncurses display manager - v0.0.1
 
-![ly screenshot](https://cloud.githubusercontent.com/assets/5473047/26368771/ef4aa91a-3ff2-11e7-8f3e-1b3e3ea67e49.png "ly on st")
+![ly screenshot](https://user-images.githubusercontent.com/5473047/42466218-8cb53d3c-83ae-11e8-8e53-bae3669f959c.png "ly on st")
 
 This is a lightweight login/display manager for linux made with ncurses.
 It is based on linux-pam and systemd and was developped in good old C99.
