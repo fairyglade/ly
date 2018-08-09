@@ -1,4 +1,4 @@
-### Ly - ncurses display manager - v0.0.1
+### Ly - ncurses display manager
 
 ![ly screenshot](https://user-images.githubusercontent.com/5473047/42466218-8cb53d3c-83ae-11e8-8e53-bae3669f959c.png "ly on st")
 
