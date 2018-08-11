@@ -91,7 +91,7 @@ int main(void)
 	set_current_field(form.form, form.fields[6]);
 	form_driver(form.form, REQ_END_LINE);
 
-	while((input_key = wgetch(win.win)))
+	while((input_key = wgetch(win.win)) != ERR)
 	{
 		form.active = current_field(form.form);
 
