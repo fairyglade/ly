@@ -2,6 +2,7 @@
 Description=ly ncurses display manager
 After=systemd-user-sessions.service plymouth-quit-wait.service
 After=getty@tty2.service
+After=multi-user.target
 
 [Service]
 Type=simple
