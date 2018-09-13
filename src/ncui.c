@@ -15,6 +15,8 @@
 #include "config.h"
 #include "utils.h"
 
+extern int ly_console_tty;
+
 size_t max(size_t a, size_t b)
 {
 	return (a > b) ? a : b;
@@ -26,8 +28,8 @@ void init_ncurses(FILE* desc)
 	/* required for ncurses */
 	putenv(LY_CONSOLE_TERM);
 	/* switches tty */
-	ioctl(filedesc, VT_ACTIVATE, LY_CONSOLE_TTY);
-	ioctl(filedesc, VT_WAITACTIVE, LY_CONSOLE_TTY);
+	ioctl(filedesc, VT_ACTIVATE, ly_console_tty);
+	ioctl(filedesc, VT_WAITACTIVE, ly_console_tty);
 	/* ncurses startup */
 	initscr();
 	raw();

@@ -33,6 +33,8 @@
 #include "login.h"
 #include "desktop.h"
 
+extern int ly_console_tty;
+
 int login_conv(int num_msg, const struct pam_message** msg,
 struct pam_response** resp, void* appdata_ptr)
 {
@@ -105,8 +107,8 @@ const char* de_command, enum deserv_t display_server)
 	destroy_env();
 	display_id = get_free_display();
 	snprintf(display_name, sizeof(display_name), ":%d", display_id);
-	snprintf(tty_id, sizeof(tty_id), "%d", LY_CONSOLE_TTY);
-	snprintf(vt, sizeof(vt), "vt%d", LY_CONSOLE_TTY);
+	snprintf(tty_id, sizeof(tty_id), "%d", ly_console_tty);
+	snprintf(vt, sizeof(vt), "vt%d", ly_console_tty);
 	init_xdg(tty_id, display_name, display_server);
 	/* pam_start and error handling */
 	pam_result = pam_start(LY_SERVICE_NAME, username, &conv, &login_handle);
