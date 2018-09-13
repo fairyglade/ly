@@ -25,6 +25,8 @@
 #define KEY_ENTER_ASCII 10
 #define KEY_BACKSPACE_ASCII 127
 
+int ly_console_tty;
+
 int main(void)
 {
 	FILE* console;
@@ -78,6 +80,23 @@ int main(void)
 	fclose(cfg_save);
 
 	kernel_log(0);
+	/* try to get console tty from environment */
+	{
+		char *console_tty_env;
+		console_tty_env = getenv("LY_CONSOLE_TTY");
+		if(console_tty_env){
+			ly_console_tty = atoi(console_tty_env);
+			if((ly_console_tty < 1) || (ly_console_tty > 99)){
+				/* Invalid value of the environment variable; defaults is used */
+				ly_console_tty = LY_CONSOLE_TTY;
+				fprintf(stderr, "LY_CONSOLE_TTY has invalid value, use default tty %d\n", ly_console_tty);
+			}
+		} else {
+			/* environment not defined */
+			ly_console_tty = LY_CONSOLE_TTY;
+			fprintf(stderr, "LY_CONSOLE_TTY not defined, use default tty %d\n", ly_console_tty);
+		}
+	}
 	/* initializes ncurses UI */
 	init_ncurses(console);
 	init_form(&form, de_names, de_count, &de_id);
