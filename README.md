@@ -2,7 +2,7 @@
 
 ![ly screenshot](https://user-images.githubusercontent.com/5473047/42466218-8cb53d3c-83ae-11e8-8e53-bae3669f959c.png "ly on st")
 
-This is a lightweight login/display manager for linux made with ncurses.
+This is a lightweight login/display manager for Linux made with ncurses.
 It is based on linux-pam and systemd and was developped in good old C99.
 This program was designed to be simple, modular and highly configurable.
 Ly was made for crazy people. If you're not insane, run away.
