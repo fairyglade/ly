@@ -23,7 +23,7 @@
 #define LY_CFG_FMAX 100
 
 /* commands */
-#define LY_CMD_X "/usr/bin/X"
+#define LY_CMD_X "/usr/bin/X -keeptty > ~/.xorg.log 2>&1"
 #define LY_CMD_TPUT "/usr/bin/tput"
 #define LY_CMD_HALT "/sbin/shutdown"
 #define LY_CMD_XINITRC "~/.xinitrc"
