@@ -1,0 +1,6 @@
+[submodule "sub/inih"]
+	path = sub/inih
+	url = https://github.com/benhoyt/inih.git
+[submodule "sub/termbox-next"]
+	path = sub/termbox-next
+	url = https://github.com/cylgom/termbox-next.git
