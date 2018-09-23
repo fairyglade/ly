@@ -1,5 +1,5 @@
 ### Ly - a TUI display manager
-
+[![CodeFactor](https://www.codefactor.io/repository/github/cylgom/ly/badge/master)](https://www.codefactor.io/repository/github/cylgom/ly/overview/master)
 ![ly screenshot](https://user-images.githubusercontent.com/5473047/42466218-8cb53d3c-83ae-11e8-8e53-bae3669f959c.png "ly on st")
 
 Ly is a lightweight, TUI (ncurses-like) display manager for linux.
