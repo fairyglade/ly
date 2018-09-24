@@ -60,7 +60,7 @@ force_update=1
 
 ### Configuration
 All the configuration takes place in `/etc/ly/config.ini`.
-A complete reference is available on the wiki.
+The file is commented, and includes useful defaults.
 
 ### Controls
 Use the up and down arrow keys to change the current field, and the
@@ -70,6 +70,8 @@ while on the desktop field (above the login field).
 ### Tips
 The numlock and capslock state is printed in the top-right corner.
 Use the F1 and F2 keys to respectively shutdown and reboot.
+Take a look at your .xsession if X doesn't start, as it can interfere
+(this filed is launched with X to configure the display properly).
 
 ### Additionnal informations
 The name "Ly" is a tribute to the fairy from the game Rayman.

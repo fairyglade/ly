@@ -369,10 +369,6 @@ int config_config_handler(void* user, const char* section, const char* name, con
 		{
 			cfg_dup(&config.service_name, value);
 		}
-		else if (strcmp(name, "tty_id") == 0)
-		{
-			config.tty_id = abs(atoi(value));
-		}
 		else if (strcmp(name, "x_cmd") == 0)
 		{
 			cfg_dup(&config.x_cmd, value);
@@ -508,23 +504,6 @@ void config_config_patch()
 	{
 		config.min_refresh_delta = 1000;
 	}
-
-	// commenting theses because the defaults are 0
-	//#if 0
-		if (config.blank_box == 0)
-		{
-			config.blank_box = false;
-		}
-		if (config.force_update == 0)
-		{
-			config.force_update = false;
-		}
-		if (config.animate == 0)
-		{
-			config.animate = 0;
-		}
-	//#endif
-
 	if (config.xsessions == 0)
 	{
 		config.xsessions = strdup("/usr/share/xsessions");
@@ -532,10 +511,6 @@ void config_config_patch()
 	if (config.service_name == 0)
 	{
 		config.service_name = strdup("login");
-	}
-	if (config.tty_id == 0)
-	{
-		config.tty_id = 2;
 	}
 	if (config.x_cmd == 0)
 	{

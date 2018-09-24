@@ -273,8 +273,8 @@ enum err login_desktop(struct desktop* desktop,
 
 	display_id = get_free_display();
 	snprintf(display_name, sizeof(display_name), ":%d", display_id);
-	snprintf(tty_id, sizeof(tty_id), "%d", config.tty_id);
-	snprintf(vt, sizeof(vt), "vt%d", config.tty_id);
+	snprintf(tty_id, sizeof(tty_id), "%d", config.tty);
+	snprintf(vt, sizeof(vt), "vt%d", config.tty);
 
 	// starting pam transations
 	pam_result = pam_start(config.service_name, login->text, &conv, &handle);

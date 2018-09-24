@@ -63,7 +63,6 @@ struct config
 	u16 animate;
 	char* xsessions;
 	char* service_name;
-	u16 tty_id;
 	char* x_cmd;
 	char* x_cmd_setup;
 	char* mcookie_cmd;
