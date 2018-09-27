@@ -73,7 +73,7 @@ Use the F1 and F2 keys to respectively shutdown and reboot.
 Take a look at your .xsession if X doesn't start, as it can interfere
 (this filed is launched with X to configure the display properly).
 
-### Additionnal informations
+### Additional Information
 The name "Ly" is a tribute to the fairy from the game Rayman.
 Ly was tested by oxodao, who is some seriously awesome dude.
 I wish to thank linux-pam, X11 and systemd developers for not
