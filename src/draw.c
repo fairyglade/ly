@@ -1,4 +1,3 @@
-#define _XOPEN_SOURCE 700
 #include "draw.h"
 #include "cylgom.h"
 #include "termbox.h"

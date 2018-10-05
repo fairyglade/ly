@@ -1,4 +1,3 @@
-#define _XOPEN_SOURCE 700
 #include "util.h"
 #include "config.h"
 #include "widgets.h"

@@ -1,4 +1,3 @@
-#define _XOPEN_SOURCE 700
 #include "desktop.h"
 #include "cylgom.h"
 #include "ini.h"
