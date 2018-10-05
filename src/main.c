@@ -8,11 +8,33 @@
 #include "util.h"
 #include <unistd.h>
 #include <stdio.h>
+#include <string.h>
 
 enum active_input {INPUT_DESKTOP, INPUT_LOGIN, INPUT_PASSWORD};
 enum shutdown {SHUTDOWN_NO, SHUTDOWN_YES, SHUTDOWN_REBOOT};
 
-int main (int argc, char **argv)
+bool args(int argc, char** argv)
+{
+	char* arg;
+
+	while (argc > 0)
+	{
+		arg = argv[argc - 1];
+
+		if (strcmp(arg, "-v") == 0
+			|| strcmp(arg, "--version") == 0)
+		{
+			printf("ly version %s\n", GIT_VERSION_STRING);
+			return false;
+		}
+
+		--argc;
+	}
+
+	return true;
+}
+
+int main(int argc, char** argv)
 {
 	struct desktop desktop;
 	struct input login;
@@ -22,6 +44,11 @@ int main (int argc, char **argv)
 	enum active_input active_input;
 	enum err error = OK;
 	enum err status;
+
+	if (!args(argc, argv))
+	{
+		return 0;
+	}
 
 	void* input_structs[3] = 
 	{

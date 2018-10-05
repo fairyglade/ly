@@ -3,6 +3,7 @@ CC=gcc
 #CC=gcc -O3
 #CC=tcc
 FLAGS=-std=c99 -pedantic -Wall -Werror=vla -Werror -g
+FLAGS+=-DGIT_VERSION_STRING=\"$(shell git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g')\"
 
 OS:=$(shell uname -s)
 ifeq ($(OS),Linux)
