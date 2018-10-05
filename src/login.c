@@ -7,21 +7,21 @@
 #include <sys/types.h>
 #include <grp.h>
 #include <pwd.h>
+#include <paths.h>  /* _PATH_MAILDIR */
 #include <signal.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 #include <security/pam_appl.h>
-#include <security/pam_misc.h>
 
 #ifdef LY_SYSTEMD
 #define PAM_SYSTEMD
 #endif
-
-#include <security/pam_modules.h>
-#include <security/pam_modutil.h>
 
 int login_conv(int num_msg, const struct pam_message** msg,
 	struct pam_response** resp, void* appdata_ptr)

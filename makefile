@@ -16,7 +16,7 @@ OBJD=obj
 RESD=res
 LANG=$(RESD)/lang
 INCL=-I$(SRCD) -I$(SUBD)/termbox-next/src -I$(SUBD)/inih
-LINK=-lm -lpam -lpam_misc
+LINK=-lm -lpam
 
 SRCS=$(SRCD)/main.c
 SRCS+=$(SRCD)/draw.c
