@@ -23,12 +23,24 @@ void hostname(char** out)
 {
 	struct addrinfo hints;
 	struct addrinfo* info;
-	char hostname[HOST_NAME_MAX + 1];
+	char* hostname;
 	char* dot;
+	int host_name_max;
 	int result;
 
-	hostname[HOST_NAME_MAX] = '\0';
-	gethostname(hostname, HOST_NAME_MAX);
+	if ((host_name_max = sysconf(_SC_HOST_NAME_MAX)) == -1)
+	{
+		perror("sysconf(_SC_HOST_NAME_MAX)");
+		exit(1);
+	}
+
+	if ((hostname = malloc(host_name_max+1)) == NULL)
+	{
+		perror("malloc");
+		exit(1);
+	}
+
+	gethostname(hostname, sizeof(hostname));
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
@@ -47,6 +59,7 @@ void hostname(char** out)
 
 	hostname_backup = *out;
 	freeaddrinfo(info);
+	free(hostname);
 }
 
 void free_hostname()
