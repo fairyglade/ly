@@ -268,6 +268,8 @@ enum err login_desktop(struct desktop* desktop,
 	char tty_id [3];
 	char vt[5];
 
+	extern char **environ;
+
 	display_id = get_free_display();
 	snprintf(display_name, sizeof(display_name), ":%d", display_id);
 	snprintf(tty_id, sizeof(tty_id), "%d", config.tty);
@@ -361,7 +363,7 @@ enum err login_desktop(struct desktop* desktop,
 		tb_shutdown();
 
 		// initialization
-		clearenv();
+		environ[0] = NULL;
 		init_xdg(tty_id, display_name, display_server);
 
 		// downgrades group permissions
