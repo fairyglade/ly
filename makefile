@@ -41,7 +41,7 @@ $(OBJD)/%.o:%.c
 
 $(SUBD)/termbox-next/bin/termbox.a:
 	@echo "building static object $@"
-	@cd $(SUBD)/termbox-next && make
+	@(cd $(SUBD)/termbox-next && $(MAKE))
 
 $(BIND)/$(NAME):$(OBJS)
 	@echo "compiling $@"
@@ -74,4 +74,4 @@ clean:
 	@echo "cleaning workspace"
 	@rm -rf $(BIND)
 	@rm -rf $(OBJD)
-	@(cd $(SUBD)/termbox-next && make clean)
+	@(cd $(SUBD)/termbox-next && $(MAKE) clean)
