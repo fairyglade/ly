@@ -1,4 +1,3 @@
-#define _XOPEN_SOURCE 700
 #include "widgets.h"
 #include "cylgom.h"
 #include <string.h>

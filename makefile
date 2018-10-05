@@ -4,6 +4,11 @@ CC=gcc
 #CC=tcc
 FLAGS=-std=c99 -pedantic -Wall -Werror=vla -Werror -g
 
+OS:=$(shell uname -s)
+ifeq ($(OS),Linux)
+	FLAGS+=-D_DEFAULT_SOURCE
+endif
+
 BIND=bin
 SRCD=src
 SUBD=sub
