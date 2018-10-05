@@ -74,3 +74,4 @@ clean:
 	@echo "cleaning workspace"
 	@rm -rf $(BIND)
 	@rm -rf $(OBJD)
+	@(cd $(SUBD)/termbox-next && make clean)
