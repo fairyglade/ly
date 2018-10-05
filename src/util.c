@@ -6,7 +6,6 @@
 #include <string.h>
 #include <unistd.h>
 
-// hostname
 #include <limits.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -24,23 +23,27 @@ void hostname(char** out)
 	struct addrinfo hints;
 	struct addrinfo* info;
 	char* hostname;
-	char* dot;
-	int host_name_max;
 	int result;
 
-	if ((host_name_max = sysconf(_SC_HOST_NAME_MAX)) == -1)
+	int maxlen = sysconf(_SC_HOST_NAME_MAX);
+	if (maxlen < 0)
 	{
-		perror("sysconf(_SC_HOST_NAME_MAX)");
-		exit(1);
+		maxlen = _POSIX_HOST_NAME_MAX;
 	}
 
-	if ((hostname = malloc(host_name_max+1)) == NULL)
+	if ((hostname = malloc(maxlen + 1)) == NULL)
 	{
 		perror("malloc");
 		exit(1);
 	}
 
-	gethostname(hostname, sizeof(hostname));
+	if (gethostname(hostname, maxlen) < 0)
+	{
+		perror("gethostname");
+		exit(1);
+	}
+	hostname[maxlen] = '\0';
+
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
@@ -49,8 +52,9 @@ void hostname(char** out)
 
 	if ((result == 0) && (info != NULL))
 	{
-		dot = strchr(info->ai_canonname, '.');
+		char* dot = strchr(info->ai_canonname, '.');
 		*out = strndup(info->ai_canonname, dot - info->ai_canonname);
+		freeaddrinfo(info);
 	}
 	else
 	{
@@ -58,7 +62,6 @@ void hostname(char** out)
 	}
 
 	hostname_backup = *out;
-	freeaddrinfo(info);
 	free(hostname);
 }
 
