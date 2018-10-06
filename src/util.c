@@ -6,7 +6,6 @@
 #include <string.h>
 #include <unistd.h>
 
-// hostname
 #include <limits.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -17,49 +16,35 @@
 #include <sys/ioctl.h>
 #include <linux/vt.h>
 
-char* hostname_backup;
+static char* hostname_backup = NULL;
 
 void hostname(char** out)
 {
-	struct addrinfo hints;
-	struct addrinfo* info;
-	char* hostname;
-	char* dot;
-	int host_name_max;
-	int result;
-
-	if ((host_name_max = sysconf(_SC_HOST_NAME_MAX)) == -1)
+	if (hostname_backup != NULL)
 	{
-		perror("sysconf(_SC_HOST_NAME_MAX)");
-		exit(1);
+		*out = hostname_backup;
+		return;
 	}
 
-	if ((hostname = malloc(host_name_max+1)) == NULL)
+	int maxlen = sysconf(_SC_HOST_NAME_MAX);
+	if (maxlen < 0)
+	{
+		maxlen = _POSIX_HOST_NAME_MAX;
+	}
+
+	if ((hostname_backup = malloc(maxlen + 1)) == NULL)
 	{
 		perror("malloc");
 		exit(1);
 	}
 
-	gethostname(hostname, sizeof(hostname));
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_CANONNAME;
-	result = getaddrinfo(hostname, "http", &hints, &info);
-
-	if ((result == 0) && (info != NULL))
+	if (gethostname(hostname_backup, maxlen) < 0)
 	{
-		dot = strchr(info->ai_canonname, '.');
-		*out = strndup(info->ai_canonname, dot - info->ai_canonname);
+		perror("gethostname");
+		exit(1);
 	}
-	else
-	{
-		*out = strdup("");
-	}
-
-	hostname_backup = *out;
-	freeaddrinfo(info);
-	free(hostname);
+	hostname_backup[maxlen] = '\0';
+	*out = hostname_backup;
 }
 
 void free_hostname()
@@ -115,7 +100,7 @@ void load(struct desktop* desktop, struct input* login)
 
 	char* line = malloc((config.max_login_len * (sizeof (char))) + 1);
 
-	if (line == NULL) 
+	if (line == NULL)
 	{
 		fclose(file);
 		return;
