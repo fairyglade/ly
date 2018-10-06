@@ -16,14 +16,15 @@
 #include <sys/ioctl.h>
 #include <linux/vt.h>
 
-char* hostname_backup;
+static char* hostname_backup = NULL;
 
 void hostname(char** out)
 {
-	struct addrinfo hints;
-	struct addrinfo* info;
-	char* hostname;
-	int result;
+	if (hostname_backup != NULL)
+	{
+		*out = hostname_backup;
+		return;
+	}
 
 	int maxlen = sysconf(_SC_HOST_NAME_MAX);
 	if (maxlen < 0)
@@ -31,38 +32,19 @@ void hostname(char** out)
 		maxlen = _POSIX_HOST_NAME_MAX;
 	}
 
-	if ((hostname = malloc(maxlen + 1)) == NULL)
+	if ((hostname_backup = malloc(maxlen + 1)) == NULL)
 	{
 		perror("malloc");
 		exit(1);
 	}
 
-	if (gethostname(hostname, maxlen) < 0)
+	if (gethostname(hostname_backup, maxlen) < 0)
 	{
 		perror("gethostname");
 		exit(1);
 	}
-	hostname[maxlen] = '\0';
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_CANONNAME;
-	result = getaddrinfo(hostname, "http", &hints, &info);
-
-	if ((result == 0) && (info != NULL))
-	{
-		char* dot = strchr(info->ai_canonname, '.');
-		*out = strndup(info->ai_canonname, dot - info->ai_canonname);
-		freeaddrinfo(info);
-	}
-	else
-	{
-		*out = strdup("");
-	}
-
-	hostname_backup = *out;
-	free(hostname);
+	hostname_backup[maxlen] = '\0';
+	*out = hostname_backup;
 }
 
 void free_hostname()
@@ -118,7 +100,7 @@ void load(struct desktop* desktop, struct input* login)
 
 	char* line = malloc((config.max_login_len * (sizeof (char))) + 1);
 
-	if (line == NULL) 
+	if (line == NULL)
 	{
 		fclose(file);
 		return;
