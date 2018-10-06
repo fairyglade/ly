@@ -2,13 +2,13 @@
 [![CodeFactor](https://www.codefactor.io/repository/github/cylgom/ly/badge/master)](https://www.codefactor.io/repository/github/cylgom/ly/overview/master)
 ![ly screenshot](https://user-images.githubusercontent.com/5473047/42466218-8cb53d3c-83ae-11e8-8e53-bae3669f959c.png "ly on st")
 
-Ly is a lightweight, TUI (ncurses-like) display manager for linux.
+Ly is a lightweight, TUI (ncurses-like) display manager for Linux.
 
 ### Dependencies
 Make sure all the following packages are properly installed and configured
-on your linux distribution before going further:
-- a c99 compiler (tested with gcc and tcc)
-- a c standard library
+before going further:
+- a C99 compiler (tested with gcc and tcc)
+- a C standard library
 - make
 - linux-pam
 - xorg
@@ -19,7 +19,7 @@ on your linux distribution before going further:
 - shutdown
 
 ### Cloning and Compiling
-This repository uses submodules, so you must clone it like so
+This repository uses submodules, to clone it properly please use
 ```
 git clone --recurse-submodules https://github.com/cylgom/ly.git
 ```
@@ -71,7 +71,7 @@ while on the desktop field (above the login field).
 The numlock and capslock state is printed in the top-right corner.
 Use the F1 and F2 keys to respectively shutdown and reboot.
 Take a look at your .xsession if X doesn't start, as it can interfere
-(this filed is launched with X to configure the display properly).
+(this file is launched with X to configure the display properly).
 
 ### Additional Information
 The name "Ly" is a tribute to the fairy from the game Rayman.
