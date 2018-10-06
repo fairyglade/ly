@@ -47,7 +47,7 @@ $(SUBD)/termbox-next/bin/termbox.a:
 $(BIND)/$(NAME):$(OBJS)
 	@echo "compiling $@"
 	@mkdir -p $(BIND)
-	@$(CC) $(INCL) $(FLAGS) $(LINK) -o $(BIND)/$(NAME) $(OBJS)
+	@$(CC) $(INCL) $(FLAGS) -o $(BIND)/$(NAME) $(OBJS) $(LINK)
 	@cp -r $(LANG) $(BIND)/lang
 	@cp $(RESD)/config.ini $(BIND)
 
