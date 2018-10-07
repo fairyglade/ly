@@ -4,6 +4,7 @@
 #include "util.h"
 #include "config.h"
 #include "widgets.h"
+
 #include <math.h>
 #include <string.h>
 #include <ctype.h>
@@ -11,6 +12,8 @@
 #include <sys/time.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <fcntl.h>
 #include <unistd.h>
 #if defined(__DragonFly__) || defined(__FreeBSD__)
 #  include <sys/kbio.h>
@@ -212,22 +215,33 @@ void draw_f_commands()
 // numlock and capslock info
 void draw_lock_state()
 {
-	FILE* console = fopen(config.console_dev, "r");
-
-	if (console == NULL)
+	int fd;
+	if ((fd = open(config.console_dev, O_RDONLY)) < 0)
 	{
 		info_line = lang.err_console_dev;
 		return;
 	}
 
-	int fd = fileno(console);
-	char led;
+	bool numlock_on;
+	bool capslock_on;
+
+#if defined(__DragonFly__) || defined(__FreeBSD__)
+	int led;
 	ioctl(fd, KDGETLED, &led);
-	fclose(console);
+	numlock_on = led & LED_NUM;
+	capslock_on = led & LED_CAP;
+#else  /* Linux */
+	char led;
+	ioctl(fd, KDGKBLED, &led);
+	numlock_on = led & K_NUMLOCK;
+	capslock_on = led & K_CAPSLOCK;
+#endif
+
+	close(fd);
 
 	u16 pos_x = width - strlen(lang.numlock);
 
-	if (led & LED_NUM)
+	if (numlock_on)
 	{
 		struct tb_cell* numlock = str_cell(lang.numlock);
 		tb_blit(pos_x, 0, strlen(lang.numlock), 1, numlock);
@@ -236,7 +250,7 @@ void draw_lock_state()
 
 	pos_x -= strlen(lang.capslock) + 1;
 
-	if (led & LED_CAP)
+	if (capslock_on)
 	{
 		struct tb_cell* capslock = str_cell(lang.capslock);
 		tb_blit(pos_x, 0, strlen(lang.capslock), 1, capslock);
