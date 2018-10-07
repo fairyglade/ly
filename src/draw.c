@@ -10,15 +10,20 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
-#include <linux/kd.h> 
-#include <linux/vt.h>
 #include <stdio.h>
 #include <unistd.h>
+#if defined(__DragonFly__) || defined(__FreeBSD__)
+#  include <sys/kbio.h>
+#else  /* assume Linux */
+#  include <linux/kd.h>
+#endif
 
+#if defined(__linux__)
 // border chars: ┌ └ ┐ ┘ ─ ─ │ │
 struct box box_main = {0x250c, 0x2514, 0x2510, 0x2518, 0x2500, 0x2500 ,0x2502, 0x2502};
-// alternative border chars:
-// struct box box_main = {'+', '+', '+', '+', '-', '-', '|', '|'};
+#else  /* no UTF-8 */
+struct box box_main = {'+', '+', '+', '+', '-', '-', '|', '|'};
+#endif
 
 u16 width = 0;
 u16 height = 0;
@@ -207,7 +212,7 @@ void draw_f_commands()
 // numlock and capslock info
 void draw_lock_state()
 {
-	FILE* console = fopen(config.console_dev, "w");
+	FILE* console = fopen(config.console_dev, "r");
 
 	if (console == NULL)
 	{
@@ -216,14 +221,13 @@ void draw_lock_state()
 	}
 
 	int fd = fileno(console);
-	char ret;
-
-	ioctl(fd, KDGKBLED, &ret);
+	char led;
+	ioctl(fd, KDGETLED, &led);
 	fclose(console);
 
 	u16 pos_x = width - strlen(lang.numlock);
 
-	if (((ret >> 1) & 0x01) == 1)
+	if (led & LED_NUM)
 	{
 		struct tb_cell* numlock = str_cell(lang.numlock);
 		tb_blit(pos_x, 0, strlen(lang.numlock), 1, numlock);
@@ -232,7 +236,7 @@ void draw_lock_state()
 
 	pos_x -= strlen(lang.capslock) + 1;
 
-	if (((ret >> 2) & 0x01) == 1)
+	if (led & LED_CAP)
 	{
 		struct tb_cell* capslock = str_cell(lang.capslock);
 		tb_blit(pos_x, 0, strlen(lang.capslock), 1, capslock);
