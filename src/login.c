@@ -7,7 +7,6 @@
 #include <sys/types.h>
 #include <grp.h>
 #include <pwd.h>
-#include <paths.h>  /* _PATH_MAILDIR */
 #include <signal.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -96,7 +95,6 @@ int get_free_display()
 enum err init_env(pam_handle_t* handle, struct passwd* pw)
 {
 	u16 i;
-	u16 len;
 	char tmp[256];
 	char** env;
 	char* termenv;
@@ -119,12 +117,6 @@ enum err init_env(pam_handle_t* handle, struct passwd* pw)
 
 	snprintf(tmp, sizeof(tmp), "%s/%s", pw->pw_dir, config.xauthority);
 	setenv("XAUTHORITY", tmp, 0);
-	len = snprintf(tmp, sizeof(tmp), "%s/%s", _PATH_MAILDIR, pw->pw_name);
-
-	if ((len > 0) && ((size_t) len < sizeof(tmp)))
-	{
-		setenv("MAIL", tmp, 0);
-	}
 	
 	if (setenv("PATH", config.path, 1))
 	{
