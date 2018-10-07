@@ -14,7 +14,11 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/ioctl.h>
-#include <linux/vt.h>
+#if defined(__DragonFly__) || defined(__FreeBSD__)
+#  include <sys/consio.h>
+#else  /* assume Linux */
+#  include <linux/vt.h>
+#endif
 
 static char* hostname_backup = NULL;
 
