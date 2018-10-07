@@ -529,7 +529,7 @@ void config_config_patch()
 	}
 	if (config.path == 0)
 	{
-		config.path = strdup("/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/env");
+		config.path = strdup("/sbin:/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/env");
 	}
 	if (config.shutdown_cmd == 0)
 	{
