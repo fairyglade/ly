@@ -380,6 +380,20 @@ void position_input(struct desktop* desktop, struct input* login, struct input* 
 }
 
 // background animations
+// screen-clearing routine
+void blank_slow()
+{
+	const struct tb_cell c = {' ', config.fg, config.bg};
+
+	for (i16 i = 0; i < width; ++i)
+	{
+		for (i16 k = 0; k < height; ++k)
+		{
+			tb_put_cell(i, k, &c);
+		}
+	}
+}
+
 // example implementation
 void spiral()
 {
@@ -415,6 +429,9 @@ void animate()
 	switch(config.animate)
 	{
 		case 1:
+			blank_slow();
+			break;
+		case 2:
 			spiral();
 			break;
 		case 0:
