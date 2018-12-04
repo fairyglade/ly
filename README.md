@@ -17,6 +17,7 @@ before going further:
 - mcookie
 - tput
 - shutdown
+- termbox
 
 ### Cloning and Compiling
 This repository uses submodules, to clone it properly please use
