@@ -178,7 +178,7 @@ void launch_wayland(struct passwd* pwd, pam_handle_t* pam_handle,
 	const char* de_command)
 {
 	char cmd[32];
-	snprintf(cmd, 32, "exec %s", de_command);
+	snprintf(cmd, 32, "exec %s %s", config.wayland_cmd, de_command);
 	reset_terminal(pwd);
 	execl(pwd->pw_shell, pwd->pw_shell, "-l", "-c", cmd, NULL);
 	exit(EXIT_SUCCESS);

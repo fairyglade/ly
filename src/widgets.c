@@ -18,6 +18,7 @@ enum err widget_desktop(struct desktop* target)
 
 	error |= widget_desktop_add(target, strdup(lang.shell), strdup(""), DS_SHELL);
 	error |= widget_desktop_add(target, strdup(lang.xinitrc), strdup(""), DS_XINITRC);
+	error |= widget_desktop_add(target, strdup(lang.wayland), strdup(""), DS_WAYLAND);
 
 	return error;
 }

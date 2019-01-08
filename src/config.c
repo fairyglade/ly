@@ -65,6 +65,10 @@ int config_lang_handler(void* user, const char* section, const char* name, const
 		{
 			cfg_dup(&lang.xinitrc, value);
 		}
+		else if (strcmp(name, "wayland") == 0)
+		{
+			cfg_dup(&lang.wayland, value);
+		}
 		else if (strcmp(name, "logout") == 0)
 		{
 			cfg_dup(&lang.logout, value);
@@ -184,6 +188,10 @@ void config_lang_patch()
 	{
 		lang.xinitrc = strdup("xinitrc");
 	}
+	if (lang.wayland == 0)
+	{
+		lang.wayland = strdup("wayland");
+	}
 	if (lang.logout == 0)
 	{
 		lang.logout = strdup("logout");
@@ -282,6 +290,7 @@ void config_lang_free()
 	free(lang.f2);
 	free(lang.shell);
 	free(lang.xinitrc);
+	free(lang.wayland);
 	free(lang.logout);
 	free(lang.capslock);
 	free(lang.numlock);
@@ -376,6 +385,14 @@ int config_config_handler(void* user, const char* section, const char* name, con
 		{
 			cfg_dup(&config.x_cmd_setup, value);
 		}
+		else if (strcmp(name, "wayland_sessions") == 0)
+		{
+			cfg_dup(&config.wayland_sessions, value);
+		}
+        else if (strcmp(name, "wayland_cmd") == 0)
+        {
+            cfg_dup(&config.wayland_cmd, value);
+        }
 		else if (strcmp(name, "mcookie_cmd") == 0)
 		{
 			cfg_dup(&config.mcookie_cmd, value);
@@ -519,7 +536,14 @@ void config_config_patch()
 	{
 		config.x_cmd_setup = strdup("/etc/ly/xsetup.sh");
 	}
-	if (config.mcookie_cmd == 0)
+	if (config.wayland_sessions == 0){
+	    config.wayland_sessions = strdup("/usr/share/wayland-sessions");
+	}
+    if (config.wayland_cmd == 0)
+    {
+        config.wayland_cmd = strdup("/etc/ly/wsetup.sh");
+    }
+    if (config.mcookie_cmd == 0)
 	{
 		config.mcookie_cmd = strdup("/usr/bin/mcookie");
 	}
@@ -569,6 +593,8 @@ void config_config_free()
 {
 	free(config.xsessions);
 	free(config.service_name);
+	free(config.wayland_sessions);
+	free(config.wayland_cmd);
 	free(config.x_cmd);
 	free(config.x_cmd_setup);
 	free(config.mcookie_cmd);

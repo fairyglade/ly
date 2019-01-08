@@ -21,6 +21,8 @@ struct lang
 	char* capslock;
 	char* numlock;
 
+	char* wayland;
+
 	// errors
 	char* err_pam_buf;
 	char* err_pam_sys;
@@ -65,6 +67,10 @@ struct config
 	char* service_name;
 	char* x_cmd;
 	char* x_cmd_setup;
+
+	char* wayland_sessions;
+	char* wayland_cmd;
+
 	char* mcookie_cmd;
 	char* xauthority;
 	char* path;

@@ -61,6 +61,7 @@ install:$(BIND)/$(NAME)
 	install -dZ ${DESTDIR}/etc/ly
 	install -DZ $(BIND)/$(NAME) -t ${DESTDIR}/usr/bin
 	install -DZ xsetup.sh -t ${DESTDIR}/etc/ly
+	install -DZ wsetup.sh -t ${DESTDIR}/etc/ly
 	install -DZ $(RESD)/config.ini -t ${DESTDIR}/etc/ly
 	install -dZ ${DESTDIR}/etc/ly/lang
 	install -DZ $(RESD)/lang/* -t ${DESTDIR}/etc/ly/lang
