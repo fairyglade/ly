@@ -122,6 +122,13 @@ int main(int argc, char** argv)
 			{
 				break;
 			}
+            else if (event.key == TB_KEY_TAB) {
+                ++active_input;
+                if (active_input > 2)
+                {
+                    active_input = 0;
+                }
+            }
 			else if ((event.key == TB_KEY_ARROW_UP) && (active_input > 0))
 			{
 				--active_input;
