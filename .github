@@ -1,0 +1,15 @@
+[submodule "sub/argoat"]
+	path = sub/argoat
+	url = https://github.com/cylgom/argoat.git
+[submodule "sub/configator"]
+	path = sub/configator
+	url = https://github.com/cylgom/configator.git
+[submodule "sub/ctypes"]
+	path = sub/ctypes
+	url = https://github.com/cylgom/ctypes.git
+[submodule "sub/dragonfail"]
+	path = sub/dragonfail
+	url = https://github.com/cylgom/dragonfail.git
+[submodule "sub/termbox_next"]
+	path = sub/termbox_next
+	url = https://github.com/cylgom/termbox_next.git

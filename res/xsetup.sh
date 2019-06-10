@@ -1,0 +1,4 @@
+#!/bin/sh
+
+~/.xsession
+exec $@
