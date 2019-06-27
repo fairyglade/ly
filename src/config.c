@@ -38,6 +38,18 @@ static void config_handle_u8(void* data, char** pars, const int pars_count)
 	}
 }
 
+static void config_handle_hex(void* data, char** pars, const int pars_count)
+{
+	if (strcmp(*pars, "") == 0)
+	{
+		*((u8*)data) = 0;
+	}
+	else
+	{
+		*((u8*)data) = strtol(*pars, NULL, 16);
+	}
+}
+
 static void config_handle_u16(void* data, char** pars, const int pars_count)
 {
 	if (strcmp(*pars, "") == 0)
@@ -154,12 +166,13 @@ void config_load()
 		{"animate", &config.animate, config_handle_bool},
 		{"animation", &config.animation, config_handle_u8},
 		{"asterisk", &config.asterisk, config_handle_char},
-		{"bg", &config.bg, config_handle_u8},
 		{"blank_box", &config.blank_box, config_handle_bool},
 		{"blank_password", &config.blank_box, config_handle_bool},
+		{"border_color", &config.border_color, config_handle_hex},
+		{"box_bg", &config.box_bg, config_handle_hex},
+		{"box_fg", &config.box_fg, config_handle_hex},
 		{"console_dev", &config.console_dev, config_handle_str},
 		{"default_input", &config.default_input, config_handle_u8},
-		{"fg", &config.fg, config_handle_u8},
 		{"hide_borders", &config.hide_borders, config_handle_bool},
 		{"input_len", &config.input_len, config_handle_u8},
 		{"lang", &config.lang, config_handle_str},
@@ -171,7 +184,11 @@ void config_load()
 		{"max_password_len", &config.max_password_len, config_handle_u8},
 		{"mcookie_cmd", &config.mcookie_cmd, config_handle_str},
 		{"min_refresh_delta", &config.min_refresh_delta, config_handle_u16},
+		{"out_bg", &config.out_bg, config_handle_hex},
+		{"out_fg", &config.out_fg, config_handle_hex},
 		{"path", &config.path, config_handle_str},
+		{"posx", &config.posx, config_handle_u8},
+		{"posy", &config.posy, config_handle_u8},
 		{"restart_cmd", &config.restart_cmd, config_handle_str},
 		{"save", &config.save, config_handle_bool},
 		{"save_file", &config.save_file, config_handle_str},
@@ -259,12 +276,13 @@ void config_defaults()
 	config.animate = false;
 	config.animation = 0;
 	config.asterisk = '*';
-	config.bg = 0;
 	config.blank_box = true;
 	config.blank_password = false;
+	config.border_color = 15;
+	config.box_bg = 16;
+	config.box_fg = 15;
 	config.console_dev = strdup("/dev/console");
 	config.default_input = 2;
-	config.fg = 9;
 	config.hide_borders = false;
 	config.input_len = 34;
 	config.lang = strdup("en");
@@ -276,7 +294,11 @@ void config_defaults()
 	config.max_password_len = 255;
 	config.mcookie_cmd = strdup("/usr/bin/mcookie");
 	config.min_refresh_delta = 5;
+	config.out_bg = 16;
+	config.out_fg = 15;
 	config.path = strdup("/sbin:/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/env");
+	config.posx = 50.0;
+	config.posy = 50.0;
 	config.restart_cmd = strdup("/sbin/shutdown -r now");
 	config.save = true;
 	config.save_file = strdup("/etc/ly/save");
