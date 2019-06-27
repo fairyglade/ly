@@ -125,7 +125,7 @@ int main(int argc, char** argv)
 
 	// start termbox
 	tb_init();
-	tb_select_output_mode(TB_OUTPUT_NORMAL);
+	tb_select_output_mode(TB_OUTPUT_256);
 	tb_clear();
 
 	// init visible elements
