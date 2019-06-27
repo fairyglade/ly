@@ -40,8 +40,8 @@ void draw_init(struct term_buf* buf);
 void draw_free(struct term_buf* buf);
 void draw_box(struct term_buf* buf);
 
-struct tb_cell* strn_cell(char* s, u16 len);
-struct tb_cell* str_cell(char* s);
+struct tb_cell* strn_cell(char* s, u16 len, bool box);
+struct tb_cell* str_cell(char* s, bool box);
 
 void draw_labels(struct term_buf* buf);
 void draw_f_commands();
