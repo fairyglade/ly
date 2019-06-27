@@ -11,7 +11,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
+#include <stropts.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -29,6 +29,7 @@ void draw_init(struct term_buf* buf)
 	buf->height = tb_height();
 	hostname(&buf->info_line);
 	buf->info_line = NULL;
+
 
 	u16 len_login = strlen(lang.login);
 	u16 len_password = strlen(lang.password);
@@ -79,10 +80,19 @@ void draw_free(struct term_buf* buf)
 
 void draw_box(struct term_buf* buf)
 {
-	u16 box_x = (buf->width - buf->box_width) / 2;
-	u16 box_y = (buf->height - buf->box_height) / 2;
-	u16 box_x2 = (buf->width + buf->box_width) / 2;
-	u16 box_y2 = (buf->height + buf->box_height) / 2;
+	u16 box_x = (buf->width - buf->box_width) * (((float)config.posx) / 100.0);
+	u16 box_y = (buf->height - buf->box_height) * (((float)config.posy) / 100.0);
+
+	if (box_x == 0) {
+		box_x = 1;
+	}
+
+	if (box_y == 0) {
+		box_y = 2;
+	}
+
+	u16 box_x2 = (box_x + buf->box_width);
+	u16 box_y2 = (box_y + buf->box_height);
 	buf->box_x = box_x;
 	buf->box_y = box_y;
 
@@ -93,30 +103,30 @@ void draw_box(struct term_buf* buf)
 			box_x - 1,
 			box_y - 1,
 			buf->box_chars.left_up,
-			config.fg,
-			config.bg);
+			config.border_color,
+			config.box_bg);
 		tb_change_cell(
 			box_x2,
 			box_y - 1,
 			buf->box_chars.right_up,
-			config.fg,
-			config.bg);
+			config.border_color,
+			config.box_bg);
 		tb_change_cell(
 			box_x - 1,
 			box_y2,
 			buf->box_chars.left_down,
-			config.fg,
-			config.bg);
+			config.border_color,
+			config.box_bg);
 		tb_change_cell(
 			box_x2,
 			box_y2,
 			buf->box_chars.right_down,
-			config.fg,
-			config.bg);
+			config.border_color,
+			config.box_bg);
 
 		// top and bottom
-		struct tb_cell c1 = {buf->box_chars.top, config.fg, config.bg};
-		struct tb_cell c2 = {buf->box_chars.bot, config.fg, config.bg};
+		struct tb_cell c1 = {buf->box_chars.top, config.border_color, config.box_bg};
+		struct tb_cell c2 = {buf->box_chars.bot, config.border_color, config.box_bg};
 
 		for (u8 i = 0; i < buf->box_width; ++i)
 		{
@@ -150,7 +160,7 @@ void draw_box(struct term_buf* buf)
 
 	if (config.blank_box)
 	{
-		struct tb_cell blank = {' ', config.fg, config.bg};
+		struct tb_cell blank = {' ', config.box_fg, config.box_bg};
 
 		for (u8 i = 0; i < buf->box_height; ++i)
 		{
@@ -165,7 +175,7 @@ void draw_box(struct term_buf* buf)
 	}
 }
 
-struct tb_cell* strn_cell(char* s, u16 len) // throws
+struct tb_cell* strn_cell(char* s, u16 len, bool box) // throws
 {
 	struct tb_cell* cells = malloc((sizeof (struct tb_cell)) * len);
 	char* s2 = s;
@@ -183,8 +193,13 @@ struct tb_cell* strn_cell(char* s, u16 len) // throws
 			s2 += utf8_char_to_unicode(&c, s2);
 
 			cells[i].ch = c;
-			cells[i].bg = config.bg;
-			cells[i].fg = config.fg;
+            if ( box ) {
+			    cells[i].bg = config.box_bg;
+			    cells[i].fg = config.box_fg;
+            } else {
+                cells[i].bg = config.out_bg;
+                cells[i].fg = config.out_fg;
+            }
 		}
 	}
 	else
@@ -195,15 +210,15 @@ struct tb_cell* strn_cell(char* s, u16 len) // throws
 	return cells;
 }
 
-struct tb_cell* str_cell(char* s) // throws
+struct tb_cell* str_cell(char* s, bool box) // throws
 {
-	return strn_cell(s, strlen(s));
+	return strn_cell(s, strlen(s), box);
 }
 
 void draw_labels(struct term_buf* buf) // throws
 {
 	// login text
-	struct tb_cell* login = str_cell(lang.login);
+	struct tb_cell* login = str_cell(lang.login, true);
 
 	if (dgn_catch())
 	{
@@ -221,7 +236,7 @@ void draw_labels(struct term_buf* buf) // throws
 	}
 
 	// password text
-	struct tb_cell* password = str_cell(lang.password);
+	struct tb_cell* password = str_cell(lang.password, true);
 
 	if (dgn_catch())
 	{
@@ -241,7 +256,7 @@ void draw_labels(struct term_buf* buf) // throws
 	if (buf->info_line != NULL)
 	{
 		u16 len = strlen(buf->info_line);
-		struct tb_cell* info_cell = str_cell(buf->info_line);
+		struct tb_cell* info_cell = str_cell(buf->info_line, true);
 
 		if (dgn_catch())
 		{
@@ -262,7 +277,7 @@ void draw_labels(struct term_buf* buf) // throws
 
 void draw_f_commands()
 {
-	struct tb_cell* f1 = str_cell(lang.f1);
+	struct tb_cell* f1 = str_cell(lang.f1, false);
 
 	if (dgn_catch())
 	{
@@ -274,7 +289,7 @@ void draw_f_commands()
 		free(f1);
 	}
 
-	struct tb_cell* f2 = str_cell(lang.f2);
+	struct tb_cell* f2 = str_cell(lang.f2, false);
 
 	if (dgn_catch())
 	{
@@ -282,7 +297,7 @@ void draw_f_commands()
 	}
 	else
 	{
-		tb_blit(strlen(lang.f1) + 1, 0, strlen(lang.f2), 1, f2);
+		tb_blit(strlen(lang.f1) + 3, 0, strlen(lang.f2), 1, f2);
 		free(f2);
 	}
 }
@@ -320,7 +335,7 @@ void draw_lock_state(struct term_buf* buf)
 
 	if (numlock_on)
 	{
-		struct tb_cell* numlock = str_cell(lang.numlock);
+		struct tb_cell* numlock = str_cell(lang.numlock, true);
 
 		if (dgn_catch())
 		{
@@ -337,7 +352,7 @@ void draw_lock_state(struct term_buf* buf)
 
 	if (capslock_on)
 	{
-		struct tb_cell* capslock = str_cell(lang.capslock);
+		struct tb_cell* capslock = str_cell(lang.capslock, true);
 
 		if (dgn_catch())
 		{
@@ -364,15 +379,15 @@ void draw_desktop(struct desktop* target)
 		target->x,
 		target->y,
 		'<',
-		config.fg,
-		config.bg);
+		config.box_fg,
+		config.box_bg);
 
 	tb_change_cell(
 		target->x + target->visible_len - 1,
 		target->y,
 		'>',
-		config.fg,
-		config.bg);
+		config.box_fg,
+		config.box_bg);
 
 	for (u16 i = 0; i < len; ++ i)
 	{
@@ -380,8 +395,8 @@ void draw_desktop(struct desktop* target)
 			target->x + i + 2,
 			target->y,
 			target->list[target->cur][i],
-			config.fg,
-			config.bg);
+			config.box_fg,
+			config.box_bg);
 	}
 }
 
@@ -395,7 +410,7 @@ void draw_input(struct text* input)
 		len = visible_len;
 	}
 
-	struct tb_cell* cells = strn_cell(input->visible_start, len);
+	struct tb_cell* cells = strn_cell(input->visible_start, len, true);
 
 	if (dgn_catch())
 	{
@@ -406,7 +421,7 @@ void draw_input(struct text* input)
 		tb_blit(input->x, input->y, len, 1, cells);
 		free(cells);
 
-		struct tb_cell c1 = {' ', config.fg, config.bg};
+		struct tb_cell c1 = {' ', config.box_fg, config.box_bg};
 
 		for (u16 i = input->end - input->visible_start; i < visible_len; ++i)
 		{
@@ -428,8 +443,8 @@ void draw_input_mask(struct text* input)
 		len = visible_len;
 	}
 
-	struct tb_cell c1 = {config.asterisk, config.fg, config.bg};
-	struct tb_cell c2 = {' ', config.fg, config.bg};
+	struct tb_cell c1 = {config.asterisk, config.box_fg, config.box_bg};
+	struct tb_cell c2 = {' ', config.box_fg, config.box_bg};
 
 	for (u16 i = 0; i < visible_len; ++i)
 	{
