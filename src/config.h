@@ -57,12 +57,13 @@ struct config
 	bool animate;
 	u8 animation;
 	char asterisk;
-	u8 bg;
 	bool blank_box;
 	bool blank_password;
+	u8 border_color;
+	u8 box_bg;
+	u8 box_fg;
 	char* console_dev;
 	u8 default_input;
-	u8 fg;
 	bool hide_borders;
 	u8 input_len;
 	char* lang;
@@ -74,7 +75,11 @@ struct config
 	u8 max_password_len;
 	char* mcookie_cmd;
 	u16 min_refresh_delta;
+	u8 out_bg;
+	u8 out_fg;
 	char* path;
+	u8 posx;
+	u8 posy;
 	char* restart_cmd;
 	bool save;
 	char* save_file;
