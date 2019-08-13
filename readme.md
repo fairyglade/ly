@@ -99,6 +99,11 @@ To enable the famous PSX DOOM fire described by [Fabien Sanglard](http://fabiens
 just uncomment `animate = true` in `/etc/ly/config.ini`. You may also
 disable the main box borders with `hide_borders = true`.
 
+NOTE: there is currently a bug preventing this from appearing. Quoting from issue [#106](https://github.com/cylgom/ly/issues/106):
+
+>Yep it's a bug. You need both /usr/share/wayland-sessions and /usr/share/xsessions folders on your system to have animation.
+> **usernamewashidden**
+
 ## Additional Information
 The name "Ly" is a tribute to the fairy from the game Rayman.
 Ly was tested by oxodao, who is some seriously awesome dude.
