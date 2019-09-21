@@ -207,8 +207,8 @@ void pam_diagnose(int error, struct term_buf* buf)
 void env_init(struct passwd* pwd, const char* display_name)
 {
 	extern char** environ;
-	// term
 	char* term = getenv("TERM");
+	char* lang = getenv("LANG");
 	// clean env
 	environ[0] = NULL;
 
@@ -227,6 +227,7 @@ void env_init(struct passwd* pwd, const char* display_name)
 	setenv("USER", pwd->pw_name, 1);
 	setenv("LOGNAME", pwd->pw_name, 1);
 	setenv("DISPLAY", display_name, 1);
+	setenv("LANG", lang, 1);
 
 	// path
 	int ok = setenv("PATH", config.path, 1);
