@@ -110,8 +110,26 @@ void desktop_crawl(
 
 void desktop_load(struct desktop* target)
 {
+	// we don't care about desktop environments presence
+	// because the fallback shell is always available
+	// so we just dismiss any "throw" for now
+	int err = 0;
+
 	desktop_crawl(target, config.waylandsessions, DS_WAYLAND);
+
+	if (dgn_catch())
+	{
+		++err;
+		dgn_reset();
+	}
+
 	desktop_crawl(target, config.xsessions, DS_XORG);
+
+	if (dgn_catch())
+	{
+		++err;
+		dgn_reset();
+	}
 }
 
 static char* hostname_backup = NULL;
