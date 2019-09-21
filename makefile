@@ -88,7 +88,12 @@ clean:
 	@rm -rf $(BIND) $(OBJD) valgrind.log
 	@(cd $(SUBD)/termbox_next && $(MAKE) clean)
 
-github:
+remotes:
+	@echo "registering remotes"
+	@git remote add github git@github.com:cylgom/$(NAME).git
+	@git remote add gitea ssh://git@git.cylgom.net:2999/cylgom/$(NAME).git
+
+github: remotes
 	@echo "sourcing submodules from https://github.com"
 	@cp .github .gitmodules
 	@git submodule sync
@@ -96,7 +101,7 @@ github:
 	@cd $(SUBD)/argoat && make github
 	@git submodule update --init --recursive --remote
 
-gitea:
+gitea: remotes
 	@echo "sourcing submodules from https://git.cylgom.net"
 	@cp .gitea .gitmodules
 	@git submodule sync
