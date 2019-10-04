@@ -423,6 +423,24 @@ void shell(struct passwd* pwd)
 	reset_terminal(pwd);
 }
 
+// pam_do performs the pam action specified in pam_action
+// on pam_action fail, call diagnose and end pam session
+int pam_do(
+	int (pam_action)(struct pam_handle *, int),
+	struct pam_handle *handle,
+	int flags,
+	struct term_buf *buf)
+{
+	int status = pam_action(handle, flags);
+
+	if (status != PAM_SUCCESS) {
+		pam_diagnose(status, buf);
+		pam_end(handle, status);
+	}
+
+	return status;
+}
+
 void auth(
 	struct desktop* desktop,
 	struct text* login,
@@ -445,39 +463,31 @@ void auth(
 		return;
 	}
 
-	ok = pam_authenticate(handle, 0);
+	ok = pam_do(pam_authenticate, handle, 0, buf);
 
 	if (ok != PAM_SUCCESS)
 	{
-		pam_diagnose(ok, buf);
-		pam_end(handle, ok);
 		return;
 	}
 
-	ok = pam_acct_mgmt(handle, 0);
+	ok = pam_do(pam_acct_mgmt, handle, 0, buf);
 
 	if (ok != PAM_SUCCESS)
 	{
-		pam_diagnose(ok, buf);
-		pam_end(handle, ok);
 		return;
 	}
 
-	ok = pam_setcred(handle, PAM_ESTABLISH_CRED);
+	ok = pam_do(pam_setcred, handle, PAM_ESTABLISH_CRED, buf);
 
 	if (ok != PAM_SUCCESS)
 	{
-		pam_diagnose(ok, buf);
-		pam_end(handle, ok);
 		return;
 	}
 
-	ok = pam_open_session(handle, 0);
+	ok = pam_do(pam_open_session, handle, 0, buf);
 
 	if (ok != PAM_SUCCESS)
 	{
-		pam_diagnose(ok, buf);
-		pam_end(handle, ok);
 		return;
 	}
 
@@ -621,21 +631,17 @@ void auth(
 	desktop_load(desktop);
 
 	// close pam session
-	ok = pam_close_session(handle, 0);
+	ok = pam_do(pam_close_session, handle, 0, buf);
 	
 	if (ok != PAM_SUCCESS)
 	{
-		pam_diagnose(ok, buf);
-		pam_end(handle, ok);
 		return;
 	}
 
-	ok = pam_setcred(handle, PAM_DELETE_CRED);
+	ok = pam_do(pam_setcred, handle, PAM_DELETE_CRED, buf);
 	
 	if (ok != PAM_SUCCESS)
 	{
-		pam_diagnose(ok, buf);
-		pam_end(handle, ok);
 		return;
 	}
 
