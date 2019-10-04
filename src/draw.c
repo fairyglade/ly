@@ -28,7 +28,6 @@ void draw_init(struct term_buf* buf)
 	buf->width = tb_width();
 	buf->height = tb_height();
 	hostname(&buf->info_line);
-	buf->info_line = NULL;
 
 	u16 len_login = strlen(lang.login);
 	u16 len_password = strlen(lang.password);
