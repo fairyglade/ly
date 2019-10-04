@@ -47,7 +47,7 @@ void log_init(char** log)
 	log[DGN_NULL] = lang.err_null;
 	log[DGN_ALLOC] = lang.err_alloc;
 	log[DGN_BOUNDS] = lang.err_bounds;
-	log[DGN_DOMAIN] = lang.err_domain; 
+	log[DGN_DOMAIN] = lang.err_domain;
 	log[DGN_MLOCK] = lang.err_mlock;
 	log[DGN_XSESSIONS_DIR] = lang.err_xsessions_dir;
 	log[DGN_XSESSIONS_OPEN] = lang.err_xsessions_open;
@@ -196,45 +196,43 @@ int main(int argc, char** argv)
 
 		if (event.type == TB_EVENT_KEY)
 		{
-			if (event.key == TB_KEY_F1)
+			switch (event.key)
 			{
+			case TB_KEY_F1:
 				shutdown = true;
+				run = false;
 				break;
-			}
-			else if (event.key == TB_KEY_F2)
-			{
+			case TB_KEY_F2:
 				reboot = true;
+				run = false;
 				break;
-			}
-			else if (event.key == TB_KEY_CTRL_C)
-			{
+			case TB_KEY_CTRL_C:
+				run = false;
 				break;
-			}
-			else if ((event.key == TB_KEY_ARROW_UP) && (active_input > 0))
-			{
-				--active_input;
-				update = true;
-			}
-			else if (((event.key == TB_KEY_ARROW_DOWN)
-				|| (event.key == TB_KEY_ENTER))
-				&& (active_input < 2))
-			{
-				++active_input;
-				update = true;
-			}
-			else if (event.key == TB_KEY_TAB)
-			{
+			case TB_KEY_ARROW_UP:
+				if (active_input > 0)
+				{
+					--active_input;
+					update = true;
+				}
+				break;
+			case TB_KEY_ARROW_DOWN:
+				if (active_input < 2)
+				{
+					++active_input;
+					update = true;
+				}
+				break;
+			case TB_KEY_TAB:
 				++active_input;
 
 				if (active_input > 2)
 				{
-					active_input = 0;
+					active_input = PASSWORD_INPUT;
 				}
-
 				update = true;
-			}
-			else if (event.key == TB_KEY_ENTER)
-			{
+				break;
+			case TB_KEY_ENTER:
 				save(&desktop, &login);
 				auth(&desktop, &login, &password, &buf);
 				update = true;
@@ -242,6 +240,8 @@ int main(int argc, char** argv)
 				if (dgn_catch())
 				{
 					++auth_fails;
+					// move focus back to password input
+					active_input = PASSWORD_INPUT;
 
 					if (dgn_output_code() != DGN_PAM)
 					{
@@ -256,13 +256,13 @@ int main(int argc, char** argv)
 				}
 
 				load(&desktop, &login);
-			}
-			else
-			{
+				break;
+			default:
 				(*input_handles[active_input])(
 					input_structs[active_input],
 					&event);
 				update = true;
+				break;
 			}
 		}
 	}
