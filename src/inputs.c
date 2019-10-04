@@ -115,6 +115,8 @@ void input_text(struct text* target, u64 len)
 	target->end = target->text;
 	target->visible_start = target->text;
 	target->len = len;
+	target->x = 0;
+	target->y = 0;
 }
 
 void input_desktop_free(struct desktop* target)
