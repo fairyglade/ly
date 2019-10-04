@@ -47,7 +47,7 @@ void log_init(char** log)
 	log[DGN_NULL] = lang.err_null;
 	log[DGN_ALLOC] = lang.err_alloc;
 	log[DGN_BOUNDS] = lang.err_bounds;
-	log[DGN_DOMAIN] = lang.err_domain; 
+	log[DGN_DOMAIN] = lang.err_domain;
 	log[DGN_MLOCK] = lang.err_mlock;
 	log[DGN_XSESSIONS_DIR] = lang.err_xsessions_dir;
 	log[DGN_XSESSIONS_OPEN] = lang.err_xsessions_open;
