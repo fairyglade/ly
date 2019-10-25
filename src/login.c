@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <utmp.h>
 #include <xcb/xcb.h>
 
 int get_free_display()
@@ -271,6 +272,38 @@ void env_xdg(const char* tty_id, const enum display_server display_server)
 	}
 }
 
+void add_utmp_entry(
+	struct utmp *entry,
+	char *username,
+	pid_t display_pid
+) {
+	entry->ut_type = USER_PROCESS;
+	entry->ut_pid = display_pid;
+	strcpy(entry->ut_line, ttyname(STDIN_FILENO) + strlen("/dev/"));
+
+	/* only correct for ptys named /dev/tty[pqr][0-9a-z] */
+	strcpy(entry->ut_id, ttyname(STDIN_FILENO) + strlen("/dev/tty"));
+
+	time((long int *) &entry->ut_time);
+
+	strncpy(entry->ut_user, username, UT_NAMESIZE);
+	memset(entry->ut_host, 0, UT_HOSTSIZE);
+	entry->ut_addr = 0;
+	setutent();
+
+	pututline(entry);
+}
+
+void remove_utmp_entry(struct utmp *entry) {
+	entry->ut_type = DEAD_PROCESS;
+	memset(entry->ut_line, 0, UT_LINESIZE);
+	entry->ut_time = 0;
+	memset(entry->ut_user, 0, UT_NAMESIZE);
+	setutent();
+	pututline(entry);
+	endutent();
+}
+
 void xauth(const char* display_name, const char* shell, const char* home)
 {
 	char xauthority[256];
@@ -310,8 +343,6 @@ void xorg(
 	const char* vt,
 	const char* desktop_cmd)
 {
-	reset_terminal(pwd);
-
 	// generate xauthority file
 	xauth(display_name, pwd->pw_shell, pwd->pw_dir);
 
@@ -365,7 +396,6 @@ void xorg(
 
 	int status;
 	waitpid(xorg_pid, &status, 0);
-	reset_terminal(pwd);
 	xcb_disconnect(xcb);
 	kill(pid, 0);
 
@@ -380,50 +410,29 @@ void wayland(
 	struct passwd* pwd,
 	const char* desktop_cmd)
 {
-	reset_terminal(pwd);
-	pid_t pid = fork();
-	
-	if (pid == 0)
-	{
-		char cmd[1024];
-		snprintf(cmd, 1024, "%s %s", config.wayland_cmd, desktop_cmd);
-		execl(pwd->pw_shell, pwd->pw_shell, "-c", cmd, NULL);
-		exit(EXIT_SUCCESS);
-	}
 
-	int status;
-	waitpid(pid, &status, 0);
-	reset_terminal(pwd);
+	char cmd[1024];
+	snprintf(cmd, 1024, "%s %s", config.wayland_cmd, desktop_cmd);
+	execl(pwd->pw_shell, pwd->pw_shell, "-c", cmd, NULL);
 }
 
 void shell(struct passwd* pwd)
 {
-	reset_terminal(pwd);
-	pid_t pid = fork();
+	const char* pos = strrchr(pwd->pw_shell, '/');
+	char args[1024];
+	args[0] = '-';
 
-	if (pid == 0)
+	if (pos != NULL)
 	{
-		const char* pos = strrchr(pwd->pw_shell, '/');
-		char args[1024];
-		args[0] = '-';
-
-		if (pos != NULL)
-		{
-			pos = pos + 1;
-		}
-		else
-		{
-			pos = pwd->pw_shell;
-		}
-
-		strncpy(args + 1, pos, 1024);
-		execl(pwd->pw_shell, args, NULL);
-		exit(EXIT_SUCCESS);
+		pos = pos + 1;
+	}
+	else
+	{
+		pos = pwd->pw_shell;
 	}
 
-	int status;
-	waitpid(pid, &status, 0);
-	reset_terminal(pwd);
+	strncpy(args + 1, pos, 1024);
+	execl(pwd->pw_shell, args, NULL);
 }
 
 // pam_do performs the pam action specified in pam_action
@@ -597,6 +606,7 @@ void auth(
 			exit(EXIT_FAILURE);
 		}
 
+		reset_terminal(pwd);
 		switch (desktop->display_server[desktop->cur])
 		{
 			case DS_WAYLAND:
@@ -620,9 +630,16 @@ void auth(
 		exit(EXIT_SUCCESS);
 	}
 
+	// add utmp audit
+	struct utmp entry;
+	add_utmp_entry(&entry, pwd->pw_name, pid);
+
 	// wait for the session to stop
 	int status;
 	waitpid(pid, &status, 0);
+	remove_utmp_entry(&entry);
+
+	reset_terminal(pwd);
 
 	// reinit termbox
 	tb_init();
