@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 #ifndef DEBUG
-	#define INI_LANG "/etc/ly/lang/%s.ini"
+	#define INI_LANG DATADIR "/lang/%s.ini"
 	#define INI_CONFIG "/etc/ly/config.ini"
 #else
 	#define INI_LANG "../res/lang/%s.ini"
@@ -284,10 +284,10 @@ void config_defaults()
 	config.shutdown_cmd = strdup("/sbin/shutdown -a now");
 	config.term_reset_cmd = strdup("/usr/bin/tput reset");
 	config.tty = 2;
-	config.wayland_cmd = strdup("/etc/ly/wsetup.sh");
+	config.wayland_cmd = strdup(DATADIR "/wsetup.sh");
 	config.waylandsessions = strdup("/usr/share/wayland-sessions");
 	config.x_cmd = strdup("/usr/bin/X");
-	config.x_cmd_setup = strdup("/etc/ly/xsetup.sh");
+	config.x_cmd_setup = strdup(DATADIR "/xsetup.sh");
 	config.xauth_cmd = strdup("/usr/bin/xauth");
 	config.xsessions = strdup("/usr/share/xsessions");
 }
