@@ -229,12 +229,15 @@ void env_init(struct passwd* pwd, const char* display_name)
 	setenv("DISPLAY", display_name, 1);
 	setenv("LANG", lang, 1);
 
-	// path
-	int ok = setenv("PATH", config.path, 1);
-
-	if (ok != 0)
+	// Set PATH if specified in the configuration
+	if (strlen(config.path))
 	{
-		dgn_throw(DGN_PATH);
+		int ok = setenv("PATH", config.path, 1);
+
+		if (ok != 0)
+		{
+			dgn_throw(DGN_PATH);
+		}
 	}
 }
 
