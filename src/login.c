@@ -466,7 +466,7 @@ void auth(
 	struct pam_conv conv = {login_conv, creds};
 	struct pam_handle* handle;
 	char tty_id [3];
-	snprintf(tty_id, 3, "%d", config.tty);
+	snprintf(tty_id, 3, "%d", (unsigned int)config.tty % 99);
 
 	ok = pam_start(config.service_name, NULL, &conv, &handle);
 
@@ -578,7 +578,7 @@ void auth(
 		char vt[5];
 
 		snprintf(display_name, 3, ":%d", display_id);
-		snprintf(vt, 5, "vt%d", config.tty);
+		snprintf(vt, 5, "vt%d", (unsigned int)config.tty % 99);
 
 		// set env
 		env_init(pwd, display_name);
