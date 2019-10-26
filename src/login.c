@@ -465,6 +465,8 @@ void auth(
 	const char* creds[2] = {login->text, password->text};
 	struct pam_conv conv = {login_conv, creds};
 	struct pam_handle* handle;
+	char tty_id [3];
+	snprintf(tty_id, 3, "%d", config.tty);
 
 	ok = pam_start(config.service_name, NULL, &conv, &handle);
 
@@ -496,6 +498,8 @@ void auth(
 		return;
 	}
 
+	// Set XDG variables to that pam_systemd can open the correct session type
+	env_xdg(tty_id, desktop->display_server[desktop->cur]);
 	ok = pam_do(pam_open_session, handle, 0, buf);
 
 	if (ok != PAM_SUCCESS)
@@ -571,11 +575,9 @@ void auth(
 		// get a display
 		int display_id = get_free_display();
 		char display_name[3];
-		char tty_id [3];
 		char vt[5];
 
 		snprintf(display_name, 3, ":%d", display_id);
-		snprintf(tty_id, 3, "%d", config.tty);
 		snprintf(vt, 5, "vt%d", config.tty);
 
 		// set env
@@ -594,8 +596,6 @@ void auth(
 			putenv(env[i]);
 		}
 
-		// add xdg variables
-		env_xdg(tty_id, desktop->display_server[desktop->cur]);
 
 		// execute
 		int ok = chdir(pwd->pw_dir);
