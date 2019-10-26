@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define ARG_COUNT 5
+#define ARG_COUNT 7
 // things you can define:
 // GIT_VERSION_STRING
 // RUNIT
@@ -61,6 +61,11 @@ void log_init(char** log)
 	log[DGN_HOSTNAME] = lang.err_hostname;
 }
 
+void arg_config(void* data, char** pars, const int pars_count)
+{
+	*((char **)data) = *pars;
+}
+
 // ly!
 int main(int argc, char** argv)
 {
@@ -71,17 +76,18 @@ int main(int argc, char** argv)
 	config_defaults();
 	lang_defaults();
 
-	config_load();
-
 	if (strcmp(config.lang, "en") != 0)
 	{
 		lang_load();
 	}
 
+	char *config_path = NULL;
 	// parse args
 	const struct argoat_sprig sprigs[ARG_COUNT] =
 	{
 		{NULL, 0, NULL, NULL},
+		{"config", 0, &config_path, arg_config},
+		{"c", 0, &config_path, arg_config},
 		{"help", 0, NULL, arg_help},
 		{"h", 0, NULL, arg_help},
 		{"version", 0, NULL, arg_version},
@@ -105,6 +111,8 @@ int main(int argc, char** argv)
 		lang_free();
 		return 1;
 	}
+
+	config_load(config_path);
 
 	void* input_structs[3] =
 	{
