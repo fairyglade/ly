@@ -498,6 +498,23 @@ void auth(
 		return;
 	}
 
+	// get passwd structure
+	struct passwd* pwd = getpwnam(login->text);
+	endpwent();
+
+	// get a display
+	int display_id = get_free_display();
+	char display_name[3];
+	snprintf(display_name, 3, ":%d", display_id);
+
+	// set env
+	env_init(pwd, display_name);
+
+	if (dgn_catch())
+	{
+		exit(EXIT_FAILURE);
+	}
+
 	// Set XDG variables to that pam_systemd can open the correct session type
 	env_xdg(tty_id, desktop->display_server[desktop->cur]);
 	ok = pam_do(pam_open_session, handle, 0, buf);
@@ -510,10 +527,6 @@ void auth(
 	// clear the credentials
 	input_text_free(password);
 	input_text(password, config.max_password_len);
-
-	// get passwd structure
-	struct passwd* pwd = getpwnam(login->text);
-	endpwent();
 
 	if (pwd == NULL)
 	{
@@ -572,22 +585,6 @@ void auth(
 			exit(EXIT_FAILURE);
 		}
 
-		// get a display
-		int display_id = get_free_display();
-		char display_name[3];
-		char vt[5];
-
-		snprintf(display_name, 3, ":%d", display_id);
-		snprintf(vt, 5, "vt%d", (unsigned int)config.tty % 99);
-
-		// set env
-		env_init(pwd, display_name);
-
-		if (dgn_catch())
-		{
-			exit(EXIT_FAILURE);
-		}
-
 		// add pam variables
 		char** env = pam_getenvlist(handle);
 
@@ -595,7 +592,6 @@ void auth(
 		{
 			putenv(env[i]);
 		}
-
 
 		// execute
 		int ok = chdir(pwd->pw_dir);
@@ -622,6 +618,8 @@ void auth(
 			case DS_XINITRC:
 			case DS_XORG:
 			{
+				char vt[5];
+				snprintf(vt, 5, "vt%d", (unsigned int)config.tty % 99);
 				xorg(pwd, display_name, vt, desktop->cmd[desktop->cur]);
 				break;
 			}
