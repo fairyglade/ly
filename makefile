@@ -20,6 +20,9 @@ SUBD = sub
 RESD = res
 TESTD = tests
 
+DATADIR ?= ${DESTDIR}/etc/ly
+FLAGS+= -DDATADIR=\"$(DATADIR)\"
+
 INCL = -I$(SRCD)
 INCL+= -I$(SUBD)/ctypes
 INCL+= -I$(SUBD)/argoat/src
@@ -70,16 +73,17 @@ install: $(BIND)/$(NAME)
 	@echo "installing"
 	@install -dZ ${DESTDIR}/etc/ly
 	@install -DZ $(BIND)/$(NAME) -t ${DESTDIR}/usr/bin
-	@install -DZ $(RESD)/xsetup.sh -t ${DESTDIR}/etc/ly
-	@install -DZ $(RESD)/wsetup.sh -t ${DESTDIR}/etc/ly
 	@install -DZ $(RESD)/config.ini -t ${DESTDIR}/etc/ly
-	@install -dZ ${DESTDIR}/etc/ly/lang
-	@install -DZ $(RESD)/lang/* -t ${DESTDIR}/etc/ly/lang
+	@install -DZ $(RESD)/xsetup.sh -t $(DATADIR)
+	@install -DZ $(RESD)/wsetup.sh -t $(DATADIR)
+	@install -dZ $(DATADIR)/lang
+	@install -DZ $(RESD)/lang/* -t $(DATADIR)/lang
 	@install -DZ $(RESD)/ly.service -t ${DESTDIR}/usr/lib/systemd/system
 
 uninstall:
 	@echo "uninstalling"
 	@rm -rf ${DESTDIR}/etc/ly
+	@rm -rf $(DATADIR)
 	@rm -f ${DESTDIR}/usr/bin/ly
 	@rm -f ${DESTDIR}/usr/lib/systemd/system/ly.service
 
