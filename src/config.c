@@ -146,8 +146,12 @@ void lang_load()
 	}
 }
 
-void config_load()
+void config_load(const char *cfg_path)
 {
+	if (cfg_path == NULL)
+	{
+		cfg_path = INI_CONFIG;
+	}
 	// must be alphabetically sorted
 	struct configator_param map_no_section[] =
 	{
@@ -202,7 +206,7 @@ void config_load()
 	config.sections = sections;
 	config.sections_len = sections_len;
 
-	configator(&config, INI_CONFIG);
+	configator(&config, cfg_path);
 }
 
 void lang_defaults()
