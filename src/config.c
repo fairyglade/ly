@@ -206,7 +206,7 @@ void config_load(const char *cfg_path)
 	config.sections = sections;
 	config.sections_len = sections_len;
 
-	configator(&config, cfg_path);
+	configator(&config, (char *) cfg_path);
 }
 
 void lang_defaults()
