@@ -16,6 +16,9 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
  - tput
  - shutdown
 
+### Debian-based distros
+ - libpam0g-dev
+
 ## Support
 The following desktop environments were tested with success
  - budgie
