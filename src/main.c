@@ -76,11 +76,6 @@ int main(int argc, char** argv)
 	config_defaults();
 	lang_defaults();
 
-	if (strcmp(config.lang, "en") != 0)
-	{
-		lang_load();
-	}
-
 	char *config_path = NULL;
 	// parse args
 	const struct argoat_sprig sprigs[ARG_COUNT] =
@@ -113,6 +108,11 @@ int main(int argc, char** argv)
 	}
 
 	config_load(config_path);
+
+	if (strcmp(config.lang, "en") != 0)
+	{
+		lang_load();
+	}
 
 	void* input_structs[3] =
 	{
