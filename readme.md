@@ -7,7 +7,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 ## Dependencies
  - a C99 compiler (tested with tcc and gcc)
  - a C standard library
- - make
+ - GNU make
  - pam
  - xcb
  - xorg
