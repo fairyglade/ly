@@ -80,6 +80,16 @@ install: $(BIND)/$(NAME)
 	@install -DZ $(RESD)/lang/* -t $(DATADIR)/lang
 	@install -DZ $(RESD)/ly.service -t ${DESTDIR}/usr/lib/systemd/system
 
+installnoconf: $(BIND)/$(NAME)
+	@echo "installing without the configuration file"
+	@install -dZ ${DESTDIR}/etc/ly
+	@install -DZ $(BIND)/$(NAME) -t ${DESTDIR}/usr/bin
+	@install -DZ $(RESD)/xsetup.sh -t $(DATADIR)
+	@install -DZ $(RESD)/wsetup.sh -t $(DATADIR)
+	@install -dZ $(DATADIR)/lang
+	@install -DZ $(RESD)/lang/* -t $(DATADIR)/lang
+	@install -DZ $(RESD)/ly.service -t ${DESTDIR}/usr/lib/systemd/system
+
 uninstall:
 	@echo "uninstalling"
 	@rm -rf ${DESTDIR}/etc/ly
