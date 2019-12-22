@@ -431,7 +431,7 @@ void shell(struct passwd* pwd)
 		pos = pwd->pw_shell;
 	}
 
-	strncpy(args + 1, pos, 1024);
+	strncpy(args + 1, pos, 1023);
 	execl(pwd->pw_shell, args, NULL);
 }
 
