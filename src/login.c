@@ -526,7 +526,7 @@ void auth(
 	if (pwd->pw_shell[0] == '\0')
 	{
 		setusershell();
-		
+
 		char* shell = getusershell();
 
 		if (shell != NULL)
@@ -547,7 +547,7 @@ void auth(
 
 	if (pid == 0)
 	{
-		// set user info 
+		// set user info
 		ok = initgroups(pwd->pw_name, pwd->pw_gid);
 
 		if (ok != 0)
@@ -652,21 +652,21 @@ void auth(
 
 	// close pam session
 	ok = pam_do(pam_close_session, handle, 0, buf);
-	
+
 	if (ok != PAM_SUCCESS)
 	{
 		return;
 	}
 
 	ok = pam_do(pam_setcred, handle, PAM_DELETE_CRED, buf);
-	
+
 	if (ok != PAM_SUCCESS)
 	{
 		return;
 	}
 
 	ok = pam_end(handle, 0);
-	
+
 	if (ok != PAM_SUCCESS)
 	{
 		pam_diagnose(ok, buf);
