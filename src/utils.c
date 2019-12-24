@@ -95,6 +95,19 @@ void desktop_crawl(
 		strncat(path, dir_info->d_name, (sizeof (path)) - 1);
 		configator(&desktop_config, path);
 
+		// if these are wayland sessions, add " (Wayland)" to their names,
+		// as long as their names don't already contain that string
+		if (server == DS_WAYLAND && config.wayland_specifier)
+		{
+			const char wayland_specifier[] = " (Wayland)";
+			if (strstr(name, wayland_specifier) == NULL)
+			{
+				name = realloc(name, (strlen(name) + sizeof(wayland_specifier) + 1));
+				// using strcat is safe because the string is constant
+				strcat(name, wayland_specifier);
+			}
+		}
+
 		if ((name != NULL) && (exec != NULL))
 		{
 			input_desktop_add(target, name, exec, server);
