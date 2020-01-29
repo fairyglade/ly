@@ -6,6 +6,7 @@
 # Copyright (C) 2001-2005 Oswald Buddenhagen <ossi@kde.org>
 
 # Note that the respective logout scripts are not sourced.
+unset DISPLAY
 case $SHELL in
   */bash)
     [ -z "$BASH" ] && exec $SHELL $0 "$@"
