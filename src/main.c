@@ -264,6 +264,7 @@ int main(int argc, char** argv)
 				}
 
 				load(&desktop, &login);
+				system("tput cnorm");
 				break;
 			default:
 				(*input_handles[active_input])(
