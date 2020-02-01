@@ -1,7 +1,7 @@
 NAME = ly
 CC = gcc
 FLAGS = -std=c99 -pedantic -g
-FLAGS+= -Wall -Wno-unused-parameter -Wextra -Werror=vla -Werror
+FLAGS+= -Wall -Wextra -Werror=vla -Wno-unused-parameter
 #FLAGS+= -DDEBUG
 FLAGS+= -DGIT_VERSION_STRING=\"$(shell git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g')\"
 LINK = -lpam -lxcb
