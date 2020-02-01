@@ -241,15 +241,8 @@ void env_init(struct passwd* pwd)
 	}
 }
 
-void env_xdg(const char* tty_id, const enum display_server display_server)
+void env_xdg_session(const enum display_server display_server)
 {
-	char user[15];
-	snprintf(user, 15, "/run/user/%d", getuid());
-	setenv("XDG_RUNTIME_DIR", user, 0);
-	setenv("XDG_SESSION_CLASS", "user", 0);
-	setenv("XDG_SEAT", "seat0", 0);
-	setenv("XDG_VTNR", tty_id, 0);
-
 	switch (display_server)
 	{
 		case DS_WAYLAND:
@@ -269,6 +262,16 @@ void env_xdg(const char* tty_id, const enum display_server display_server)
 			break;
 		}
 	}
+}
+
+void env_xdg(const char* tty_id)
+{
+	char user[15];
+	snprintf(user, 15, "/run/user/%d", getuid());
+	setenv("XDG_RUNTIME_DIR", user, 0);
+	setenv("XDG_SESSION_CLASS", "user", 0);
+	setenv("XDG_SEAT", "seat0", 0);
+	setenv("XDG_VTNR", tty_id, 0);
 }
 
 void add_utmp_entry(
@@ -505,10 +508,13 @@ void auth(
 		return;
 	}
 
+	env_xdg_session(desktop->display_server[desktop->cur]);
+
 	ok = pam_do(pam_open_session, handle, 0, buf);
 
 	if (ok != PAM_SUCCESS)
 	{
+		setenv("XDG_SESSION_TYPE", "tty", 0);
 		return;
 	}
 
@@ -601,7 +607,7 @@ void auth(
 		}
 
 		// add xdg variables
-		env_xdg(tty_id, desktop->display_server[desktop->cur]);
+		env_xdg(tty_id);
 
 		// execute
 		int ok = chdir(pwd->pw_dir);
