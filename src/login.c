@@ -304,10 +304,10 @@ void remove_utmp_entry(struct utmp *entry) {
 	endutent();
 }
 
-void xauth(const char* display_name, const char* shell, const char* home)
+void xauth(const char* display_name, const char* shell, const char* dir)
 {
 	char xauthority[256];
-	snprintf(xauthority, 256, "%s/%s", home, ".lyxauth");
+	snprintf(xauthority, 256, "%s/%s", dir, ".lyxauth");
 	setenv("XAUTHORITY", xauthority, 1);
 
 	FILE* fp = fopen(xauthority, "ab+");
@@ -344,7 +344,16 @@ void xorg(
 	const char* desktop_cmd)
 {
 	// generate xauthority file
-	xauth(display_name, pwd->pw_shell, pwd->pw_dir);
+	const char* xauth_dir;
+
+	xauth_dir = getenv("XDG_CONFIG_HOME");
+
+	if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
+	{
+		xauth_dir = pwd->pw_dir;
+	}
+
+	xauth(display_name, pwd->pw_shell, xauth_dir);
 
 	// start xorg
 	pid_t pid = fork();
