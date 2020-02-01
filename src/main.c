@@ -19,7 +19,6 @@
 #define ARG_COUNT 7
 // things you can define:
 // GIT_VERSION_STRING
-// RUNIT
 
 // global
 struct lang lang;
