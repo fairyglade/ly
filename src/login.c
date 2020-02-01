@@ -205,7 +205,7 @@ void pam_diagnose(int error, struct term_buf* buf)
 	dgn_throw(DGN_PAM);
 }
 
-void env_init(struct passwd* pwd, const char* display_name)
+void env_init(struct passwd* pwd)
 {
 	extern char** environ;
 	char* term = getenv("TERM");
@@ -227,7 +227,6 @@ void env_init(struct passwd* pwd, const char* display_name)
 	setenv("SHELL", pwd->pw_shell, 1);
 	setenv("USER", pwd->pw_name, 1);
 	setenv("LOGNAME", pwd->pw_name, 1);
-	setenv("DISPLAY", display_name, 1);
 	setenv("LANG", lang, 1);
 
 	// Set PATH if specified in the configuration
@@ -255,7 +254,7 @@ void env_xdg(const char* tty_id, const enum display_server display_server)
 	{
 		case DS_WAYLAND:
 		{
-			setenv("XDG_SESSION_TYPE", "wayland", 0);
+			setenv("XDG_SESSION_TYPE", "wayland", 1);
 			break;
 		}
 		case DS_SHELL:
@@ -309,6 +308,7 @@ void xauth(const char* display_name, const char* shell, const char* dir)
 	char xauthority[256];
 	snprintf(xauthority, 256, "%s/%s", dir, ".lyxauth");
 	setenv("XAUTHORITY", xauthority, 1);
+	setenv("DISPLAY", display_name, 1);
 
 	FILE* fp = fopen(xauthority, "ab+");
 
@@ -339,20 +339,20 @@ void xauth(const char* display_name, const char* shell, const char* dir)
 
 void xorg(
 	struct passwd* pwd,
-	const char* display_name,
 	const char* vt,
 	const char* desktop_cmd)
 {
 	// generate xauthority file
-	const char* xauth_dir;
-
-	xauth_dir = getenv("XDG_CONFIG_HOME");
+	const char* xauth_dir = getenv("XDG_CONFIG_HOME");
 
 	if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
 	{
 		xauth_dir = pwd->pw_dir;
 	}
 
+	char display_name[4];
+
+	snprintf(display_name, 3, ":%d", get_free_display());
 	xauth(display_name, pwd->pw_shell, xauth_dir);
 
 	// start xorg
@@ -578,17 +578,14 @@ void auth(
 		}
 
 		// get a display
-		int display_id = get_free_display();
-		char display_name[3];
 		char tty_id [3];
 		char vt[5];
 
-		snprintf(display_name, 3, ":%d", display_id);
 		snprintf(tty_id, 3, "%d", config.tty);
 		snprintf(vt, 5, "vt%d", config.tty);
 
 		// set env
-		env_init(pwd, display_name);
+		env_init(pwd);
 
 		if (dgn_catch())
 		{
@@ -631,7 +628,7 @@ void auth(
 			case DS_XINITRC:
 			case DS_XORG:
 			{
-				xorg(pwd, display_name, vt, desktop->cmd[desktop->cur]);
+				xorg(pwd, vt, desktop->cmd[desktop->cur]);
 				break;
 			}
 		}
