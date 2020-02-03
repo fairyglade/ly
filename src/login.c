@@ -513,8 +513,7 @@ void auth(
 	}
 
 	// clear the credentials
-	input_text_free(password);
-	input_text(password, config.max_password_len);
+	input_text_clear(password);
 
 	// get passwd structure
 	struct passwd* pwd = getpwnam(login->text);
