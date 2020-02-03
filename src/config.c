@@ -184,6 +184,7 @@ void config_load(const char *cfg_path)
 		{"term_reset_cmd", &config.term_reset_cmd, config_handle_str},
 		{"tty", &config.tty, config_handle_u8},
 		{"wayland_cmd", &config.wayland_cmd, config_handle_str},
+		{"wayland_specifier", &config.wayland_specifier, config_handle_bool},
 		{"waylandsessions", &config.waylandsessions, config_handle_str},
 		{"x_cmd", &config.x_cmd, config_handle_str},
 		{"x_cmd_setup", &config.x_cmd_setup, config_handle_str},
@@ -289,6 +290,7 @@ void config_defaults()
 	config.term_reset_cmd = strdup("/usr/bin/tput reset");
 	config.tty = 2;
 	config.wayland_cmd = strdup(DATADIR "/wsetup.sh");
+	config.wayland_specifier = false;
 	config.waylandsessions = strdup("/usr/share/wayland-sessions");
 	config.x_cmd = strdup("/usr/bin/X");
 	config.x_cmd_setup = strdup(DATADIR "/xsetup.sh");

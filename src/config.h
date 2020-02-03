@@ -89,6 +89,7 @@ struct config
 	char* term_reset_cmd;
 	u8 tty;
 	char* wayland_cmd;
+	bool wayland_specifier;
 	char* waylandsessions;
 	char* x_cmd;
 	char* x_cmd_setup;
