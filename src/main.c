@@ -216,6 +216,12 @@ int main(int argc, char** argv)
 			case TB_KEY_CTRL_C:
 				run = false;
 				break;
+			case TB_KEY_CTRL_U:
+				if (active_input > 0)
+				{
+					input_text_clear(input_structs[active_input]);
+				}
+				break;
 			case TB_KEY_ARROW_UP:
 				if (active_input > 0)
 				{
