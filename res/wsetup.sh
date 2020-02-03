@@ -19,7 +19,7 @@ case $SHELL in
       . $HOME/.profile
     fi
     ;;
-*/zsh)
+  */zsh)
     [ -z "$ZSH_NAME" ] && exec $SHELL $0 "$@"
     [ -d /etc/zsh ] && zdir=/etc/zsh || zdir=/etc
     zhome=${ZDOTDIR:-$HOME}
@@ -50,5 +50,7 @@ case $SHELL in
     [ -f $HOME/.profile ] && . $HOME/.profile
     ;;
 esac
+
+unset DISPLAY
 
 exec $@
