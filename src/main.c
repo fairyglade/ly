@@ -255,6 +255,11 @@ int main(int argc, char** argv)
 						buf.info_line = dgn_output_log();
 					}
 
+					if (config.blank_password)
+					{
+						input_text_clear(&password);
+					}
+
 					dgn_reset();
 				}
 				else

@@ -50,5 +50,6 @@ void input_text_left(struct text* target);
 void input_text_write(struct text* target, char ascii);
 void input_text_delete(struct text* target);
 void input_text_backspace(struct text* target);
+void input_text_clear(struct text* target);
 
 #endif

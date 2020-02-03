@@ -258,3 +258,11 @@ void input_text_backspace(struct text* target)
 		input_text_delete(target);
 	}
 }
+
+void input_text_clear(struct text* target)
+{
+	memset(target->text, 0, target->len + 1);
+	target->cur = target->text;
+	target->end = target->text;
+	target->visible_start = target->text;
+}

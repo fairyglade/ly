@@ -160,7 +160,7 @@ void config_load(const char *cfg_path)
 		{"asterisk", &config.asterisk, config_handle_char},
 		{"bg", &config.bg, config_handle_u8},
 		{"blank_box", &config.blank_box, config_handle_bool},
-		{"blank_password", &config.blank_box, config_handle_bool},
+		{"blank_password", &config.blank_password, config_handle_bool},
 		{"console_dev", &config.console_dev, config_handle_str},
 		{"default_input", &config.default_input, config_handle_u8},
 		{"fg", &config.fg, config_handle_u8},
