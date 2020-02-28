@@ -297,23 +297,20 @@ void env_xdg(const char* tty_id, const enum display_server display_server)
 	}
 }
 
-void add_utmp_entry(
-	struct utmp *entry,
-	char *username,
-	pid_t display_pid
-) {
+void add_utmp_entry(struct utmp* entry, pid_t display_pid, char* username, char* tty_id, char* xdisplay) {
+	char tty_name[6];
 	entry->ut_type = USER_PROCESS;
 	entry->ut_pid = display_pid;
-	strcpy(entry->ut_line, ttyname(STDIN_FILENO) + strlen("/dev/"));
-
-	/* only correct for ptys named /dev/tty[pqr][0-9a-z] */
-	strcpy(entry->ut_id, ttyname(STDIN_FILENO) + strlen("/dev/tty"));
+	snprintf(tty_name, sizeof(tty_name), "tty%d", config.tty);
+	strncpy(entry->ut_line, tty_name, sizeof(entry->ut_line));
+	strncpy(entry->ut_user, username, sizeof(entry->ut_user));
+	if (xdisplay) {
+		strncpy(entry->ut_id, xdisplay, sizeof(entry->ut_id));
+		strncpy(entry->ut_host, xdisplay, sizeof(entry->ut_host));
+	}
 
 	time((long int *) &entry->ut_time);
 
-	strncpy(entry->ut_user, username, UT_NAMESIZE);
-	memset(entry->ut_host, 0, UT_HOSTSIZE);
-	entry->ut_addr = 0;
 	setutent();
 
 	pututline(entry);
@@ -366,6 +363,7 @@ void xauth(const char* display_name, const char* shell, const char* dir)
 void xorg(
 	struct passwd* pwd,
 	const char* vt,
+	const char* display_name,
 	const char* desktop_cmd)
 {
 	// generate xauthority file
@@ -376,9 +374,6 @@ void xorg(
 		xauth_dir = pwd->pw_dir;
 	}
 
-	char display_name[4];
-
-	snprintf(display_name, 3, ":%d", get_free_display());
 	xauth(display_name, pwd->pw_shell, xauth_dir);
 
 	// start xorg
@@ -572,6 +567,16 @@ void auth(
 	tb_present();
 	tb_shutdown();
 
+	// get a display
+	char tty_id[3];
+	char vt[5];
+	char display_name[4];
+
+	snprintf(tty_id, 3, "%d", config.tty);
+	snprintf(vt, 5, "vt%d", config.tty);
+	// Xorg only?
+	snprintf(display_name, 3, ":%d", get_free_display());
+
 	// start desktop environment
 	pid_t pid = fork();
 
@@ -601,13 +606,6 @@ void auth(
 			dgn_throw(DGN_USER_UID);
 			exit(EXIT_FAILURE);
 		}
-
-		// get a display
-		char tty_id [3];
-		char vt[5];
-
-		snprintf(tty_id, 3, "%d", config.tty);
-		snprintf(vt, 5, "vt%d", config.tty);
 
 		// set env
 		env_init(pwd);
@@ -653,7 +651,7 @@ void auth(
 			case DS_XINITRC:
 			case DS_XORG:
 			{
-				xorg(pwd, vt, desktop->cmd[desktop->cur]);
+				xorg(pwd, vt, display_name, desktop->cmd[desktop->cur]);
 				break;
 			}
 		}
@@ -663,7 +661,7 @@ void auth(
 
 	// add utmp audit
 	struct utmp entry;
-	add_utmp_entry(&entry, pwd->pw_name, pid);
+	add_utmp_entry(&entry, pid, pwd->pw_name, tty_id, display_name);
 
 	// wait for the session to stop
 	int status;
