@@ -207,11 +207,29 @@ void pam_diagnose(int error, struct term_buf* buf)
 
 void env_init(struct passwd* pwd)
 {
+	// borrowed from
+	// https://github.com/linuxdeepin/lightdm/blob/810f9b171feb779e48eba1dca38eb37d6d027d1a/src/session-child.c
+	static const char* const locale_var_names[] = {
+        "LC_PAPER",
+        "LC_NAME",
+        "LC_ADDRESS",
+        "LC_TELEPHONE",
+        "LC_MEASUREMENT",
+        "LC_IDENTIFICATION",
+        "LC_COLLATE",
+        "LC_CTYPE",
+        "LC_MONETARY",
+        "LC_NUMERIC",
+        "LC_TIME",
+        "LC_MESSAGES",
+        "LC_ALL",
+        "LANG",
+        NULL
+    };
 	extern char** environ;
 	char* term = getenv("TERM");
-	char* lang = getenv("LANG");
 	// clean env
-	environ[0] = NULL;
+	environ = NULL;
 
 	if (term != NULL)
 	{
@@ -227,7 +245,15 @@ void env_init(struct passwd* pwd)
 	setenv("SHELL", pwd->pw_shell, 1);
 	setenv("USER", pwd->pw_name, 1);
 	setenv("LOGNAME", pwd->pw_name, 1);
-	setenv("LANG", lang, 1);
+
+	char* locale_value;
+	for (int i = 0; locale_var_names[i] != NULL; i++)
+	{
+		if ((locale_value = getenv(locale_var_names[i])) != NULL)
+		{
+			setenv(locale_var_names[i], locale_value, 1);
+		}
+	}
 
 	// Set PATH if specified in the configuration
 	if (strlen(config.path))
