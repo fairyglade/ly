@@ -93,6 +93,19 @@ Use the up and down arrow keys to change the current field, and the
 left and right arrow keys to change the target desktop environment
 while on the desktop field (above the login field).
 
+# .xinitrc
+If your .xinitrc doesn't work make sure it is executable and includes a shebang.
+This file is supposed to be a shell script! Quoting from xinit's man page:
+```
+If no specific client program is given on the command line, xinit will look for
+a file in the user's home directory called .xinitrc to run as a shell script to
+start up client programs.
+```
+On ArchLinux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
+```
+#!/bin/sh
+```
+
 ## Tips
 The numlock and capslock state is printed in the top-right corner.
 Use the F1 and F2 keys to respectively shutdown and reboot.
