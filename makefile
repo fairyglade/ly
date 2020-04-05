@@ -78,7 +78,7 @@ install: $(BIND)/$(NAME)
 	@install -DZ $(RESD)/wsetup.sh -t $(DATADIR)
 	@install -dZ $(DATADIR)/lang
 	@install -DZ $(RESD)/lang/* -t $(DATADIR)/lang
-	@install -DZ $(RESD)/ly.service -t ${DESTDIR}/usr/lib/systemd/system
+	@install -DZ $(RESD)/ly.service -m 644 -t ${DESTDIR}/usr/lib/systemd/system
 
 installnoconf: $(BIND)/$(NAME)
 	@echo "installing without the configuration file"
@@ -88,7 +88,7 @@ installnoconf: $(BIND)/$(NAME)
 	@install -DZ $(RESD)/wsetup.sh -t $(DATADIR)
 	@install -dZ $(DATADIR)/lang
 	@install -DZ $(RESD)/lang/* -t $(DATADIR)/lang
-	@install -DZ $(RESD)/ly.service -t ${DESTDIR}/usr/lib/systemd/system
+	@install -DZ $(RESD)/ly.service -m 644 -t ${DESTDIR}/usr/lib/systemd/system
 
 uninstall:
 	@echo "uninstalling"
