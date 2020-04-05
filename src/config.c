@@ -281,7 +281,7 @@ void config_defaults()
 	config.max_password_len = 255;
 	config.mcookie_cmd = strdup("/usr/bin/mcookie");
 	config.min_refresh_delta = 5;
-	config.path = strdup("/sbin:/bin:/usr/local/sbin:/usr/local/bin:/usr/bin");
+	config.path = strdup("/sbin:/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin");
 	config.restart_cmd = strdup("/sbin/shutdown -r now");
 	config.save = true;
 	config.save_file = strdup("/etc/ly/save");
