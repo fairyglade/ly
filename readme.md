@@ -93,7 +93,7 @@ Use the up and down arrow keys to change the current field, and the
 left and right arrow keys to change the target desktop environment
 while on the desktop field (above the login field).
 
-# .xinitrc
+## .xinitrc
 If your .xinitrc doesn't work make sure it is executable and includes a shebang.
 This file is supposed to be a shell script! Quoting from xinit's man page:
 ```
