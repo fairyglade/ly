@@ -27,7 +27,11 @@ struct config config;
 // args handles
 void arg_help(void* data, char** pars, const int pars_count)
 {
-	printf("RTFM\n");
+	printf(
+		"Check git repository for the manual: %s\n",
+		"https://github.com/cylgom/ly"
+	);
+	printf("Or the configuration file: /etc/ly/config.ini\n");
 }
 
 void arg_version(void* data, char** pars, const int pars_count)
