@@ -1,5 +1,4 @@
 # Ly - a TUI display manager
-[![CodeFactor](https://www.codefactor.io/repository/github/cylgom/ly/badge/master)](https://www.codefactor.io/repository/github/cylgom/ly/overview/master)
 ![Ly screenshot](https://user-images.githubusercontent.com/5473047/42466218-8cb53d3c-83ae-11e8-8e53-bae3669f959c.png "Ly screenshot")
 
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
@@ -48,7 +47,7 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-git clone https://github.com/cylgom/ly.git
+git clone https://github.com/nullgemm/ly.git
 ```
 
 Fetch submodules

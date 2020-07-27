@@ -107,8 +107,8 @@ clean:
 
 remotes:
 	@echo "registering remotes"
-	@git remote add github git@github.com:cylgom/$(NAME).git
-	@git remote add gitea ssh://git@git.cylgom.net:2999/cylgom/$(NAME).git
+	@git remote add github git@github.com:nullgemm/$(NAME).git
+	@git remote add gitea ssh://git@git.nullgem.fr:2999/nullgemm/$(NAME).git
 
 github:
 	@echo "sourcing submodules from https://github.com"
@@ -119,7 +119,7 @@ github:
 	@git submodule update --init --recursive --remote
 
 gitea:
-	@echo "sourcing submodules from https://git.cylgom.net"
+	@echo "sourcing submodules from personal server"
 	@cp .gitea .gitmodules
 	@git submodule sync
 	@git submodule update --init --remote
