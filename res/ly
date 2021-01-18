@@ -1,0 +1,25 @@
+#!/sbin/openrc-run
+
+command=/usr/bin/ly
+
+name="ly"
+description="TUI display manager"
+
+
+depend() {
+	after agetty
+}
+start() {
+	TERM_NAME=linux
+	BAUD_RATE=38400
+	if [ -x /sbin/getty -o -x /bin/getty ];then
+		GETTY=getty
+		# busybox
+	elif [ -x /sbin/agetty -o -x /bin/agetty ];then
+		GETTY=agetty
+		# util-linux
+	fi
+
+	exec setsid ${GETTY} -nl /usr/bin/ly tty1 "${BAUD_RATE}" "${TERM_NAME}"
+}
+	
