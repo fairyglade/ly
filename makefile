@@ -78,7 +78,7 @@ install: $(BIND)/$(NAME)
 	@install -DZ $(RESD)/wsetup.sh -t $(DATADIR)
 	@install -dZ $(DATADIR)/lang
 	@install -DZ $(RESD)/lang/* -t $(DATADIR)/lang
-	@install -DZ $(RESD)/ly.service -m 644 -t ${DESTDIR}/usr/lib/systemd/system
+	@install -DZ $(RESD)/ly -m 644 -t ${DESTDIR}/usr/lib/systemd/system
 	@install -DZ $(RESD)/pam.d/ly -m 644 -t ${DESTDIR}/etc/pam.d
 
 installnoconf: $(BIND)/$(NAME)
@@ -89,7 +89,7 @@ installnoconf: $(BIND)/$(NAME)
 	@install -DZ $(RESD)/wsetup.sh -t $(DATADIR)
 	@install -dZ $(DATADIR)/lang
 	@install -DZ $(RESD)/lang/* -t $(DATADIR)/lang
-	@install -DZ $(RESD)/ly.service -m 644 -t ${DESTDIR}/usr/lib/systemd/system
+	@install -DZ $(RESD)/ly -m 755 -t /etc/init.d/
 	@install -DZ $(RESD)/pam.d/ly -m 644 -t ${DESTDIR}/etc/pam.d
 
 uninstall:
