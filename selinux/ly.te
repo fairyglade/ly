@@ -1,0 +1,32 @@
+policy_module(ly, 1.0.0)
+
+########################################
+#
+# Declarations
+#
+
+type ly_t;
+type ly_exec_t;
+init_daemon_domain(ly_t, ly_exec_t)
+
+permissive ly_t;
+
+########################################
+#
+# ly local policy
+#
+allow ly_t self:capability { setgid setuid };
+allow ly_t self:process { fork signal_perms };
+allow ly_t self:process transition;
+allow ly_t self:fifo_file rw_fifo_file_perms;
+allow ly_t self:unix_stream_socket create_stream_socket_perms;
+
+domain_use_interactive_fds(ly_t)
+
+files_read_etc_files(ly_t)
+
+auth_use_nsswitch(ly_t)
+
+logging_send_audit_msgs(ly_t)
+
+miscfiles_read_localization(ly_t)

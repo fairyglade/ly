@@ -1,0 +1,40 @@
+
+## <summary>policy for ly</summary>
+
+########################################
+## <summary>
+##	Execute ly_exec_t in the ly domain.
+## </summary>
+## <param name="domain">
+## <summary>
+##	Domain allowed to transition.
+## </summary>
+## </param>
+#
+interface(`ly_domtrans',`
+	gen_require(`
+		type ly_t, ly_exec_t;
+	')
+
+	corecmd_search_bin($1)
+	domtrans_pattern($1, ly_exec_t, ly_t)
+')
+
+######################################
+## <summary>
+##	Execute ly in the caller domain.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed access.
+##	</summary>
+## </param>
+#
+interface(`ly_exec',`
+	gen_require(`
+		type ly_exec_t;
+	')
+
+	corecmd_search_bin($1)
+	can_exec($1, ly_exec_t)
+')
