@@ -8,6 +8,7 @@ VCS:            {{{ git_dir_vcs }}}
 Source:         {{{ git_dir_pack }}}
 BuildRequires:  libxcb-devel
 BuildRequires:  pam-devel
+BuildRequires:  make
 Requires:       libxcb
 Requires:       pam
 
