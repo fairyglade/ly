@@ -9,6 +9,7 @@ Source:         {{{ git_dir_pack }}}
 BuildRequires:  libxcb-devel
 BuildRequires:  pam-devel
 BuildRequires:  make
+BuildRequires:  git
 Requires:       libxcb
 Requires:       pam
 
