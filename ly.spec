@@ -4,7 +4,6 @@ Release:        1
 Summary:        A TUI display manager
 License:        WTFPL
 URL:            https://github.com/nullgemm/ly
-Source:         https://github.com/dhalucario/ly/archive/v0.5.2.tar.gz
 BuildRequires:  libxcb-devel
 BuildRequires:  pam-devel
 BuildRequires:  make
@@ -15,8 +14,10 @@ Requires:       pam
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 %prep
-cd src
-make github
+tar -czvf v0.5.2.tar.gz %{buildroot}
+mv v0.5.2.tar.gz %{_sourcedir}
+cd %{_sourcedir}
+ls -la
 
 %build
 cd src
