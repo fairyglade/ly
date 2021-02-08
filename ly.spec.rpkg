@@ -1,10 +1,10 @@
-Name:           ly
-Version:        0.5.2
-Release:        1
+Name:           {{{ git_dir_name }}}
+Version:        {{{ git_dir_version }}}
+Release:        1%{?dist}
 Summary:        A TUI display manager
 License:        WTFPL
 URL:            https://github.com/nullgemm/ly
-Source:         https://github.com/dhalucario/ly/archive/v0.5.2.tar.gz
+VCS:            {{{ git_dir_vcs }}}
 BuildRequires:  libxcb-devel
 BuildRequires:  pam-devel
 BuildRequires:  make
@@ -50,3 +50,4 @@ chmod -x %{buildroot}/etc/ly/lang/*
 /etc/pam.d/ly
 
 %changelog
+{{{ git_dir_changelog }}}
