@@ -1,11 +1,9 @@
-Name:           {{{ git_dir_name }}}
-Version:        {{{ git_dir_version }}}
-Release:        1%{?dist}
+Name:           ly
+Version:        0.5.2
+Release:        0
 Summary:        A TUI display manager
 License:        WTFPL
 URL:            https://github.com/nullgemm/ly
-VCS:            {{{ git_dir_vcs }}}
-Source:         {{{ git_dir_pack }}}
 BuildRequires:  libxcb-devel
 BuildRequires:  pam-devel
 BuildRequires:  make
@@ -16,10 +14,11 @@ Requires:       pam
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 %prep
-{{{ git_dir_setup_macro }}}
+cd src
 make github
 
 %build
+cd src
 make
 
 %install
@@ -29,6 +28,8 @@ mkdir -p %{buildroot}/usr/bin/
 mkdir -p %{buildroot}/usr/lib/systemd/system/
 mkdir -p %{buildroot}/etc/pam.d/
 DESTDIR="%{buildroot}" make install
+chmod -x %{buildroot}/etc/ly/config.ini
+chmod -x %{buildroot}/etc/ly/lang/*
 
 %files
 /usr/bin/ly
@@ -45,4 +46,3 @@ DESTDIR="%{buildroot}" make install
 /etc/pam.d/ly
 
 %changelog
-{{{ git_dir_changelog }}}

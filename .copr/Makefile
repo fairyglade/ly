@@ -1,0 +1,2 @@
+srpm:
+	make github
