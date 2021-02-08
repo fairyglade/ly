@@ -15,8 +15,7 @@ Requires:       pam
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 %prep
-rm * -rf
-git clone https://github.com/dhalucario/ly.git
+git clone https://github.com/dhalucario/ly.git ly
 cd ly
 git checkout v0.5.2
 make github
