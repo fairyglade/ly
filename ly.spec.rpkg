@@ -5,6 +5,7 @@ Summary:        A TUI display manager
 License:        WTFPL
 URL:            https://github.com/nullgemm/ly
 VCS:            {{{ git_dir_vcs }}}
+Source:         {{{ git_dir_pack }}}
 BuildRequires:  libxcb-devel
 BuildRequires:  pam-devel
 BuildRequires:  make
