@@ -1,9 +1,10 @@
 Name:           ly
 Version:        0.5.2
-Release:        0
+Release:        1
 Summary:        A TUI display manager
 License:        WTFPL
 URL:            https://github.com/nullgemm/ly
+Source:         https://github.com/dhalucario/ly/archive/v0.5.2.tar.gz
 BuildRequires:  libxcb-devel
 BuildRequires:  pam-devel
 BuildRequires:  make

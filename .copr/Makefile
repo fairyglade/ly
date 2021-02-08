@@ -1,2 +1,2 @@
 srpm:
-	make github
+	rpmbuild -bs ly.spec
