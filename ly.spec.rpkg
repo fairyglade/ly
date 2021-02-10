@@ -39,6 +39,7 @@ mkdir -p %{buildroot}/usr/bin/
 mkdir -p %{buildroot}/usr/lib/systemd/system/
 mkdir -p %{buildroot}/etc/pam.d/
 DESTDIR="%{buildroot}" make install
+DESTDIR="%{buildroot}" make installselinux
 chmod -x %{buildroot}/etc/ly/config.ini
 chmod -x %{buildroot}/etc/ly/lang/*
 
