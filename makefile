@@ -96,6 +96,7 @@ makeselinux:
 	@echo "installing selinux modules"
 	@checkmodule -M -m -o ly.mod selinux/ly.te
 	@semodule_package -o ly.pp -m ly.mod
+	@cp ly.pp $(DESTDIR)/etc/selinux/packages/ly.pp
 
 uninstall:
 	@echo "uninstalling"
