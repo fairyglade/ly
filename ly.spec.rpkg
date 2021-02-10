@@ -16,6 +16,7 @@ BuildRequires:  pam-devel
 BuildRequires:  make
 BuildRequires:  git
 BuildRequires:  gcc
+BuildRequires:  selinux-policy-devel
 Requires:       libxcb
 Requires:       pam
 
