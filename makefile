@@ -92,6 +92,11 @@ installnoconf: $(BIND)/$(NAME)
 	@install -DZ $(RESD)/ly.service -m 644 -t ${DESTDIR}/usr/lib/systemd/system
 	@install -DZ $(RESD)/pam.d/ly -m 644 -t ${DESTDIR}/etc/pam.d
 
+makeselinux:
+	@echo "installing selinux modules"
+	@checkmodule -M -m -o ly.mod selinux/ly.te
+	@semodule_package -o ly.pp -m ly.mod
+
 uninstall:
 	@echo "uninstalling"
 	@rm -rf ${DESTDIR}/etc/ly

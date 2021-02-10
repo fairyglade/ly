@@ -1,3 +1,8 @@
+%define relabel_files() \
+restorecon -R /usr/bin/ly; \
+
+%define selinux_policyver 3.14.6-34
+
 Name:           {{{ git_dir_name }}}
 Version:        {{{ git_dir_version }}}
 Release:        1%{?dist}
@@ -37,6 +42,26 @@ DESTDIR="%{buildroot}" make install
 chmod -x %{buildroot}/etc/ly/config.ini
 chmod -x %{buildroot}/etc/ly/lang/*
 
+%post
+semodule -n -i %{_datadir}/selinux/packages/ly.pp
+if /usr/sbin/selinuxenabled ; then
+    /usr/sbin/load_policy
+    %relabel_files
+
+fi;
+exit 0
+
+%postun
+if [ $1 -eq 0 ]; then
+    semodule -n -r ly
+    if /usr/sbin/selinuxenabled ; then
+       /usr/sbin/load_policy
+       %relabel_files
+
+    fi;
+fi;
+exit 0
+
 %files
 /usr/bin/ly
 /usr/lib/systemd/system/ly.service
@@ -50,6 +75,7 @@ chmod -x %{buildroot}/etc/ly/lang/*
 /etc/ly/wsetup.sh
 /etc/ly/config.ini
 /etc/pam.d/ly
+/etc/selinux/packages/ly.pp
 
 %changelog
 {{{ git_dir_changelog }}}
