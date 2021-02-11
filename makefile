@@ -93,9 +93,9 @@ installnoconf: $(BIND)/$(NAME)
 	@install -DZ $(RESD)/pam.d/ly -m 644 -t ${DESTDIR}/etc/pam.d
 
 installselinux:
-	@echo "installing selinux modules"
-	@make -f /usr/share/selinux/devel/Makefile ly.pp
-	#@cp ly.pp $(DESTDIR)/etc/selinux/packages/ly.pp
+	echo "installing selinux modules"
+	make -f /usr/share/selinux/devel/Makefile ly.pp
+	@install -DZ ly.pp ${DESTDIR}/etc/selinux/packages/ly.pp
 
 uninstall:
 	@echo "uninstalling"
