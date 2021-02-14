@@ -45,7 +45,7 @@ chmod -x %{buildroot}/etc/ly/config.ini
 chmod -x %{buildroot}/etc/ly/lang/*
 
 %post
-semodule -n -i %{_datadir}/selinux/packages/ly.pp
+semodule -n -i /usr/share/selinux/packages/ly.pp
 if /usr/sbin/selinuxenabled ; then
     /usr/sbin/load_policy
     %relabel_files
