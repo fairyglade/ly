@@ -77,7 +77,7 @@ exit 0
 /etc/ly/wsetup.sh
 /etc/ly/config.ini
 /etc/pam.d/ly
-/etc/selinux/packages/ly.pp
+/usr/share/selinux/packages/ly.pp
 
 %changelog
 {{{ git_dir_changelog }}}

@@ -95,7 +95,7 @@ installnoconf: $(BIND)/$(NAME)
 installselinux:
 	echo "installing selinux modules"
 	make -f /usr/share/selinux/devel/Makefile ly.pp
-	@install -DZ ly.pp ${DESTDIR}/etc/selinux/packages/ly.pp
+	@install -DZ ly.pp ${DESTDIR}/usr/share/selinux/packages
 
 uninstall:
 	@echo "uninstalling"
