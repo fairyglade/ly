@@ -56,11 +56,6 @@ exit 0
 %postun
 if [ $1 -eq 0 ]; then
     semodule -n -r ly
-    if /usr/sbin/selinuxenabled ; then
-       /usr/sbin/load_policy
-       %relabel_files
-
-    fi;
 fi;
 exit 0
 
