@@ -456,7 +456,7 @@ void position_input(
 	struct text* password)
 {
 	u16 x = buf->box_x + config.margin_box_h + buf->labels_max_len + 1;
-	i32 len = buf->box_x + buf->box_width - config.margin_box_h - x;
+        i32 len = buf->box_x + buf->box_width - config.margin_box_h - x;
         i32 len_password = config.asterisk_empty ? 0 : len;
 
 	if (len < 0)
