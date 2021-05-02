@@ -788,8 +788,8 @@ static void matrix(struct term_buf* buf)
 		for (int i = 1; i <= buf->height; ++i)
 		{
 			u32 c;
-			u16 fg = TB_GREEN;
-			u16 bg = TB_DEFAULT;
+			int fg = TB_GREEN;
+			int bg = TB_DEFAULT;
 
 			if (s->grid[i][j].val == -1 || s->grid[i][j].val == ' ')
 			{
