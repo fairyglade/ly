@@ -69,6 +69,7 @@ void draw_init(struct term_buf* buf)
 }
 
 static void doom_free(struct term_buf* buf);
+static void matrix_free(struct term_buf* buf);
 
 void draw_free(struct term_buf* buf)
 {
@@ -78,6 +79,9 @@ void draw_free(struct term_buf* buf)
 		{
 			case 0:
 				doom_free(buf);
+				break;
+			case 1:
+				matrix_free(buf);
 				break;
 		}
 	}
@@ -513,6 +517,16 @@ static void doom_free(struct term_buf* buf)
 	free(buf->astate.doom);
 }
 
+static void matrix_init(struct term_buf* buf)
+{
+	// TODO
+}
+
+static void matrix_free(struct term_buf* buf)
+{
+	// TODO
+}
+
 void animate_init(struct term_buf* buf)
 {
 	if (config.animate)
@@ -522,6 +536,11 @@ void animate_init(struct term_buf* buf)
 			case 0:
 			{
 				doom_init(buf);
+				break;
+			}
+			case 1:
+			{
+				matrix_init(buf);
 				break;
 			}
 		}
@@ -591,6 +610,11 @@ static void doom(struct term_buf* term_buf)
 	}
 }
 
+static void matrix(struct term_buf* buf)
+{
+	// TODO
+}
+
 void animate(struct term_buf* buf)
 {
 	buf->width = tb_width();
@@ -603,6 +627,11 @@ void animate(struct term_buf* buf)
 			case 0:
 			{
 				doom(buf);
+				break;
+			}
+			case 1:
+			{
+				matrix(buf);
 				break;
 			}
 		}

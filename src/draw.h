@@ -18,6 +18,20 @@ struct box
 	u32 right;
 };
 
+struct matrix_dot
+{
+	int val;
+	bool is_head;
+};
+
+struct matrix_state
+{
+	struct matrix_dot** grid;
+	int* length;
+	int* spaces;
+	int* updates;
+};
+
 struct doom_state
 {
 	u8* buf;
