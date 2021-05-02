@@ -68,11 +68,18 @@ void draw_init(struct term_buf* buf)
 #endif
 }
 
+static void doom_free(struct term_buf* buf);
+
 void draw_free(struct term_buf* buf)
 {
 	if (config.animate)
 	{
-		free(buf->tmp_buf);
+		switch (config.animation)
+		{
+			case 0:
+				doom_free(buf);
+				break;
+		}
 	}
 }
 
@@ -480,18 +487,30 @@ static void doom_init(struct term_buf* buf)
 {
 	buf->init_width = buf->width;
 	buf->init_height = buf->height;
+	buf->astate.doom = malloc(sizeof(struct doom_state));
 
-	u16 tmp_len = buf->width * buf->height;
-	buf->tmp_buf = malloc(tmp_len);
-	tmp_len -= buf->width;
-
-	if (buf->tmp_buf == NULL)
+	if (buf->astate.doom == NULL)
 	{
 		dgn_throw(DGN_ALLOC);
 	}
 
-	memset(buf->tmp_buf, 0, tmp_len);
-	memset(buf->tmp_buf + tmp_len, DOOM_STEPS - 1, buf->width);
+	u16 tmp_len = buf->width * buf->height;
+	buf->astate.doom->buf = malloc(tmp_len);
+	tmp_len -= buf->width;
+
+	if (buf->astate.doom->buf == NULL)
+	{
+		dgn_throw(DGN_ALLOC);
+	}
+
+	memset(buf->astate.doom->buf, 0, tmp_len);
+	memset(buf->astate.doom->buf + tmp_len, DOOM_STEPS - 1, buf->width);
+}
+
+static void doom_free(struct term_buf* buf)
+{
+	free(buf->astate.doom->buf);
+	free(buf->astate.doom);
 }
 
 void animate_init(struct term_buf* buf)
@@ -500,7 +519,7 @@ void animate_init(struct term_buf* buf)
 	{
 		switch(config.animation)
 		{
-			default:
+			case 0:
 			{
 				doom_init(buf);
 				break;
@@ -533,7 +552,7 @@ static void doom(struct term_buf* term_buf)
 	u16 dst;
 
 	u16 w = term_buf->init_width;
-	u8* tmp = term_buf->tmp_buf;
+	u8* tmp = term_buf->astate.doom->buf;
 
 	if ((term_buf->width != term_buf->init_width) || (term_buf->height != term_buf->init_height))
 	{
@@ -581,7 +600,7 @@ void animate(struct term_buf* buf)
 	{
 		switch(config.animation)
 		{
-			default:
+			case 0:
 			{
 				doom(buf);
 				break;
