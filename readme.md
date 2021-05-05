@@ -1,7 +1,11 @@
-# Ly - a TUI display manager
+# Ly - a TUI display manager (for Artix Linux)
 ![Ly screenshot](https://user-images.githubusercontent.com/5473047/88958888-65efbf80-d2a1-11ea-8ae5-3f263bce9cce.png "Ly screenshot")
 
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
+
+## Patches added in fork
+- runit service instead of systemd one by @qub1750ul
+- service installed on default Artix service path (`/etc/runit/sv/`)
 
 ## Dependencies
  - a C99 compiler (tested with tcc and gcc)
@@ -47,7 +51,7 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-git clone https://github.com/nullgemm/ly.git
+git clone https://github.com/xcession/ly-artix-runit.git
 ```
 
 Fetch submodules
@@ -60,26 +64,19 @@ Compile
 make
 ```
 
-Test in the configured tty (tty2 by default)
-or a terminal emulator (but desktop environments won't start)
-```
-sudo make run
-```
-
-Install Ly and the provided systemd service file
+Install Ly and the runit service file
 ```
 sudo make install
 ```
 
-Enable the service
+You can disable getty-tty2
 ```
-sudo systemctl enable ly.service
+sudo unlink /run/runit/service/agetty-tty2
 ```
 
-If you need to switch between ttys after Ly's start you also have to
-disable getty on Ly's tty to prevent "login" from spawning on top of it
+Now enable the runit service to make it spawn on startup
 ```
-sudo systemctl disable getty@tty2.service
+sudo ln -s /etc/runit/sv/ly/ /run/runit/service/
 ```
 
 ## Configuration
