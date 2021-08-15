@@ -212,22 +212,14 @@ void env_init(struct passwd* pwd)
 	char* lang = getenv("LANG");
 	// clean env
 	environ[0] = NULL;
-
-	if (term != NULL)
-	{
-		setenv("TERM", term, 1);
-	}
-	else
-	{
-		setenv("TERM", "linux", 1);
-	}
-
+	
+	setenv("TERM", term ? term : "linux", 1);
 	setenv("HOME", pwd->pw_dir, 1);
 	setenv("PWD", pwd->pw_dir, 1);
 	setenv("SHELL", pwd->pw_shell, 1);
 	setenv("USER", pwd->pw_name, 1);
 	setenv("LOGNAME", pwd->pw_name, 1);
-	setenv("LANG", lang, 1);
+	setenv("LANG", lang ? lang : "en_US.UTF-8, 1);
 
 	// Set PATH if specified in the configuration
 	if (strlen(config.path))
