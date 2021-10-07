@@ -110,18 +110,10 @@ remotes:
 	@git remote add github git@github.com:nullgemm/$(NAME).git
 	@git remote add gitea ssh://git@git.nullgem.fr:2999/nullgemm/$(NAME).git
 
+gitea: github
 github:
-	@echo "sourcing submodules from https://github.com"
-	@cp .github .gitmodules
+	@echo "sourcing submodules"
 	@git submodule sync
 	@git submodule update --init --remote
 	@cd $(SUBD)/argoat && make github
-	@git submodule update --init --recursive --remote
-
-gitea:
-	@echo "sourcing submodules from personal server"
-	@cp .gitea .gitmodules
-	@git submodule sync
-	@git submodule update --init --remote
-	@cd $(SUBD)/argoat && make gitea
 	@git submodule update --init --recursive --remote

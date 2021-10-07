@@ -1,12 +1,12 @@
 #include "configator.h"
 #include "dragonfail.h"
-
 #include "inputs.h"
 #include "config.h"
 #include "utils.h"
 
 #include <dirent.h>
 #include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

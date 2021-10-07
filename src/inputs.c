@@ -1,10 +1,9 @@
 #include "dragonfail.h"
 #include "termbox.h"
-#include "ctypes.h"
-
 #include "inputs.h"
 #include "config.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -89,7 +88,7 @@ void input_desktop(struct desktop* target)
 #endif
 }
 
-void input_text(struct text* target, u64 len)
+void input_text(struct text* target, uint64_t len)
 {
 	target->text = malloc(len + 1);
 
@@ -123,7 +122,7 @@ void input_desktop_free(struct desktop* target)
 {
 	if (target != NULL)
 	{
-		for (u16 i = 0; i < target->len; ++i)
+		for (uint16_t i = 0; i < target->len; ++i)
 		{
 			if (target->list[i] != NULL)
 			{
