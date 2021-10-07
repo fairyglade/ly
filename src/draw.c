@@ -6,6 +6,7 @@
 #include "config.h"
 #include "draw.h"
 
+#include <ctype.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
