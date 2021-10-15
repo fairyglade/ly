@@ -2,20 +2,21 @@
 #define H_LY_DRAW
 
 #include "termbox.h"
-#include "ctypes.h"
-
 #include "inputs.h"
+
+#include <stdbool.h>
+#include <stdint.h>
 
 struct box
 {
-	u32 left_up;
-	u32 left_down;
-	u32 right_up;
-	u32 right_down;
-	u32 top;
-	u32 bot;
-	u32 left;
-	u32 right;
+	uint32_t left_up;
+	uint32_t left_down;
+	uint32_t right_up;
+	uint32_t right_down;
+	uint32_t top;
+	uint32_t bot;
+	uint32_t left;
+	uint32_t right;
 };
 
 struct matrix_dot
@@ -45,18 +46,19 @@ union anim_state
 
 struct term_buf
 {
-	u16 width;
-	u16 height;
-	u16 init_width;
-	u16 init_height;
+	uint16_t width;
+	uint16_t height;
+	uint16_t init_width;
+	uint16_t init_height;
 
 	struct box box_chars;
 	char* info_line;
-	u16 labels_max_len;
-	u16 box_x;
-	u16 box_y;
-	u16 box_width;
-	u16 box_height;
+	uint16_t labels_max_len;
+	uint16_t box_x;
+	uint16_t box_y;
+	uint16_t box_width;
+	uint16_t box_height;
+
 
 	union anim_state astate;
 };
@@ -65,7 +67,7 @@ void draw_init(struct term_buf* buf);
 void draw_free(struct term_buf* buf);
 void draw_box(struct term_buf* buf);
 
-struct tb_cell* strn_cell(char* s, u16 len);
+struct tb_cell* strn_cell(char* s, uint16_t len);
 struct tb_cell* str_cell(char* s);
 
 void draw_labels(struct term_buf* buf);
@@ -83,6 +85,6 @@ void position_input(
 
 void animate_init(struct term_buf* buf);
 void animate(struct term_buf* buf);
-bool cascade(struct term_buf* buf, u8* fails);
+bool cascade(struct term_buf* buf, uint8_t* fails);
 
 #endif

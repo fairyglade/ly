@@ -12,6 +12,7 @@
 #include <pwd.h>
 #include <security/pam_appl.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +25,7 @@
 int get_free_display()
 {
 	char xlock[1024];
-	u8 i;
+	uint8_t i;
 
 	for (i = 0; i < 200; ++i)
 	{
@@ -594,7 +595,7 @@ void auth(
 		// add pam variables
 		char** env = pam_getenvlist(handle);
 
-		for (u16 i = 0; env && env[i]; ++i)
+		for (uint16_t i = 0; env && env[i]; ++i)
 		{
 			putenv(env[i]);
 		}
