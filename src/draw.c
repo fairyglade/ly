@@ -495,12 +495,39 @@ static void doom_init(struct term_buf* buf)
 	memset(buf->tmp_buf + tmp_len, DOOM_STEPS - 1, buf->width);
 }
 
+
+static void matrix_init(struct term_buf* buf)
+{
+		buf->init_width = buf->width;
+		buf->init_height = buf->height;
+
+		uint16_t len = buf->width * buf->height;
+		buf->tmp_buf = malloc(len);
+
+		if (buf->tmp_buf == NULL)
+		{
+			dgn_throw(DGN_ALLOC);
+		}
+
+		memset(buf->tmp_buf, 0, len);
+}
+
 void animate_init(struct term_buf* buf)
 {
 	if (config.animate)
 	{
 		switch(config.animation)
 		{
+			case 0:
+			{
+				doom_init(buf);
+				break;
+			}
+			case 1:
+			{
+				matrix_init(buf);
+				break;
+			}
 			default:
 			{
 				doom_init(buf);
@@ -573,6 +600,71 @@ static void doom(struct term_buf* term_buf)
 	}
 }
 
+
+static void matrix(struct term_buf* term_buf)
+{
+	if ((term_buf->width != term_buf->init_width) ||
+	    (term_buf->height != term_buf->init_height))
+	{
+		return;
+	}
+
+	uint16_t characters[37] =
+	{
+		0x0030, 0x0031, 0x0032, 0x0033, 0x0034, 0x0035, 0x0036, 0x0037,
+		0x0038, 0x0039, 0x0041, 0x0042, 0x0043, 0x0044, 0x0045, 0x0046,
+		0x0047, 0x0048, 0x0049, 0x004a, 0x004b, 0x004c, 0x004d, 0x004e,
+		0x004f, 0x0050, 0x0051, 0x0052, 0x0053, 0x0054, 0x0055, 0x0056,
+		0x0057, 0x0058, 0x0059, 0x005a, 0x005a
+	};
+
+	enum cells {NONE, LEADER, FOLLOWER};
+
+	bool can_update = 0;
+	uint16_t src;
+	uint32_t random;
+
+	uint16_t width = term_buf->width;
+	uint16_t height = term_buf->height;
+	uint8_t* tmp = term_buf->tmp_buf;
+	struct tb_cell* buf = tb_cell_buffer();
+
+	if (tmp[0]++ == 10)
+	{
+		can_update = 1;
+		memmove(tmp+(2*width), tmp+width, width * (height-2));
+		tmp[0] = 0;
+	}
+
+	for (uint16_t x = 0; x < width; ++x)
+	{
+		for (uint16_t y = 1; y < height; ++y)
+		{
+			random = rand();
+			src = (y * width) + x;
+
+			if (y == 1 && can_update)
+			{
+				if (tmp[src+width] != NONE)
+					tmp[src] = FOLLOWER;
+
+				if ((random % 10 == 1) && (tmp[src+width] == NONE))
+					tmp[src] = LEADER;
+
+				if ((random % 8 == 1) && (tmp[src+width] == FOLLOWER))
+					tmp[src] = NONE;
+			}
+
+			uint8_t color = tmp[src] == LEADER ? TB_WHITE : TB_GREEN;
+			if (tmp[src] != NONE)
+			{
+				buf[src] = (struct tb_cell){characters[random%37], color, 0};
+			}
+		}
+	}
+	can_update = 0;
+}
+
 void animate(struct term_buf* buf)
 {
 	buf->width = tb_width();
@@ -582,6 +674,16 @@ void animate(struct term_buf* buf)
 	{
 		switch(config.animation)
 		{
+			case 0:
+			{
+				doom(buf);
+				break;
+			}
+			case 1:
+			{
+				matrix(buf);
+				break;
+			}
 			default:
 			{
 				doom(buf);
