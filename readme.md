@@ -47,7 +47,7 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-git --recurse-submodules clone https://github.com/nullgemm/ly.git
+git clone --recurse-submodules https://github.com/nullgemm/ly.git
 ```
 
 Compile
