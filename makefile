@@ -104,11 +104,3 @@ clean:
 	@echo "cleaning"
 	@rm -rf $(BIND) $(OBJD) valgrind.log
 	@(cd $(SUBD)/termbox_next && $(MAKE) clean)
-
-gitea: github
-github:
-	@echo "sourcing submodules"
-	@git submodule sync
-	@git submodule update --init --remote
-	@cd $(SUBD)/argoat && make github
-	@git submodule update --init --recursive --remote
