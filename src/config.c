@@ -2,7 +2,9 @@
 
 #include "config.h"
 
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -30,11 +32,11 @@ static void config_handle_u8(void* data, char** pars, const int pars_count)
 {
 	if (strcmp(*pars, "") == 0)
 	{
-		*((u8*)data) = 0;
+		*((uint8_t*)data) = 0;
 	}
 	else
 	{
-		*((u8*)data) = atoi(*pars);
+		*((uint8_t*)data) = atoi(*pars);
 	}
 }
 
@@ -42,11 +44,11 @@ static void config_handle_u16(void* data, char** pars, const int pars_count)
 {
 	if (strcmp(*pars, "") == 0)
 	{
-		*((u16*)data) = 0;
+		*((uint16_t*)data) = 0;
 	}
 	else
 	{
-		*((u16*)data) = atoi(*pars);
+		*((uint16_t*)data) = atoi(*pars);
 	}
 }
 

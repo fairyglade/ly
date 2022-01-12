@@ -2,7 +2,6 @@
 #include "configator.h"
 #include "dragonfail.h"
 #include "termbox.h"
-#include "ctypes.h"
 
 #include "draw.h"
 #include "inputs.h"
@@ -10,8 +9,10 @@
 #include "utils.h"
 #include "config.h"
 
-#include <stddef.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -134,7 +135,7 @@ int main(int argc, char** argv)
 	// init visible elements
 	struct tb_event event;
 	struct term_buf buf;
-	u8 active_input = config.default_input;
+	uint8_t active_input = config.default_input;
 
 	(*input_handles[active_input])(input_structs[active_input], NULL);
 
@@ -158,7 +159,7 @@ int main(int argc, char** argv)
 	bool update = true;
 	bool reboot = false;
 	bool shutdown = false;
-	u8 auth_fails = 0;
+	uint8_t auth_fails = 0;
 
 	switch_tty(&buf);
 

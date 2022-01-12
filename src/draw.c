@@ -1,6 +1,5 @@
 #include "dragonfail.h"
 #include "termbox.h"
-#include "ctypes.h"
 
 #include "inputs.h"
 #include "utils.h"
@@ -9,6 +8,8 @@
 
 #include <ctype.h>
 #include <fcntl.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -29,8 +30,8 @@ void draw_init(struct term_buf* buf)
 	buf->height = tb_height();
 	hostname(&buf->info_line);
 
-	u16 len_login = strlen(lang.login);
-	u16 len_password = strlen(lang.password);
+	uint16_t len_login = strlen(lang.login);
+	uint16_t len_password = strlen(lang.password);
 
 	if (len_login > len_password)
 	{
@@ -78,10 +79,10 @@ void draw_free(struct term_buf* buf)
 
 void draw_box(struct term_buf* buf)
 {
-	u16 box_x = (buf->width - buf->box_width) / 2;
-	u16 box_y = (buf->height - buf->box_height) / 2;
-	u16 box_x2 = (buf->width + buf->box_width) / 2;
-	u16 box_y2 = (buf->height + buf->box_height) / 2;
+	uint16_t box_x = (buf->width - buf->box_width) / 2;
+	uint16_t box_y = (buf->height - buf->box_height) / 2;
+	uint16_t box_x2 = (buf->width + buf->box_width) / 2;
+	uint16_t box_y2 = (buf->height + buf->box_height) / 2;
 	buf->box_x = box_x;
 	buf->box_y = box_y;
 
@@ -117,7 +118,7 @@ void draw_box(struct term_buf* buf)
 		struct tb_cell c1 = {buf->box_chars.top, config.fg, config.bg};
 		struct tb_cell c2 = {buf->box_chars.bot, config.fg, config.bg};
 
-		for (u8 i = 0; i < buf->box_width; ++i)
+		for (uint8_t i = 0; i < buf->box_width; ++i)
 		{
 			tb_put_cell(
 				box_x + i,
@@ -133,7 +134,7 @@ void draw_box(struct term_buf* buf)
 		c1.ch = buf->box_chars.left;
 		c2.ch = buf->box_chars.right;
 
-		for (u8 i = 0; i < buf->box_height; ++i)
+		for (uint8_t i = 0; i < buf->box_height; ++i)
 		{
 			tb_put_cell(
 				box_x - 1,
@@ -151,9 +152,9 @@ void draw_box(struct term_buf* buf)
 	{
 		struct tb_cell blank = {' ', config.fg, config.bg};
 
-		for (u8 i = 0; i < buf->box_height; ++i)
+		for (uint8_t i = 0; i < buf->box_height; ++i)
 		{
-			for (u8 k = 0; k < buf->box_width; ++k)
+			for (uint8_t k = 0; k < buf->box_width; ++k)
 			{
 				tb_put_cell(
 					box_x + k,
@@ -164,15 +165,15 @@ void draw_box(struct term_buf* buf)
 	}
 }
 
-struct tb_cell* strn_cell(char* s, u16 len) // throws
+struct tb_cell* strn_cell(char* s, uint16_t len) // throws
 {
 	struct tb_cell* cells = malloc((sizeof (struct tb_cell)) * len);
 	char* s2 = s;
-	u32 c;
+	uint32_t c;
 
 	if (cells != NULL)
 	{
-		for (u16 i = 0; i < len; ++i)
+		for (uint16_t i = 0; i < len; ++i)
 		{
 			if ((s2 - s) >= len)
 			{
@@ -239,7 +240,7 @@ void draw_labels(struct term_buf* buf) // throws
 
 	if (buf->info_line != NULL)
 	{
-		u16 len = strlen(buf->info_line);
+		uint16_t len = strlen(buf->info_line);
 		struct tb_cell* info_cell = str_cell(buf->info_line);
 
 		if (dgn_catch())
@@ -315,7 +316,7 @@ void draw_lock_state(struct term_buf* buf)
 	close(fd);
 
 	// print text
-	u16 pos_x = buf->width - strlen(lang.numlock);
+	uint16_t pos_x = buf->width - strlen(lang.numlock);
 
 	if (numlock_on)
 	{
@@ -352,7 +353,7 @@ void draw_lock_state(struct term_buf* buf)
 
 void draw_desktop(struct desktop* target)
 {
-	u16 len = strlen(target->list[target->cur]);
+	uint16_t len = strlen(target->list[target->cur]);
 
 	if (len > (target->visible_len - 3))
 	{
@@ -373,7 +374,7 @@ void draw_desktop(struct desktop* target)
 		config.fg,
 		config.bg);
 
-	for (u16 i = 0; i < len; ++ i)
+	for (uint16_t i = 0; i < len; ++ i)
 	{
 		tb_change_cell(
 			target->x + i + 2,
@@ -386,8 +387,8 @@ void draw_desktop(struct desktop* target)
 
 void draw_input(struct text* input)
 {
-	u16 len = strlen(input->text);
-	u16 visible_len = input->visible_len;
+	uint16_t len = strlen(input->text);
+	uint16_t visible_len = input->visible_len;
 
 	if (len > visible_len)
 	{
@@ -407,7 +408,7 @@ void draw_input(struct text* input)
 
 		struct tb_cell c1 = {' ', config.fg, config.bg};
 
-		for (u16 i = input->end - input->visible_start; i < visible_len; ++i)
+		for (uint16_t i = input->end - input->visible_start; i < visible_len; ++i)
 		{
 			tb_put_cell(
 				input->x + i,
@@ -419,8 +420,8 @@ void draw_input(struct text* input)
 
 void draw_input_mask(struct text* input)
 {
-	u16 len = strlen(input->text);
-	u16 visible_len = input->visible_len;
+	uint16_t len = strlen(input->text);
+	uint16_t visible_len = input->visible_len;
 
 	if (len > visible_len)
 	{
@@ -430,7 +431,7 @@ void draw_input_mask(struct text* input)
 	struct tb_cell c1 = {config.asterisk, config.fg, config.bg};
 	struct tb_cell c2 = {' ', config.fg, config.bg};
 
-	for (u16 i = 0; i < visible_len; ++i)
+	for (uint16_t i = 0; i < visible_len; ++i)
 	{
 		if (input->visible_start + i < input->end)
 		{
@@ -455,8 +456,8 @@ void position_input(
 	struct text* login,
 	struct text* password)
 {
-	u16 x = buf->box_x + config.margin_box_h + buf->labels_max_len + 1;
-	i32 len = buf->box_x + buf->box_width - config.margin_box_h - x;
+	uint16_t x = buf->box_x + config.margin_box_h + buf->labels_max_len + 1;
+	int32_t len = buf->box_x + buf->box_width - config.margin_box_h - x;
 
 	if (len < 0)
 	{
@@ -481,7 +482,7 @@ static void doom_init(struct term_buf* buf)
 	buf->init_width = buf->width;
 	buf->init_height = buf->height;
 
-	u16 tmp_len = buf->width * buf->height;
+	uint16_t tmp_len = buf->width * buf->height;
 	buf->tmp_buf = malloc(tmp_len);
 	tmp_len -= buf->width;
 
@@ -528,12 +529,12 @@ static void doom(struct term_buf* term_buf)
 		{0x2588, 8, 4}, // white
 	};
 
-	u16 src;
-	u16 random;
-	u16 dst;
+	uint16_t src;
+	uint16_t random;
+	uint16_t dst;
 
-	u16 w = term_buf->init_width;
-	u8* tmp = term_buf->tmp_buf;
+	uint16_t w = term_buf->init_width;
+	uint8_t* tmp = term_buf->tmp_buf;
 
 	if ((term_buf->width != term_buf->init_width) || (term_buf->height != term_buf->init_height))
 	{
@@ -542,9 +543,9 @@ static void doom(struct term_buf* term_buf)
 
 	struct tb_cell* buf = tb_cell_buffer();
 
-	for (u16 x = 0; x < w; ++x)
+	for (uint16_t x = 0; x < w; ++x)
 	{
-		for (u16 y = 1; y < term_buf->init_height; ++y)
+		for (uint16_t y = 1; y < term_buf->init_height; ++y)
 		{
 			src = y * w + x;
 			random = ((rand() % 7) & 3);
@@ -590,10 +591,10 @@ void animate(struct term_buf* buf)
 	}
 }
 
-bool cascade(struct term_buf* term_buf, u8* fails)
+bool cascade(struct term_buf* term_buf, uint8_t* fails)
 {
-	u16 width = term_buf->width;
-	u16 height = term_buf->height;
+	uint16_t width = term_buf->width;
+	uint16_t height = term_buf->height;
 
 	struct tb_cell* buf = tb_cell_buffer();
 	bool changes = false;
