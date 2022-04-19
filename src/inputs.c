@@ -197,17 +197,18 @@ void input_desktop_add(
 
 	target->list[target->cur] = name;
 
-    if (strstr(name, " ") != NULL)
+    char* name_simple = *name;
+    if (strstr(name_simple, " ") != NULL)
     {
-        name = strtok(name, " ");
+        name_simple = strtok(name_simple, " ");
     }
 
     for (int i = 0; i < name_len; i++)
     {
-        name[i] = tolower(name[i]);
+        name_simple[i] = tolower(name_simple[i]);
     }
 
-    target->list_simple[target->cur] = name;
+    target->list_simple[target->cur] = name_simple;
     target->cmd[target->cur] = cmd;
 	target->display_server[target->cur] = display_server;
 }
