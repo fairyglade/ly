@@ -271,6 +271,7 @@ void env_xdg(const char* tty_id)
     snprintf(user, 15, "/run/user/%d", getuid());
     setenv("XDG_RUNTIME_DIR", user, 0);
     setenv("XDG_SESSION_CLASS", "user", 0);
+    setenv("XDG_SESSION_ID", "1", 0);
     setenv("XDG_SEAT", "seat0", 0);
     setenv("XDG_VTNR", tty_id, 0);
 }
