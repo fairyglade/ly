@@ -95,11 +95,13 @@ void desktop_crawl(
 		strncat(path, dir_info->d_name, (sizeof (path)) - 1);
 		configator(&desktop_config, path);
 
+        const char wayland_specifier[] = " (Wayland)";
+        const char gnome_wayland_specifier[] = " on Wayland";
+
 		// if these are wayland sessions, add " (Wayland)" to their names,
 		// as long as their names don't already contain that string
 		if (server == DS_WAYLAND && config.wayland_specifier)
 		{
-			const char wayland_specifier[] = " (Wayland)";
 			if (strstr(name, wayland_specifier) == NULL)
 			{
 				name = realloc(name, (strlen(name) + sizeof(wayland_specifier) + 1));
@@ -110,7 +112,10 @@ void desktop_crawl(
 
 		if ((name != NULL) && (exec != NULL))
 		{
-			input_desktop_add(target, name, exec, server);
+			if (!(strstr(name, wayland_specifier) != NULL && contains(target->list, target->len, gnome_wayland_specifier) == 1))
+            {
+                input_desktop_add(target, name, exec, server);
+            }
 		}
 
 		name = NULL;
@@ -273,4 +278,17 @@ void load(struct desktop* desktop, struct text* login)
 
 	fclose(fp);
 	free(line);
+}
+
+int contains(char** ptr, int len, const char* substr)
+{
+    for (int i = 0; i < len; i++)
+    {
+        if (strstr(ptr[i], substr) != NULL)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
 }

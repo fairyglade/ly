@@ -11,5 +11,6 @@ void free_hostname();
 void switch_tty(struct term_buf* buf);
 void save(struct desktop* desktop, struct text* login);
 void load(struct desktop* desktop, struct text* login);
+int contains(char** ptr, int len, const char* substr);
 
 #endif
