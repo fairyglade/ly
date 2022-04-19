@@ -23,7 +23,6 @@ struct text
 struct desktop
 {
 	char** list;
-    char** list_simple;
 	char** cmd;
 	enum display_server* display_server;
 
