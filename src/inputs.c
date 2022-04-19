@@ -199,7 +199,7 @@ void input_desktop_add(
 
     if (strstr(name, " ") != NULL)
     {
-        name = strtok(name_simple, " ");
+        name = strtok(name, " ");
     }
 
     for (int i = 0; i < name_len; i++)
