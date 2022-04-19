@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <ctype.h>
 
 void handle_desktop(void* input_struct, struct tb_event* event)
 {
@@ -193,22 +194,20 @@ void input_desktop_add(
 	}
 
     int name_len = strlen(name);
+
 	target->list[target->cur] = name;
 
-    char* name_simple;
-    *name_simple = *name;
-
-    if (strstr(name_simple, " ") != NULL)
+    if (strstr(name, " ") != NULL)
     {
-        name_simple = strtok(name_simple, " ");
+        name = strtok(name_simple, " ");
     }
 
     for (int i = 0; i < name_len; i++)
     {
-        name_simple[i] = tolower(name_simple[i]);
+        name[i] = tolower(name[i]);
     }
 
-    target->list_simple[target->cur] = name_simple;
+    target->list_simple[target->cur] = name;
     target->cmd[target->cur] = cmd;
 	target->display_server[target->cur] = display_server;
 }
