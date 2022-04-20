@@ -268,11 +268,12 @@ void env_xdg_session(const enum display_server display_server)
 void env_xdg(const char* tty_id)
 {
     char user[15];
+    char* desktop = getenv("XDG_CURRENT_DESKTOP");
     snprintf(user, 15, "/run/user/%d", getuid());
     setenv("XDG_RUNTIME_DIR", user, 0);
     setenv("XDG_SESSION_CLASS", "user", 0);
     setenv("XDG_SESSION_ID", "1", 0);
-    setenv("XDG_SESSION_DESKTOP", getenv("XDG_CURRENT_DESKTOP"), 0);
+    setenv("XDG_SESSION_DESKTOP", desktop ? desktop : "none", 0);
     setenv("XDG_SEAT", "seat0", 0);
     setenv("XDG_VTNR", tty_id, 0);
 }
