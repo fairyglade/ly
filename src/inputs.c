@@ -192,12 +192,13 @@ void input_desktop_add(
 		dgn_throw(DGN_ALLOC);
 		return;
 	}
+me;
 
     int name_len = strlen(name);
+    char name_simple[name_len];
 
-	target->list[target->cur] = name;
+    memcpy(name_simple, name, name_len);
 
-    char* name_simple = name;
     if (strstr(name_simple, " ") != NULL)
     {
         name_simple = strtok(name_simple, " ");
