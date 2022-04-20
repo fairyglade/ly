@@ -192,10 +192,11 @@ void input_desktop_add(
 		dgn_throw(DGN_ALLOC);
 		return;
 	}
-me;
+
+    target->list[target->cur] = name;
 
     int name_len = strlen(name);
-    char name_simple[name_len];
+    char* name_simple = malloc(name_len);
 
     memcpy(name_simple, name, name_len);
 
