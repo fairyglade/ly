@@ -197,7 +197,7 @@ void input_desktop_add(
 
 	target->list[target->cur] = name;
 
-    char* name_simple = *name;
+    char* name_simple = name;
     if (strstr(name_simple, " ") != NULL)
     {
         name_simple = strtok(name_simple, " ");
