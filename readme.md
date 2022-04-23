@@ -19,9 +19,11 @@ On Debian-based distros running `apt install build-essential libpam0g-dev libxcb
 
 ## Support
 The following desktop environments were tested with success
+ - bspwm
  - budgie
  - cinnamon
  - deepin
+ - dwm 
  - enlightenment
  - gnome
  - i3
@@ -47,12 +49,7 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-git clone https://github.com/nullgemm/ly.git
-```
-
-Fetch submodules
-```
-make github
+git clone --recurse-submodules https://github.com/nullgemm/ly.git
 ```
 
 Compile

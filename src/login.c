@@ -12,6 +12,7 @@
 #include <pwd.h>
 #include <security/pam_appl.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +25,7 @@
 int get_free_display()
 {
 	char xlock[1024];
-	u8 i;
+	uint8_t i;
 
 	for (i = 0; i < 200; ++i)
 	{
@@ -241,15 +242,8 @@ void env_init(struct passwd* pwd)
 	}
 }
 
-void env_xdg(const char* tty_id, const enum display_server display_server)
+void env_xdg_session(const enum display_server display_server)
 {
-	char user[15];
-	snprintf(user, 15, "/run/user/%d", getuid());
-	setenv("XDG_RUNTIME_DIR", user, 0);
-	setenv("XDG_SESSION_CLASS", "user", 0);
-	setenv("XDG_SEAT", "seat0", 0);
-	setenv("XDG_VTNR", tty_id, 0);
-
 	switch (display_server)
 	{
 		case DS_WAYLAND:
@@ -269,6 +263,17 @@ void env_xdg(const char* tty_id, const enum display_server display_server)
 			break;
 		}
 	}
+}
+
+void env_xdg(const char* tty_id)
+{
+    char user[15];
+    snprintf(user, 15, "/run/user/%d", getuid());
+    setenv("XDG_RUNTIME_DIR", user, 0);
+    setenv("XDG_SESSION_CLASS", "user", 0);
+    setenv("XDG_SESSION_ID", "1", 0);
+    setenv("XDG_SEAT", "seat0", 0);
+    setenv("XDG_VTNR", tty_id, 0);
 }
 
 void add_utmp_entry(
@@ -477,6 +482,9 @@ void auth(
 
 	ok = pam_start(config.service_name, NULL, &conv, &handle);
 
+    // Set XDG_SESSION_TYPE earlier to fix some bugs
+    env_xdg_session(desktop->display_server[desktop->cur]);
+
 	if (ok != PAM_SUCCESS)
 	{
 		pam_diagnose(ok, buf);
@@ -594,13 +602,13 @@ void auth(
 		// add pam variables
 		char** env = pam_getenvlist(handle);
 
-		for (u16 i = 0; env && env[i]; ++i)
+		for (uint16_t i = 0; env && env[i]; ++i)
 		{
 			putenv(env[i]);
 		}
 
 		// add xdg variables
-		env_xdg(tty_id, desktop->display_server[desktop->cur]);
+		env_xdg(tty_id);
 
 		// execute
 		int ok = chdir(pwd->pw_dir);

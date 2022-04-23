@@ -1,7 +1,8 @@
 #ifndef H_LY_CONFIG
 #define H_LY_CONFIG
 
-#include "ctypes.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 enum INPUTS {
 	SESSION_SWITCH,
@@ -61,25 +62,26 @@ struct lang
 struct config
 {
 	bool animate;
-	u8 animation;
+	uint8_t animation;
 	char asterisk;
-	u8 bg;
+	uint8_t bg;
 	bool blank_box;
 	bool blank_password;
 	char* console_dev;
-	u8 default_input;
-	u8 fg;
+	uint8_t default_input;
+	uint8_t fg;
 	bool hide_borders;
-	u8 input_len;
+	bool hide_f1_commands;
+	uint8_t input_len;
 	char* lang;
 	bool load;
-	u8 margin_box_h;
-	u8 margin_box_v;
-	u8 max_desktop_len;
-	u8 max_login_len;
-	u8 max_password_len;
+	uint8_t margin_box_h;
+	uint8_t margin_box_v;
+	uint8_t max_desktop_len;
+	uint8_t max_login_len;
+	uint8_t max_password_len;
 	char* mcookie_cmd;
-	u16 min_refresh_delta;
+	uint16_t min_refresh_delta;
 	char* path;
 	char* restart_cmd;
 	bool save;
@@ -87,7 +89,7 @@ struct config
 	char* service_name;
 	char* shutdown_cmd;
 	char* term_reset_cmd;
-	u8 tty;
+	uint8_t tty;
 	char* wayland_cmd;
 	bool wayland_specifier;
 	char* waylandsessions;
