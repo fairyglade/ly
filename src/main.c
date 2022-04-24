@@ -141,10 +141,16 @@ int main(int argc, char** argv)
 	struct term_buf buf;
 	uint8_t active_input = config.default_input;
 
-	(*input_handles[active_input])(input_structs[active_input], NULL);
 
 	// init drawing stuff
 	draw_init(&buf);
+
+	// draw_box and position_input are called because they need to be
+	// called before *input_handles[active_input] for the cursor to be
+	// positioned correctly
+	draw_box(&buf);
+	position_input(&buf, &desktop, &login, &password);
+	(*input_handles[active_input])(input_structs[active_input], NULL);
 
 	if (config.animate)
 	{
