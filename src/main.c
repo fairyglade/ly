@@ -174,6 +174,7 @@ int main(int argc, char** argv)
 		{
 			if (auth_fails < 10)
 			{
+				(*input_handles[active_input])(input_structs[active_input], NULL);
 				tb_clear();
 				animate(&buf);
 				draw_box(&buf);
@@ -195,7 +196,11 @@ int main(int argc, char** argv)
 			tb_present();
 		}
 
-		error = tb_peek_event(&event, config.min_refresh_delta);
+		if (config.animate) {
+			error = tb_peek_event(&event, config.min_refresh_delta);
+		} else {
+			error = tb_poll_event(&event);
+		}
 
 		if (error < 0)
 		{
@@ -221,6 +226,7 @@ int main(int argc, char** argv)
 				if (active_input > 0)
 				{
 					input_text_clear(input_structs[active_input]);
+					update = true;
 				}
 				break;
 			case TB_KEY_ARROW_UP:
