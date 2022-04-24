@@ -31,6 +31,7 @@ The following desktop environments were tested with success
  - lxde
  - lxqt
  - mate
+ - qtile
  - sway
  - xfce
  - pantheon
