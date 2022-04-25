@@ -104,16 +104,3 @@ clean:
 	@echo "cleaning"
 	@rm -rf $(BIND) $(OBJD) valgrind.log
 	@(cd $(SUBD)/termbox_next && $(MAKE) clean)
-
-remotes:
-	@echo "registering remotes"
-	@git remote add github git@github.com:nullgemm/$(NAME).git
-	@git remote add gitea ssh://git@git.nullgem.fr:2999/nullgemm/$(NAME).git
-
-gitea: github
-github:
-	@echo "sourcing submodules"
-	@git submodule sync
-	@git submodule update --init --remote
-	@cd $(SUBD)/argoat && make github
-	@git submodule update --init --recursive --remote

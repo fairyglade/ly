@@ -108,11 +108,7 @@ int main(int argc, char** argv)
 	}
 
 	config_load(config_path);
-
-	if (strcmp(config.lang, "en") != 0)
-	{
-		lang_load();
-	}
+	lang_load();
 
 	void* input_structs[3] =
 	{
@@ -141,10 +137,16 @@ int main(int argc, char** argv)
 	struct term_buf buf;
 	uint8_t active_input = config.default_input;
 
-	(*input_handles[active_input])(input_structs[active_input], NULL);
 
 	// init drawing stuff
 	draw_init(&buf);
+
+	// draw_box and position_input are called because they need to be
+	// called before *input_handles[active_input] for the cursor to be
+	// positioned correctly
+	draw_box(&buf);
+	position_input(&buf, &desktop, &login, &password);
+	(*input_handles[active_input])(input_structs[active_input], NULL);
 
 	if (config.animate)
 	{
@@ -174,11 +176,13 @@ int main(int argc, char** argv)
 		{
 			if (auth_fails < 10)
 			{
+				(*input_handles[active_input])(input_structs[active_input], NULL);
 				tb_clear();
 				animate(&buf);
 				draw_box(&buf);
 				draw_labels(&buf);
-				draw_f_commands();
+				if(!config.hide_f1_commands)
+					draw_f_commands();
 				draw_lock_state(&buf);
 				position_input(&buf, &desktop, &login, &password);
 				draw_desktop(&desktop);
@@ -195,7 +199,11 @@ int main(int argc, char** argv)
 			tb_present();
 		}
 
-		error = tb_peek_event(&event, config.min_refresh_delta);
+		if (config.animate) {
+			error = tb_peek_event(&event, config.min_refresh_delta);
+		} else {
+			error = tb_poll_event(&event);
+		}
 
 		if (error < 0)
 		{
@@ -221,6 +229,7 @@ int main(int argc, char** argv)
 				if (active_input > 0)
 				{
 					input_text_clear(input_structs[active_input]);
+					update = true;
 				}
 				break;
 			case TB_KEY_ARROW_UP:
