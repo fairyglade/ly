@@ -135,8 +135,16 @@ int main(int argc, char** argv)
 	// init visible elements
 	struct tb_event event;
 	struct term_buf buf;
-	uint8_t active_input = config.default_input;
-
+	
+	//Place the curser on the login field if there is no saved username, if there is, place the curser on the password field
+	uint8_t active_input;
+	if (login.text == login.end)
+	{
+		active_input = LOGIN_INPUT;
+	}
+	else{
+		active_input = PASSWORD_INPUT;
+	}
 
 	// init drawing stuff
 	draw_init(&buf);
