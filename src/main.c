@@ -251,7 +251,7 @@ int main(int argc, char** argv)
 
 				if (active_input > 2)
 				{
-					active_input = 0;
+					active_input = SESSION_SWITCH;
 				}
 				update = true;
 				break;
