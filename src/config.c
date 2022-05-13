@@ -271,7 +271,7 @@ void config_defaults()
 	config.blank_box = true;
 	config.blank_password = false;
 	config.console_dev = strdup("/dev/console");
-	config.default_input = PASSWORD_INPUT;
+	config.default_input = LOGIN_INPUT;
 	config.fg = 9;
 	config.hide_borders = false;
 	config.input_len = 34;
