@@ -138,13 +138,13 @@ int main(int argc, char** argv)
 	
 	//Place the curser on the login field if there is no saved username, if there is, place the curser on the password field
 	uint8_t active_input;
-	if (login.text == login.end)
-	{
-		active_input = LOGIN_INPUT;
-	}
-	else{
-		active_input = PASSWORD_INPUT;
-	}
+        if (config.default_input == LOGIN_INPUT && login.text != login.end){
+        	active_input = PASSWORD_INPUT;
+        }
+        else{
+        	active_input = config.default_input;
+        }
+
 
 	// init drawing stuff
 	draw_init(&buf);
