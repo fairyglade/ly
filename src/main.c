@@ -251,7 +251,7 @@ int main(int argc, char** argv)
 
 				if (active_input > 2)
 				{
-					active_input = PASSWORD_INPUT;
+					active_input = 0;
 				}
 				update = true;
 				break;
