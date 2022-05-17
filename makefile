@@ -92,6 +92,10 @@ installnoconf: $(BIND)/$(NAME)
 	@install -DZ $(RESD)/ly.service -m 644 -t ${DESTDIR}/usr/lib/systemd/system
 	@install -DZ $(RESD)/pam.d/ly -m 644 -t ${DESTDIR}/etc/pam.d
 
+installopenrc:
+	@echo "installing openrc service"
+	@install -DZ $(RESD)/ly-openrc -m 755 -t ${DESTDIR}/etc/init.d/${NAME}
+
 uninstall:
 	@echo "uninstalling"
 	@rm -rf ${DESTDIR}/etc/ly
