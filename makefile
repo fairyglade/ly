@@ -94,7 +94,7 @@ installnoconf: $(BIND)/$(NAME)
 
 installopenrc:
 	@echo "installing openrc service"
-	@install -DZ $(RESD)/ly-openrc -m 755 -t ${DESTDIR}/etc/init.d/${NAME}
+	@install -DZ $(RESD)/ly-openrc -m 755 -T ${DESTDIR}/etc/init.d/${NAME}
 
 uninstall:
 	@echo "uninstalling"
