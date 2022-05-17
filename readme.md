@@ -82,10 +82,10 @@ sudo systemctl disable getty@tty2.service
 
 ### OpenRC
 
-clone, compile and test (tty7 by default).
+clone, compile and test.
 Install Ly and the provided openrc service
 ```
-sudo make install-openrc
+sudo make install installopenrc
 ```
 
 Enable the service
@@ -93,7 +93,7 @@ Enable the service
 sudo rc-update add ly
 ```
 
-You can edit the tty in which ly will start in the service script.
+You can edit which tty ly will start on in the service script.
 If you choose a tty that already has a login/getty running you have to disable the getty so it doesn't respawn on top of ly
 ```
 sudo rc-update del agetty.tty1
