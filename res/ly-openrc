@@ -8,5 +8,8 @@ depend() {
 }
 
 start() {
-        exec supervise-daemon ly --start --pidfile /run/${RC_SVCNAME}.pid --respawn-period 60 /sbin/agetty -- -nl /usr/bin/ly tty7 38400 linux
+        TTY=tty7
+        BAUD=38400
+        TERM=linux
+        exec supervise-daemon ly --start --pidfile /run/${RC_SVCNAME}.pid --respawn-period 60 /sbin/agetty -- -nl /usr/bin/ly $TTY $BAUD $TERM
 }
