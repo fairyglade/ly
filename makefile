@@ -103,6 +103,7 @@ uninstall:
 	@rm -f ${DESTDIR}/usr/bin/ly
 	@rm -f ${DESTDIR}/usr/lib/systemd/system/ly.service
 	@rm -f ${DESTDIR}/etc/pam.d/ly
+	@rm -f ${DESTDIR}/etc/init.d/${NAME}
 
 clean:
 	@echo "cleaning"
