@@ -1,0 +1,12 @@
+#!/sbin/openrc-run
+
+name="ly"
+description="TUI display manager ly"
+
+depend() {
+        after agetty
+}
+
+start() {
+        exec supervise-daemon ly --start --pidfile /run/${RC_SVCNAME}.pid --respawn-period 60 /sbin/agetty -- -nl /usr/bin/ly tty7 38400 linux
+}
