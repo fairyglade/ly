@@ -80,6 +80,25 @@ disable getty on Ly's tty to prevent "login" from spawning on top of it
 sudo systemctl disable getty@tty2.service
 ```
 
+### OpenRC
+
+clone, compile and test (tty7 by default).
+Install Ly and the provided openrc service
+```
+sudo make install-openrc
+```
+
+Enable the service
+```
+sudo rc-update add ly
+```
+
+You can edit the tty in which ly will start in the service script.
+If you choose a tty that already has a login/getty running you have to disable the getty so it doesn't respawn on top of ly
+```
+sudo rc-update del agetty.tty1
+```
+
 ## Configuration
 You can find all the configuration in `/etc/ly/config.ini`.
 The file is commented, and includes the default values.
