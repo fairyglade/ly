@@ -82,7 +82,7 @@ sudo systemctl disable getty@tty2.service
 
 ### OpenRC
 
-clone, compile and test.
+Clone, compile and test.
 Install Ly and the provided openrc service
 ```
 sudo make install installopenrc
