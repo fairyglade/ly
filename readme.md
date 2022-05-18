@@ -37,6 +37,7 @@ The following desktop environments were tested with success
  - pantheon
  - maxx
  - windowmaker
+ - spectrwm
 
 Ly should work with any X desktop environment, and provides
 basic wayland support (sway works very well, for example).
