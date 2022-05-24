@@ -304,10 +304,31 @@ void remove_utmp_entry(struct utmp *entry) {
 	endutent();
 }
 
-void xauth(const char* display_name, const char* shell)
+void xauth(const char* display_name, const char* shell, char* pwd)
 {
+	const char* xauth_file = ".lyxauth";
+	char* xauth_dir = getenv("XDG_RUNTIME_DIR");
+	if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
+	{
+		xauth_dir = getenv("XDG_CONFIG_DIR");
+		if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
+		{
+			xauth_dir = pwd;
+			xauth_file = "lyxauth";
+		}
+	}
+	else
+	{
+		xauth_file = "lyxauth";
+	}
+
+	// trim trailing slashes
+	int i = strlen(xauth_dir) - 1;
+	while (xauth_dir[i] == '/') i--;
+	xauth_dir[i + 1] = '\0';
+
 	char xauthority[256];
-	snprintf(xauthority, 256, "%s/%s", getenv("XDG_RUNTIME_DIR"), "lyxauth");
+	snprintf(xauthority, 256, "%s/%s", xauth_dir, xauth_file);
 	setenv("XAUTHORITY", xauthority, 1);
 	setenv("DISPLAY", display_name, 1);
 
@@ -346,7 +367,7 @@ void xorg(
 	char display_name[4];
 
 	snprintf(display_name, 3, ":%d", get_free_display());
-	xauth(display_name, pwd->pw_shell);
+	xauth(display_name, pwd->pw_shell, pwd->pw_dir);
 
 	// start xorg
 	pid_t pid = fork();
