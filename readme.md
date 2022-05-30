@@ -34,6 +34,7 @@ The following desktop environments were tested with success
  - qtile
  - sway
  - xfce
+ - xmonad
  - pantheon
  - maxx
  - windowmaker
