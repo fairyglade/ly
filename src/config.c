@@ -189,6 +189,7 @@ void config_load(const char *cfg_path)
 		{"wayland_specifier", &config.wayland_specifier, config_handle_bool},
 		{"waylandsessions", &config.waylandsessions, config_handle_str},
 		{"x_cmd", &config.x_cmd, config_handle_str},
+		{"xinitrc", &config.xinitrc, config_handle_str},
 		{"x_cmd_setup", &config.x_cmd_setup, config_handle_str},
 		{"xauth_cmd", &config.xauth_cmd, config_handle_str},
 		{"xsessions", &config.xsessions, config_handle_str},
@@ -295,6 +296,7 @@ void config_defaults()
 	config.wayland_specifier = false;
 	config.waylandsessions = strdup("/usr/share/wayland-sessions");
 	config.x_cmd = strdup("/usr/bin/X");
+	config.xinitrc = strdup("~/.xinitrc");
 	config.x_cmd_setup = strdup(DATADIR "/xsetup.sh");
 	config.xauth_cmd = strdup("/usr/bin/xauth");
 	config.xsessions = strdup("/usr/share/xsessions");
@@ -363,6 +365,7 @@ void config_free()
 	free(config.wayland_cmd);
 	free(config.waylandsessions);
 	free(config.x_cmd);
+	free(config.xinitrc);
 	free(config.x_cmd_setup);
 	free(config.xauth_cmd);
 	free(config.xsessions);
