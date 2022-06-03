@@ -300,10 +300,31 @@ void remove_utmp_entry(struct utmp *entry) {
 	endutent();
 }
 
-void xauth(const char* display_name, const char* shell, const char* dir)
+void xauth(const char* display_name, const char* shell, char* pwd)
 {
+	const char* xauth_file = ".lyxauth";
+	char* xauth_dir = getenv("XDG_RUNTIME_DIR");
+	if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
+	{
+		xauth_dir = getenv("XDG_CONFIG_DIR");
+		if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
+		{
+			xauth_dir = pwd;
+			xauth_file = "lyxauth";
+		}
+	}
+	else
+	{
+		xauth_file = "lyxauth";
+	}
+
+	// trim trailing slashes
+	int i = strlen(xauth_dir) - 1;
+	while (xauth_dir[i] == '/') i--;
+	xauth_dir[i + 1] = '\0';
+
 	char xauthority[256];
-	snprintf(xauthority, 256, "%s/%s", dir, ".lyxauth");
+	snprintf(xauthority, 256, "%s/%s", xauth_dir, xauth_file);
 	setenv("XAUTHORITY", xauthority, 1);
 	setenv("DISPLAY", display_name, 1);
 
@@ -339,18 +360,10 @@ void xorg(
 	const char* vt,
 	const char* desktop_cmd)
 {
-	// generate xauthority file
-	const char* xauth_dir = getenv("XDG_CONFIG_HOME");
-
-	if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
-	{
-		xauth_dir = pwd->pw_dir;
-	}
-
 	char display_name[4];
 
 	snprintf(display_name, 3, ":%d", get_free_display());
-	xauth(display_name, pwd->pw_shell, xauth_dir);
+	xauth(display_name, pwd->pw_shell, pwd->pw_dir);
 
 	// start xorg
 	pid_t pid = fork();
@@ -530,7 +543,7 @@ void auth(
 	if (pwd->pw_shell[0] == '\0')
 	{
 		setusershell();
-		
+
 		char* shell = getusershell();
 
 		if (shell != NULL)
@@ -551,7 +564,7 @@ void auth(
 
 	if (pid == 0)
 	{
-		// set user info 
+		// set user info
 		ok = initgroups(pwd->pw_name, pwd->pw_gid);
 
 		if (ok != 0)
@@ -657,21 +670,21 @@ void auth(
 
 	// close pam session
 	ok = pam_do(pam_close_session, handle, 0, buf);
-	
+
 	if (ok != PAM_SUCCESS)
 	{
 		return;
 	}
 
 	ok = pam_do(pam_setcred, handle, PAM_DELETE_CRED, buf);
-	
+
 	if (ok != PAM_SUCCESS)
 	{
 		return;
 	}
 
 	ok = pam_end(handle, 0);
-	
+
 	if (ok != PAM_SUCCESS)
 	{
 		pam_diagnose(ok, buf);
