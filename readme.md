@@ -19,9 +19,11 @@ On Debian-based distros running `apt install build-essential libpam0g-dev libxcb
 
 ## Support
 The following desktop environments were tested with success
+ - bspwm
  - budgie
  - cinnamon
  - deepin
+ - dwm 
  - enlightenment
  - gnome
  - i3
@@ -29,11 +31,14 @@ The following desktop environments were tested with success
  - lxde
  - lxqt
  - mate
+ - qtile
  - sway
  - xfce
+ - xmonad
  - pantheon
  - maxx
  - windowmaker
+ - spectrwm
 
 Ly should work with any X desktop environment, and provides
 basic wayland support (sway works very well, for example).

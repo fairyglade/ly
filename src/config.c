@@ -167,6 +167,7 @@ void config_load(const char *cfg_path)
 		{"default_input", &config.default_input, config_handle_u8},
 		{"fg", &config.fg, config_handle_u8},
 		{"hide_borders", &config.hide_borders, config_handle_bool},
+		{"hide_f1_commands", &config.hide_f1_commands, config_handle_bool},
 		{"input_len", &config.input_len, config_handle_u8},
 		{"lang", &config.lang, config_handle_str},
 		{"load", &config.load, config_handle_bool},
@@ -271,7 +272,7 @@ void config_defaults()
 	config.blank_box = true;
 	config.blank_password = false;
 	config.console_dev = strdup("/dev/console");
-	config.default_input = PASSWORD_INPUT;
+	config.default_input = LOGIN_INPUT;
 	config.fg = 9;
 	config.hide_borders = false;
 	config.input_len = 34;
