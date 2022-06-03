@@ -53,7 +53,12 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-git clone --recurse-submodules https://github.com/nullgemm/ly.git
+git clone --recurse-submodules https://github.com/nullgemm/ly
+```
+
+Change the directory to ly
+```
+cd ly
 ```
 
 Compile
