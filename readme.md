@@ -1,3 +1,4 @@
+
 # Ly - a TUI display manager
 ![Ly screenshot](https://user-images.githubusercontent.com/5473047/88958888-65efbf80-d2a1-11ea-8ae5-3f263bce9cce.png "Ly screenshot")
 
@@ -80,6 +81,12 @@ If you need to switch between ttys after Ly's start you also have to
 disable getty on Ly's tty to prevent "login" from spawning on top of it
 ```
 sudo systemctl disable getty@tty2.service
+```
+
+## Arch Linux Installation
+From AUR:
+``` 
+yay -S ly
 ```
 
 ## Configuration
