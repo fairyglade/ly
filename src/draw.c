@@ -129,7 +129,7 @@ void draw_box(struct term_buf* buf)
 		struct tb_cell c1 = {buf->box_chars.top, config.fg, config.bg};
 		struct tb_cell c2 = {buf->box_chars.bot, config.fg, config.bg};
 
-		for (uint8_t i = 0; i < buf->box_width; ++i)
+		for (uint16_t i = 0; i < buf->box_width; ++i)
 		{
 			tb_put_cell(
 				box_x + i,
@@ -145,7 +145,7 @@ void draw_box(struct term_buf* buf)
 		c1.ch = buf->box_chars.left;
 		c2.ch = buf->box_chars.right;
 
-		for (uint8_t i = 0; i < buf->box_height; ++i)
+		for (uint16_t i = 0; i < buf->box_height; ++i)
 		{
 			tb_put_cell(
 				box_x - 1,
@@ -163,9 +163,9 @@ void draw_box(struct term_buf* buf)
 	{
 		struct tb_cell blank = {' ', config.fg, config.bg};
 
-		for (uint8_t i = 0; i < buf->box_height; ++i)
+		for (uint16_t i = 0; i < buf->box_height; ++i)
 		{
-			for (uint8_t k = 0; k < buf->box_width; ++k)
+			for (uint16_t k = 0; k < buf->box_width; ++k)
 			{
 				tb_put_cell(
 					box_x + k,

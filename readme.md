@@ -1,3 +1,4 @@
+
 # Ly - a TUI display manager
 ![Ly screenshot](https://user-images.githubusercontent.com/5473047/88958888-65efbf80-d2a1-11ea-8ae5-3f263bce9cce.png "Ly screenshot")
 
@@ -34,9 +35,11 @@ The following desktop environments were tested with success
  - qtile
  - sway
  - xfce
+ - xmonad
  - pantheon
  - maxx
  - windowmaker
+ - spectrwm
 
 Ly should work with any X desktop environment, and provides
 basic wayland support (sway works very well, for example).
@@ -50,7 +53,12 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-git clone --recurse-submodules https://github.com/nullgemm/ly.git
+git clone --recurse-submodules https://github.com/nullgemm/ly
+```
+
+Change the directory to ly
+```
+cd ly
 ```
 
 Compile
@@ -97,6 +105,12 @@ You can edit which tty ly will start on in the service script.
 If you choose a tty that already has a login/getty running you have to disable the getty so it doesn't respawn on top of ly
 ```
 sudo rc-update del agetty.tty1
+```
+
+## Arch Linux Installation
+From AUR:
+``` 
+yay -S ly
 ```
 
 ## Configuration

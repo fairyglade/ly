@@ -28,7 +28,7 @@ struct config config;
 // args handles
 void arg_help(void* data, char** pars, const int pars_count)
 {
-	printf("RTFM\n");
+	printf("If you want to configure Ly, please check the config file, usually located at /etc/ly/config.ini.\n");
 }
 
 void arg_version(void* data, char** pars, const int pars_count)

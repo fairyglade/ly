@@ -94,6 +94,7 @@ struct config
 	bool wayland_specifier;
 	char* waylandsessions;
 	char* x_cmd;
+	char* xinitrc;
 	char* x_cmd_setup;
 	char* xauth_cmd;
 	char* xsessions;
