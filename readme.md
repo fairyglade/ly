@@ -82,7 +82,7 @@ sudo systemctl disable getty@tty2.service
 ```
 
 ## Arch Linux Installation
-From AUR:
+From [AUR](https://aur.archlinux.org/packages/ly):
 ``` 
 yay -S ly
 ```
