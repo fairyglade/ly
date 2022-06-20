@@ -24,6 +24,8 @@ case $SHELL in
     [ -d /etc/zsh ] && zdir=/etc/zsh || zdir=/etc
     zhome=${ZDOTDIR:-$HOME}
     # zshenv is always sourced automatically.
+    [ -f /etc/profile ] && . /etc/profile
+    [ -f $HOME/.profile ] && . $HOME/.profile
     [ -f $zdir/zprofile ] && . $zdir/zprofile
     [ -f $zhome/.zprofile ] && . $zhome/.zprofile
     [ -f $zdir/zlogin ] && . $zdir/zlogin
