@@ -1,0 +1,28 @@
+#! /sbin/openrc-run
+
+name="ly"
+description="TUI Display Manager"
+
+supervisor=supervise-daemon
+respawn-period=60
+pidfile=/run/"${RC_SVCNAME}.pid"
+
+depend() {
+         after agetty
+}
+
+start() {
+        TTY=tty2
+        BAUD=38400
+        TERM=linux
+
+        if [ -x /sbin/getty -o -x /bin/getty ];
+        then
+            GETTY=/sbin/getty
+        elif [ -x /sbin/getty -o -x /bin/getty ];
+        then
+            GETTY=/sbin/agetty
+        fi
+
+        exec setsid ${GETTY} -nl /usr/bin/ly "${TTY}" "${BAUD}" "${TERM}"
+}
