@@ -4,7 +4,7 @@ name="ly"
 description="TUI Display Manager"
 
 supervisor=supervise-daemon
-respawn-period=60
+respawn_period=60
 pidfile=/run/"${RC_SVCNAME}.pid"
 
 depend() {
