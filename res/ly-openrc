@@ -23,7 +23,7 @@ fi
 CONFTTY=$(cat /etc/ly/conf.ini | grep tty | grep -v '#' | sed -e 's/tty = //' | sed -e 's/ //')
 
 ## The execution vars
-# If CONFTTY is empty the default to 2
+# If CONFTTY is empty then default to 2
 TTY=${CONFTTY:-"2"}
 TERM=linux
 BAUD=38400
