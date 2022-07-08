@@ -24,12 +24,12 @@ CONFTTY=$(cat /etc/ly/config.ini | grep tty | grep -v '#' | sed -e 's/tty = //' 
 
 ## The execution vars
 # If CONFTTY is empty then default to 2
-TTY=${CONFTTY:-"2"}
+TTY="tty${CONFTTY:-'2'}"
 TERM=linux
 BAUD=38400
 # If we don't have getty then we should have agetty
 command=${commandB:-$commandUL}
-command_args_foreground="-nl /usr/bin/ty ${TTY} ${BAUD} ${TERM}"
+command_args_foreground="-nl /usr/bin/ly ${TTY} ${BAUD} ${TERM}"
 
 depend() {
          after agetty
