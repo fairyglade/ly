@@ -7,22 +7,16 @@ supervisor=supervise-daemon
 respawn_period=60
 pidfile=/run/"${RC_SVCNAME}.pid"
 
+# tty to spawn ly in
+## Make sure this corresponds with the tty in /etc/ly/config.ini
+TTY=tty7
+TERM=linux
+BAUD=38400
+command="/sbin/agetty"
+command_args_foreground="-nl /usr/bin/ty ${TTY} ${BAUD} ${TERM}"
+
 depend() {
          after agetty
-}
-
-start() {
-        TTY=tty2
-        BAUD=38400
-        TERM=linux
-
-        if [ -x /sbin/getty -o -x /bin/getty ];
-        then
-            GETTY=/sbin/getty
-        elif [ -x /sbin/getty -o -x /bin/getty ];
-        then
-            GETTY=/sbin/agetty
-        fi
-
-        exec setsid ${GETTY} -nl /usr/bin/ly "${TTY}" "${BAUD}" "${TERM}"
+         provide display-manager
+         want elogind
 }
