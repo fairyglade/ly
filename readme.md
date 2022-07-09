@@ -108,7 +108,7 @@ sudo rc-update del agetty.tty1
 ```
 
 ## Arch Linux Installation
-From AUR:
+From [AUR](https://aur.archlinux.org/packages/ly):
 ``` 
 yay -S ly
 ```
