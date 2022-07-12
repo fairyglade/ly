@@ -91,7 +91,8 @@ sudo systemctl disable getty@tty2.service
 ### OpenRC
 
 Clone, compile and test.
-Install Ly and the provided openrc service
+
+Install Ly and the provided OpenRC service
 ```
 sudo make install installopenrc
 ```
@@ -101,10 +102,11 @@ Enable the service
 sudo rc-update add ly
 ```
 
-You can edit which tty ly will start on in the service script.
-If you choose a tty that already has a login/getty running you have to disable the getty so it doesn't respawn on top of ly
+You can edit which tty Ly will start on by editing the `tty` option in the configuration file.
+
+If you choose a tty that already has a login/getty running (has a basic login prompt), then you have to disable the getty so it doesn't respawn on top of ly
 ```
-sudo rc-update del agetty.tty1
+sudo rc-update del agetty.tty2
 ```
 
 ## Arch Linux Installation
