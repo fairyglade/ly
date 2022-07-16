@@ -24,7 +24,7 @@ CONFTTY=$(cat /etc/ly/config.ini | sed -n 's/^tty.*=[^1-9]*// p')
 
 ## The execution vars
 # If CONFTTY is empty then default to 2
-TTY="tty${CONFTTY:-'2'}"
+TTY="tty${CONFTTY:-2}"
 TERM=linux
 BAUD=38400
 # If we don't have getty then we should have agetty
