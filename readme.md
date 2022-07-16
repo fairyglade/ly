@@ -74,7 +74,7 @@ sudo make run
 
 Install Ly and the provided systemd service file
 ```
-sudo make install
+sudo make install installsystemd
 ```
 
 Enable the service

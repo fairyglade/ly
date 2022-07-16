@@ -70,7 +70,7 @@ leakgrind: $(BIND)/$(NAME)
 	@less valgrind.log
 
 install: $(BIND)/$(NAME)
-	@echo "installing"
+	@echo "installing ly"
 	@install -dZ ${DESTDIR}/etc/ly
 	@install -DZ $(BIND)/$(NAME) -t ${DESTDIR}/usr/bin
 	@install -DZ $(RESD)/config.ini -t ${DESTDIR}/etc/ly
@@ -78,19 +78,21 @@ install: $(BIND)/$(NAME)
 	@install -DZ $(RESD)/wsetup.sh -t $(DATADIR)
 	@install -dZ $(DATADIR)/lang
 	@install -DZ $(RESD)/lang/* -t $(DATADIR)/lang
-	@install -DZ $(RESD)/ly.service -m 644 -t ${DESTDIR}/usr/lib/systemd/system
 	@install -DZ $(RESD)/pam.d/ly -m 644 -t ${DESTDIR}/etc/pam.d
 
 installnoconf: $(BIND)/$(NAME)
-	@echo "installing without the configuration file"
+	@echo "installing ly without the configuration file"
 	@install -dZ ${DESTDIR}/etc/ly
 	@install -DZ $(BIND)/$(NAME) -t ${DESTDIR}/usr/bin
 	@install -DZ $(RESD)/xsetup.sh -t $(DATADIR)
 	@install -DZ $(RESD)/wsetup.sh -t $(DATADIR)
 	@install -dZ $(DATADIR)/lang
 	@install -DZ $(RESD)/lang/* -t $(DATADIR)/lang
-	@install -DZ $(RESD)/ly.service -m 644 -t ${DESTDIR}/usr/lib/systemd/system
 	@install -DZ $(RESD)/pam.d/ly -m 644 -t ${DESTDIR}/etc/pam.d
+
+installsystemd:
+	@echo "installing systemd service"
+	@install -DZ $(RESD)/ly.service -m 644 -t ${DESTDIR}/usr/lib/systemd/system
 
 installopenrc:
 	@echo "installing openrc service"
