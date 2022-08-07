@@ -20,6 +20,8 @@ On Debian-based distros running `apt install build-essential libpam0g-dev libxcb
 
 ## Support
 The following desktop environments were tested with success
+
+ - awesome
  - bspwm
  - budgie
  - cinnamon
@@ -32,14 +34,14 @@ The following desktop environments were tested with success
  - lxde
  - lxqt
  - mate
+ - maxx 
+ - pantheon
  - qtile
+ - spectrwm
  - sway
+ - windowmaker 
  - xfce
  - xmonad
- - pantheon
- - maxx
- - windowmaker
- - spectrwm
 
 Ly should work with any X desktop environment, and provides
 basic wayland support (sway works very well, for example).
@@ -53,39 +55,39 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-git clone --recurse-submodules https://github.com/nullgemm/ly
+$ git clone --recurse-submodules https://github.com/nullgemm/ly
 ```
 
 Change the directory to ly
 ```
-cd ly
+$ cd ly
 ```
 
 Compile
 ```
-make
+$ make
 ```
 
 Test in the configured tty (tty2 by default)
 or a terminal emulator (but desktop environments won't start)
 ```
-sudo make run
+# make run
 ```
 
 Install Ly and the provided systemd service file
 ```
-sudo make install installsystemd
+# make install installsystemd
 ```
 
 Enable the service
 ```
-sudo systemctl enable ly.service
+# systemctl enable ly.service
 ```
 
 If you need to switch between ttys after Ly's start you also have to
 disable getty on Ly's tty to prevent "login" from spawning on top of it
 ```
-sudo systemctl disable getty@tty2.service
+# systemctl disable getty@tty2.service
 ```
 
 ### OpenRC
@@ -94,25 +96,25 @@ Clone, compile and test.
 
 Install Ly and the provided OpenRC service
 ```
-sudo make install installopenrc
+# make install installopenrc
 ```
 
 Enable the service
 ```
-sudo rc-update add ly
+# rc-update add ly
 ```
 
 You can edit which tty Ly will start on by editing the `tty` option in the configuration file.
 
 If you choose a tty that already has a login/getty running (has a basic login prompt), then you have to disable the getty so it doesn't respawn on top of ly
 ```
-sudo rc-update del agetty.tty2
+# rc-update del agetty.tty2
 ```
 
 ## Arch Linux Installation
 From [AUR](https://aur.archlinux.org/packages/ly):
 ``` 
-yay -S ly
+# yay -S ly
 ```
 
 ## Configuration
@@ -127,12 +129,10 @@ while on the desktop field (above the login field).
 ## .xinitrc
 If your .xinitrc doesn't work make sure it is executable and includes a shebang.
 This file is supposed to be a shell script! Quoting from xinit's man page:
-```
-If no specific client program is given on the command line, xinit will look for
-a file in the user's home directory called .xinitrc to run as a shell script to
-start up client programs.
-```
-On ArchLinux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
+
+> If no specific client program is given on the command line, xinit will look for a file in the user's home directory called .xinitrc to run as a shell script to start up client programs.
+
+On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
 ```
 #!/bin/sh
 ```
