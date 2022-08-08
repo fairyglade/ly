@@ -302,7 +302,7 @@ void remove_utmp_entry(struct utmp *entry) {
 
 void xauth(const char* display_name, const char* shell, char* pwd)
 {
-	const char* xauth_file = ".lyxauth";
+	const char* xauth_file = "lyxauth";
 	char* xauth_dir = getenv("XDG_RUNTIME_DIR");
 	if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
 	{
@@ -310,23 +310,15 @@ void xauth(const char* display_name, const char* shell, char* pwd)
 		if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
 		{
 			xauth_dir = strdup(pwd);
-			strcat(xauth_dir, "/.config/ly");
+			strcat(xauth_dir, "/.config");
 			struct stat sb;
 			stat(xauth_dir, &sb);
 			if (!S_ISDIR(sb.st_mode))
 			{
 				xauth_dir = pwd;
-				// xauth_file is already assigned correctly
-			}
-			else
-			{
-				xauth_file = "lyxauth";
+				xauth_file = ".lyxauth";
 			}
 		}
-	}
-	else
-	{
-		xauth_file = "lyxauth";
 	}
 
 	// trim trailing slashes
