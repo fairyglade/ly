@@ -306,11 +306,22 @@ void xauth(const char* display_name, const char* shell, char* pwd)
 	char* xauth_dir = getenv("XDG_RUNTIME_DIR");
 	if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
 	{
-		xauth_dir = getenv("XDG_CONFIG_DIR");
+		xauth_dir = getenv("XDG_CONFIG_HOME");
 		if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
 		{
-			xauth_dir = pwd;
-			xauth_file = "lyxauth";
+			xauth_dir = strdup(pwd);
+			strcat(xauth_dir, "/.config/ly");
+			struct stat sb;
+			stat(xauth_dir, &sb);
+			if (!S_ISDIR(sb.st_mode))
+			{
+				xauth_dir = pwd;
+				// xauth_file is already assigned correctly
+			}
+			else
+			{
+				xauth_file = "lyxauth";
+			}
 		}
 	}
 	else
