@@ -476,9 +476,12 @@ void auth(
 {
 	int ok;
 
+    char tty_id [3];
+    snprintf(tty_id, 3, "%d", config.tty);
+
     // Add XDG environment variables
     env_xdg_session(desktop->display_server[desktop->cur]);
-    env_xdg(tty_id);
+    env_xdg(tty_id, desktop->list_simple[desktop->cur]);
 
 	// open pam session
 	const char* creds[2] = {login->text, password->text};
@@ -587,10 +590,7 @@ void auth(
 		}
 
 		// get a display
-		char tty_id [3];
 		char vt[5];
-
-		snprintf(tty_id, 3, "%d", config.tty);
 		snprintf(vt, 5, "vt%d", config.tty);
 
 		// set env
@@ -608,9 +608,6 @@ void auth(
 		{
 			putenv(env[i]);
 		}
-
-		// add xdg variables
-		env_xdg(tty_id, desktop->list_simple[desktop->cur]);
 
 		// execute
 		int ok = chdir(pwd->pw_dir);
