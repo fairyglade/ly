@@ -476,15 +476,16 @@ void auth(
 {
 	int ok;
 
+    // Add XDG environment variables
+    env_xdg_session(desktop->display_server[desktop->cur]);
+    env_xdg(tty_id);
+
 	// open pam session
 	const char* creds[2] = {login->text, password->text};
 	struct pam_conv conv = {login_conv, creds};
 	struct pam_handle* handle;
 
 	ok = pam_start(config.service_name, NULL, &conv, &handle);
-
-    // Set XDG_SESSION_TYPE earlier to fix some bugs
-    env_xdg_session(desktop->display_server[desktop->cur]);
 
 	if (ok != PAM_SUCCESS)
 	{
