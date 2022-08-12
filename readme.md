@@ -55,7 +55,7 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-$ git clone --recurse-submodules https://github.com/nullgemm/ly
+$ git clone --recurse-submodules https://github.com/fairyglade/ly
 ```
 
 Change the directory to ly
