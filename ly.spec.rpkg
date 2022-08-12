@@ -1,0 +1,78 @@
+%define relabel_files() \
+restorecon -R /usr/bin/ly; \
+
+%define selinux_policyver 3.14.6-34
+
+Name:           {{{ git_dir_name }}}
+Version:        {{{ git_dir_version }}}
+Release:        1%{?dist}
+Summary:        A TUI display manager
+License:        WTFPL
+URL:            https://github.com/nullgemm/ly
+VCS:            {{{ git_dir_vcs }}}
+Source:         {{{ git_dir_pack }}}
+BuildRequires:  libxcb-devel
+BuildRequires:  pam-devel
+BuildRequires:  make
+BuildRequires:  git
+BuildRequires:  gcc
+BuildRequires:  selinux-policy-devel
+Requires:       libxcb
+Requires:       pam
+
+%description
+Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
+
+%prep
+git clone https://github.com/dhalucario/ly.git ly
+cd ly
+# git checkout v0.5.2
+make github
+
+%build
+cd ly
+make
+
+%install
+cd ly
+mkdir -p %{buildroot}/etc/
+mkdir -p %{buildroot}/usr/bin/
+mkdir -p %{buildroot}/usr/lib/systemd/system/
+mkdir -p %{buildroot}/etc/pam.d/
+DESTDIR="%{buildroot}" make install
+DESTDIR="%{buildroot}" make installselinux
+chmod -x %{buildroot}/etc/ly/config.ini
+chmod -x %{buildroot}/etc/ly/lang/*
+
+%post
+semodule -n -i /usr/share/selinux/packages/ly.pp
+if /usr/sbin/selinuxenabled ; then
+    /usr/sbin/load_policy
+    %relabel_files
+
+fi;
+exit 0
+
+%postun
+if [ $1 -eq 0 ]; then
+    semodule -n -r ly
+fi;
+exit 0
+
+%files
+/usr/bin/ly
+/usr/lib/systemd/system/ly.service
+/etc/ly/lang/es.ini
+/etc/ly/lang/pt.ini
+/etc/ly/lang/ru.ini
+/etc/ly/lang/en.ini
+/etc/ly/lang/fr.ini
+/etc/ly/lang/ro.ini
+/etc/ly/xsetup.sh
+/etc/ly/wsetup.sh
+/etc/ly/config.ini
+/etc/pam.d/ly
+/usr/share/selinux/packages/ly.pp
+
+%changelog
+{{{ git_dir_changelog }}}
