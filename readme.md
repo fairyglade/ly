@@ -91,9 +91,9 @@ disable getty on Ly's tty to prevent "login" from spawning on top of it
 ```
 
 ## Arch Linux Installation
-From [AUR](https://aur.archlinux.org/packages/ly):
+You can install ly from the [AUR](https://aur.archlinux.org/packages/ly), using yay for example:
 ``` 
-# yay -S ly
+$ yay -S ly
 ```
 
 ## Configuration
