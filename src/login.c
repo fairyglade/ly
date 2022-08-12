@@ -257,13 +257,14 @@ void env_xdg_session(const enum display_server display_server)
 	}
 }
 
-void env_xdg(const char* tty_id)
+void env_xdg(const char* tty_id, const char* desktop_name)
 {
     char user[15];
     snprintf(user, 15, "/run/user/%d", getuid());
     setenv("XDG_RUNTIME_DIR", user, 0);
     setenv("XDG_SESSION_CLASS", "user", 0);
     setenv("XDG_SESSION_ID", "1", 0);
+    setenv("XDG_SESSION_DESKTOP", desktop_name, 0);
     setenv("XDG_SEAT", "seat0", 0);
     setenv("XDG_VTNR", tty_id, 0);
 }
@@ -480,15 +481,19 @@ void auth(
 {
 	int ok;
 
+    char tty_id [3];
+    snprintf(tty_id, 3, "%d", config.tty);
+
+    // Add XDG environment variables
+    env_xdg_session(desktop->display_server[desktop->cur]);
+    env_xdg(tty_id, desktop->list_simple[desktop->cur]);
+
 	// open pam session
 	const char* creds[2] = {login->text, password->text};
 	struct pam_conv conv = {login_conv, creds};
 	struct pam_handle* handle;
 
 	ok = pam_start(config.service_name, NULL, &conv, &handle);
-
-    // Set XDG_SESSION_TYPE earlier to fix some bugs
-    env_xdg_session(desktop->display_server[desktop->cur]);
 
 	if (ok != PAM_SUCCESS)
 	{
@@ -590,10 +595,7 @@ void auth(
 		}
 
 		// get a display
-		char tty_id [3];
 		char vt[5];
-
-		snprintf(tty_id, 3, "%d", config.tty);
 		snprintf(vt, 5, "vt%d", config.tty);
 
 		// set env
@@ -611,9 +613,6 @@ void auth(
 		{
 			putenv(env[i]);
 		}
-
-		// add xdg variables
-		env_xdg(tty_id);
 
 		// execute
 		int ok = chdir(pwd->pw_dir);
