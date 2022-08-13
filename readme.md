@@ -76,7 +76,7 @@ or a terminal emulator (but desktop environments won't start)
 
 Install Ly and the provided systemd service file
 ```
-# make install
+# make install installsystemd
 ```
 
 Enable the service
@@ -88,6 +88,27 @@ If you need to switch between ttys after Ly's start you also have to
 disable getty on Ly's tty to prevent "login" from spawning on top of it
 ```
 # systemctl disable getty@tty2.service
+```
+
+### OpenRC
+
+Clone, compile and test.
+
+Install Ly and the provided OpenRC service
+```
+# make install installopenrc
+```
+
+Enable the service
+```
+# rc-update add ly
+```
+
+You can edit which tty Ly will start on by editing the `tty` option in the configuration file.
+
+If you choose a tty that already has a login/getty running (has a basic login prompt), then you have to disable the getty so it doesn't respawn on top of ly
+```
+# rc-update del agetty.tty2
 ```
 
 ## Arch Linux Installation
