@@ -307,17 +307,34 @@ void xauth(const char* display_name, const char* shell, char* pwd)
 	if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
 	{
 		xauth_dir = getenv("XDG_CONFIG_HOME");
+		struct stat sb;
 		if ((xauth_dir == NULL) || (*xauth_dir == '\0'))
 		{
 			xauth_dir = strdup(pwd);
 			strcat(xauth_dir, "/.config");
-			struct stat sb;
 			stat(xauth_dir, &sb);
-			if (!S_ISDIR(sb.st_mode))
+			if (S_ISDIR(sb.st_mode))
+			{
+				strcat(xauth_dir, "/ly");
+			}
+			else
 			{
 				xauth_dir = pwd;
 				xauth_file = ".lyxauth";
 			}
+		}
+		else
+		{
+			strcat(xauth_dir, "/ly");
+		}
+
+		// If .config/ly/ or XDG_CONFIG_HOME/ly/ doesn't exist and can't create the directory, use pwd
+		// Passing pwd beforehand is safe since stat will always evaluate false
+		stat(xauth_dir, &sb);
+		if (!S_ISDIR(sb.st_mode) && mkdir(xauth_dir, 0777) == -1)
+		{
+			xauth_dir = pwd;
+			xauth_file = ".lyxauth";
 		}
 	}
 
