@@ -1,0 +1,14 @@
+if [ -x /sbin/agetty -o -x /bin/agetty ]; then
+	# util-linux specific settings
+	if [ "${tty}" = "tty1" ]; then
+		GETTY_ARGS="--noclear"
+	fi
+fi
+
+BAUD_RATE=38400
+TERM_NAME=linux
+
+StandardInput=tty
+TTYPath=/dev/tty2
+TTYReset=yes
+TTYVHangup=yes
