@@ -113,13 +113,14 @@ If you choose a tty that already has a login/getty running (has a basic login pr
 
 ### runit
 
-```sh
-# make
+```
+$ make
 # make install installrunit
 # ln -s /etc/sv/ly /var/service/
 ```
 
 Disable your existing display manager service if need be e.g.:
+
 ```
 # rm /var/service/lxdm
 ```
