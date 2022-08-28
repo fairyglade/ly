@@ -111,6 +111,26 @@ If you choose a tty that already has a login/getty running (has a basic login pr
 # rc-update del agetty.tty2
 ```
 
+### runit
+
+```
+$ make
+# make install installrunit
+# ln -s /etc/sv/ly /var/service/
+```
+
+Disable your existing display manager service if need be e.g.:
+
+```
+# rm /var/service/lxdm
+```
+
+If you are running on `tty2` (check your `/etc/ly/config.ini`) you can disable e.g. `agetty` running there:
+
+```
+# rm /var/service/agetty-tty2
+```
+
 ## Arch Linux Installation
 You can install ly from the [AUR](https://aur.archlinux.org/packages/ly), using yay for example:
 ``` 

@@ -98,6 +98,11 @@ installopenrc:
 	@echo "installing openrc service"
 	@install -DZ $(RESD)/ly-openrc -m 755 -T ${DESTDIR}/etc/init.d/${NAME}
 
+installrunit:
+	@echo "installing runit service"
+	@install -dZ ${DESTDIR}/etc/sv/ly-runit-service
+	@install -DZ $(RESD)/ly-runit-service/* -t ${DESTDIR}/etc/sv/ly
+
 uninstall:
 	@echo "uninstalling"
 	@rm -rf ${DESTDIR}/etc/ly
