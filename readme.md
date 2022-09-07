@@ -16,7 +16,8 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
  - tput
  - shutdown
 
-On Debian-based distros running `apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you. For fedora try running `make automake gcc gcc-c++ kernel-devel pam-devel libxcb-devel`
+On Debian-based distros running `apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you. 
+For Fedora try running `dnf install make automake gcc gcc-c++ kernel-devel pam-devel libxcb-devel`
 
 ## Support
 The following desktop environments were tested with success
