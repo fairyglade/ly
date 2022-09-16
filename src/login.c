@@ -257,16 +257,32 @@ void env_xdg_session(const enum display_server display_server)
 	}
 }
 
+static unsigned int ilog10(unsigned int n) {
+        unsigned int res = 0;
+        while (n >= 10) {
+          ++res;
+          n /= 10;
+        }
+        return res;
+}
+
 void env_xdg(const char* tty_id, const char* desktop_name)
 {
-    char user[15];
-    snprintf(user, 15, "/run/user/%d", getuid());
-    setenv("XDG_RUNTIME_DIR", user, 0);
-    setenv("XDG_SESSION_CLASS", "user", 0);
-    setenv("XDG_SESSION_ID", "1", 0);
-    setenv("XDG_SESSION_DESKTOP", desktop_name, 0);
-    setenv("XDG_SEAT", "seat0", 0);
-    setenv("XDG_VTNR", tty_id, 0);
+        uid_t user_uid = getuid();
+        char* xdg_runtime_dir_prefix = "/run/user/";
+        // ilog10(n) + 1 == number of digits in n
+        unsigned int xdg_runtime_dir_length = strlen(xdg_runtime_dir_prefix) + ilog10(user_uid) + 1;
+        char* user = malloc(sizeof(*user) * (xdg_runtime_dir_length + 1));
+        snprintf(user, xdg_runtime_dir_length + 1, "%s%d", xdg_runtime_dir_prefix, user_uid);
+        setenv("XDG_RUNTIME_DIR", user, 0);
+        free(user);
+        user = NULL;
+
+        setenv("XDG_SESSION_CLASS", "user", 0);
+        setenv("XDG_SESSION_ID", "1", 0);
+        setenv("XDG_SESSION_DESKTOP", desktop_name, 0);
+        setenv("XDG_SEAT", "seat0", 0);
+        setenv("XDG_VTNR", tty_id, 0);
 }
 
 void add_utmp_entry(
