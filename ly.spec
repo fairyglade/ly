@@ -4,7 +4,7 @@ Release:        1%{?dist}
 Summary:        a TUI display manager
 
 License:        WTFPL
-URL:            https://github.com/fairyglade/ly
+URL:            https://github.com/fairyglade/ly.git
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  make automake
