@@ -24,7 +24,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 
 %install
-%make_install systemd
+%make_install installsystemd
 
 
 %check
