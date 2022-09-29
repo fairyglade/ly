@@ -20,7 +20,6 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 
 %build
-%configure
 %make_build
 
 
