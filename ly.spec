@@ -11,6 +11,7 @@ BuildRequires:  make automake
 BuildRequires:  gcc gcc-c++
 BuildRequires:  kernel-devel pam-devel
 BuildRequires:  libxcb-devel
+BuildRequires:  systemd-rpm-macros
 
 %systemd_requires
 
