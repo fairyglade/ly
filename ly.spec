@@ -1,6 +1,6 @@
 Name:           ly
 Version:        0.5.3
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        a TUI display manager
 
 License:        WTFPL
@@ -28,7 +28,10 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 %build
 %make_build
 mv -f res/config.ini config.ini_orig
-awk '{print}/#save_file/{print "save_file = %{_sharedstatedir}/%{name}/save"}' config.ini_orig > res/config.ini
+awk '{print}
+/#save_file/{print "save_file = %{_sharedstatedir}/%{name}/save"}
+/#wayland_specifier/{print "wayland_specifier = true"}
+' config.ini_orig > res/config.ini
 
 
 %install
@@ -58,12 +61,15 @@ restorecon -R %{_bindir}/ly %{_sharedstatedir}/%{name} || :
 %systemd_preun %{name}.service
 
 %postun
-if [ $1 -eq 0];then
+if [ $1 -eq 0 ];then
 semanage fcontext --delete --type xdm_exe_t '%{_bindir}/ly' 2>/dev/null || :
 semanage fcontext --delete --type xdm_var_lib_t '%{_sharedstatedir}/%{name}' 2>/dev/null || :
 fi
 
 %changelog
+* Fri Sep 30 2022 Jerzy Drozdz <jerzy.drozdz@jdsieci.pl> - 0.5.3-3
+- Added wayland_specifier = true
+
 * Fri Sep 30 2022 Jerzy Drozdz <jerzy.drozdz@jdsieci.pl> - 0.5.3-2
 - Added setting SELinux contexts
 - Added configuration option for state files
