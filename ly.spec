@@ -1,6 +1,6 @@
 Name:           ly
 Version:        0.5.3
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        a TUI display manager
 
 License:        WTFPL
@@ -12,7 +12,10 @@ BuildRequires:  gcc gcc-c++
 BuildRequires:  kernel-devel pam-devel
 BuildRequires:  libxcb-devel
 BuildRequires:  systemd-rpm-macros
+BuildRequires:  gawk
 
+Requires(post): policycoreutils-python-utils
+Requires(postun): policycoreutils-python-utils
 %systemd_requires
 
 %description
@@ -24,11 +27,13 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 %build
 %make_build
+mv -f res/config.ini config.ini_orig
+awk '{print}/#save_file/{print "save_file = %{_sharedstatedir}/%{name}/save"}' config.ini_orig > res/config.ini
 
 
 %install
 %make_install installsystemd
-
+install -m 755 -d %{buildroot}%{_sharedstatedir}/%{name}
 
 %check
 
@@ -36,18 +41,33 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 %files
 %license license.md
 %doc readme.md
-%{_sysconfdir}/ly
-%{_sysconfdir}/pam.d/*
+%config(noreplace) %{_sysconfdir}/ly
+%config %{_sysconfdir}/pam.d/*
 %{_unitdir}/*
 %{_bindir}/*
+%{_sharedstatedir}/%{name}
 
 
 %post
 %systemd_post %{name}.service
+semanage fcontext --add --ftype f --type xdm_exec_t '%{_bindir}/ly' 2>/dev/null || :
+semanage fcontext --add --ftype a --type xdm_var_lib_t '%{_sharedstatedir}/%{name}' 2>/dev/null || :
+restorecon -R %{_bindir}/ly %{_sharedstatedir}/%{name} || :
 
 %preun
 %systemd_preun %{name}.service
 
+%postun
+if [ $1 -eq 0];then
+semanage fcontext --delete --type xdm_exe_t '%{_bindir}/ly' 2>/dev/null || :
+semanage fcontext --delete --type xdm_var_lib_t '%{_sharedstatedir}/%{name}' 2>/dev/null || :
+fi
+
 %changelog
+* Fri Sep 30 2022 Jerzy Drozdz <jerzy.drozdz@jdsieci.pl> - 0.5.3-2
+- Added setting SELinux contexts
+- Added configuration option for state files
+- Configuration directory and pam service set to \%config
+
 * Thu Sep 29 2022 Jerzy Drozdz <jerzy.drozdz@jdsieci.pl> - 0.5.3-1
 - Initial build
