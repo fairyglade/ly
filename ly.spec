@@ -1,6 +1,6 @@
 Name:           ly
 Version:        0.5.3
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        a TUI display manager
 
 License:        WTFPL
@@ -62,11 +62,14 @@ restorecon -R %{_bindir}/ly %{_sharedstatedir}/%{name} || :
 
 %postun
 if [ $1 -eq 0 ];then
-semanage fcontext --delete --type xdm_exe_t '%{_bindir}/ly' 2>/dev/null || :
-semanage fcontext --delete --type xdm_var_lib_t '%{_sharedstatedir}/%{name}' 2>/dev/null || :
+semanage fcontext --delete --ftype f --type xdm_exe_t '%{_bindir}/ly' 2>/dev/null || :
+semanage fcontext --delete --ftype a --type xdm_var_lib_t '%{_sharedstatedir}/%{name}' 2>/dev/null || :
 fi
 
 %changelog
+* Sun Oct 02 2022 Jerzy Drozdz <jerzy.drozdz@jdsieci.pl> - 0.5.3-4
+- Fixed postun script
+
 * Fri Sep 30 2022 Jerzy Drozdz <jerzy.drozdz@jdsieci.pl> - 0.5.3-3
 - Added wayland_specifier = true
 
