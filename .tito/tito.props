@@ -4,3 +4,4 @@ tagger = tito.tagger.VersionTagger
 changelog_do_not_remove_cherrypick = 0
 changelog_format = %s (%ae)
 lib_dir = .tito/custom
+tag_format = "v{version}"

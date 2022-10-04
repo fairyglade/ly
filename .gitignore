@@ -1,3 +1,4 @@
 bin
 obj
 valgrind.log
+__pycache__
