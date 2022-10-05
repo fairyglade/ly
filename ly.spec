@@ -1,6 +1,6 @@
 Name:           ly
 Version:        0.5.3
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        a TUI display manager
 
 License:        WTFPL
@@ -67,16 +67,19 @@ semanage fcontext --delete --ftype a --type xdm_var_lib_t '%{_sharedstatedir}/%{
 fi
 
 %changelog
-* Sun Oct 02 2022 Jerzy Drozdz <jerzy.drozdz@jdsieci.pl> - 0.5.3-4
+* Wed Oct 05 2022 Jerzy Drożdż <jerzy.drozdz@jdsieci.pl> - 0.5.3-5
+- Added patches from PR #446
+
+* Sun Oct 02 2022 Jerzy Drożdż <jerzy.drozdz@jdsieci.pl> - 0.5.3-4
 - Fixed postun script
 
-* Fri Sep 30 2022 Jerzy Drozdz <jerzy.drozdz@jdsieci.pl> - 0.5.3-3
+* Fri Sep 30 2022 Jerzy Drożdż <jerzy.drozdz@jdsieci.pl> - 0.5.3-3
 - Added wayland_specifier = true
 
-* Fri Sep 30 2022 Jerzy Drozdz <jerzy.drozdz@jdsieci.pl> - 0.5.3-2
+* Fri Sep 30 2022 Jerzy Drożdż <jerzy.drozdz@jdsieci.pl> - 0.5.3-2
 - Added setting SELinux contexts
 - Added configuration option for state files
 - Configuration directory and pam service set to \%config
 
-* Thu Sep 29 2022 Jerzy Drozdz <jerzy.drozdz@jdsieci.pl> - 0.5.3-1
+* Thu Sep 29 2022 Jerzy Drożdż <jerzy.drozdz@jdsieci.pl> - 0.5.3-1
 - Initial build
