@@ -54,7 +54,7 @@ install -m 755 -d %{buildroot}%{_sharedstatedir}/%{name}
 %post
 %systemd_post %{name}.service
 semanage fcontext --add --ftype f --type xdm_exec_t '%{_bindir}/ly' 2>/dev/null || :
-semanage fcontext --add --ftype a --type xdm_var_lib_t '%{_sharedstatedir}/%{name}' 2>/dev/null || :
+semanage fcontext --add --ftype a --type xdm_var_lib_t '%{_sharedstatedir}/%{name}(/.*)?' 2>/dev/null || :
 restorecon -R %{_bindir}/ly %{_sharedstatedir}/%{name} || :
 
 %preun
@@ -63,7 +63,7 @@ restorecon -R %{_bindir}/ly %{_sharedstatedir}/%{name} || :
 %postun
 if [ $1 -eq 0 ];then
 semanage fcontext --delete --ftype f --type xdm_exe_t '%{_bindir}/ly' 2>/dev/null || :
-semanage fcontext --delete --ftype a --type xdm_var_lib_t '%{_sharedstatedir}/%{name}' 2>/dev/null || :
+semanage fcontext --delete --ftype a --type xdm_var_lib_t '%{_sharedstatedir}/%{name}(/.*)?' 2>/dev/null || :
 fi
 
 %changelog
