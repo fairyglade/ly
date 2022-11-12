@@ -1,3 +1,4 @@
 #!/bin/sh
-tty=${PWD##*-}
-exec utmpset -w $tty
+[ -r conf ] && . ./conf
+
+exec utmpset -w ${TTY}
