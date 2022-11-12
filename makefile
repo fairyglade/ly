@@ -100,7 +100,6 @@ installopenrc:
 
 installrunit:
 	@echo "installing runit service"
-	@install -dZ ${DESTDIR}/etc/sv/ly-runit-service
 	@install -DZ $(RESD)/ly-runit-service/* -t ${DESTDIR}/etc/sv/ly
 
 uninstall:
@@ -111,6 +110,7 @@ uninstall:
 	@rm -f ${DESTDIR}/usr/lib/systemd/system/ly.service
 	@rm -f ${DESTDIR}/etc/pam.d/ly
 	@rm -f ${DESTDIR}/etc/init.d/${NAME}
+	@rm -rf ${DESTDIR}/etc/sv/ly
 
 clean:
 	@echo "cleaning"

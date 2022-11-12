@@ -120,13 +120,15 @@ $ make
 # ln -s /etc/sv/ly /var/service/
 ```
 
-Disable your existing display manager service if need be e.g.:
+By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini` 
+
+You should as well disable your existing display manager service if needed, e.g.:
 
 ```
 # rm /var/service/lxdm
 ```
 
-If you are running on `tty2` (check your `/etc/ly/config.ini`) you can disable e.g. `agetty` running there:
+The agetty service for the tty console where you are running ly should be disabled. For instance, if you are running ly on tty2 (that's the default, check your `/etc/ly/config.ini`) you should disable the agetty-tty2 service like this:
 
 ```
 # rm /var/service/agetty-tty2
