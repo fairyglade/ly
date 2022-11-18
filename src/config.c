@@ -161,9 +161,9 @@ void config_load(const char *cfg_path)
 		{"animation", &config.animation, config_handle_u8},
 		{"asterisk", &config.asterisk, config_handle_char},
 		{"bg", &config.bg, config_handle_u8},
+		{"bigclock", &config.bigclock, config_handle_bool},
 		{"blank_box", &config.blank_box, config_handle_bool},
 		{"blank_password", &config.blank_password, config_handle_bool},
-		{"clock", &config.clock, config_handle_bool},
 		{"console_dev", &config.console_dev, config_handle_str},
 		{"default_input", &config.default_input, config_handle_u8},
 		{"fg", &config.fg, config_handle_u8},
@@ -270,6 +270,7 @@ void config_defaults()
 	config.animation = 0;
 	config.asterisk = '*';
 	config.bg = 0;
+	config.bigclock = false;
 	config.blank_box = true;
 	config.blank_password = false;
 	config.console_dev = strdup("/dev/console");

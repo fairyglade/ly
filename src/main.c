@@ -188,7 +188,7 @@ int main(int argc, char** argv)
 				(*input_handles[active_input])(input_structs[active_input], NULL);
 				tb_clear();
 				animate(&buf);
-				draw_clock(&buf);
+				draw_bigclock(&buf);
 				draw_box(&buf);
 				draw_labels(&buf);
 				if(!config.hide_f1_commands)
@@ -211,7 +211,7 @@ int main(int argc, char** argv)
 
 		if (config.animate) {
 			error = tb_peek_event(&event, config.min_refresh_delta);
-		} else if (config.clock) {
+		} else if (config.bigclock) {
 			struct timeval tv;
 			gettimeofday(&tv, NULL);
 			error = tb_peek_event(&event, (60 - tv.tv_sec % 60) * 1000 - tv.tv_usec / 1000);

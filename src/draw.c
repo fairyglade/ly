@@ -179,7 +179,7 @@ void draw_box(struct term_buf* buf)
 	}
 }
 
-char* get_clock_string()
+char* bigclock_str()
 {
 	time_t timer;
 	char* buffer = malloc(6);
@@ -231,15 +231,15 @@ void alpha_blit(struct tb_cell* buf, uint16_t x, uint16_t y, uint16_t w, uint16_
 	}
 }
 
-void draw_clock(struct term_buf* buf)
+void draw_bigclock(struct term_buf* buf)
 {
-	if (!config.clock)
+	if (!config.bigclock)
 		return;
 
 	int xo = buf->box_x + buf->box_width / 2 - (5 * (CLOCK_W + 1)) / 2;
 	int yo = buf->box_y - CLOCK_H - 2;
 
-	char* clockstr = get_clock_string();
+	char* clockstr = bigclock_str();
 	struct tb_cell* clockcell;
 
 	for (int i = 0; i < 5; i++)
