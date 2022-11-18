@@ -215,8 +215,11 @@ struct tb_cell* clock_cell(char c)
 	return cells;
 }
 
-void alpha_blit(struct tb_cell* buf, int x, int y, int w, int h, struct tb_cell* cells)
+void alpha_blit(struct tb_cell* buf, uint16_t x, uint16_t y, uint16_t w, uint16_t h, struct tb_cell* cells)
 {
+	if (x + w >= tb_width() || y + h >= tb_height())
+		return;
+
 	for (int i = 0; i < h; i++)
 	{
 		for (int j = 0; j < w; j++)
@@ -245,6 +248,8 @@ void draw_clock(struct term_buf* buf)
 		alpha_blit(tb_cell_buffer(), xo + i * (CLOCK_W + 1), yo, CLOCK_W, CLOCK_H, clockcell);
 		free(clockcell);
 	}
+
+	free(clockstr);
 }
 
 
