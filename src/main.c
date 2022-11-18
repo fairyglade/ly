@@ -190,6 +190,7 @@ int main(int argc, char** argv)
 				animate(&buf);
 				draw_bigclock(&buf);
 				draw_box(&buf);
+				draw_clock(&buf);
 				draw_labels(&buf);
 				if(!config.hide_f1_commands)
 					draw_f_commands();
@@ -209,15 +210,26 @@ int main(int argc, char** argv)
 			tb_present();
 		}
 
-		if (config.animate) {
-			error = tb_peek_event(&event, config.min_refresh_delta);
-		} else if (config.bigclock) {
+		int timeout = -1;
+
+		if (config.animate)
+		{
+			timeout = config.min_refresh_delta;
+		}
+		else
+		{
 			struct timeval tv;
 			gettimeofday(&tv, NULL);
-			error = tb_peek_event(&event, (60 - tv.tv_sec % 60) * 1000 - tv.tv_usec / 1000);
-		} else {
-			error = tb_poll_event(&event);
+			if (config.bigclock)
+				timeout = (60 - tv.tv_sec % 60) * 1000 - tv.tv_usec / 1000 + 1;
+			if (config.clock)
+				timeout = 1000 - tv.tv_usec / 1000 + 1;
 		}
+
+		if (timeout == -1)
+			error = tb_poll_event(&event);
+		else
+			error = tb_peek_event(&event, timeout);
 
 		if (error < 0)
 		{

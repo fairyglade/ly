@@ -3,11 +3,13 @@
 #define CLOCK_W 5
 #define CLOCK_H 5
 
-// #define X (char) 219 // block char
-// #define _ (char) 032 // space
-
-#define X 0x2593
-#define _ 0x0000
+#if defined(__linux__) || defined(__FreeBSD__)
+	#define X 0x2593
+	#define _ 0x0000
+#else
+	#define X '#'
+	#define _ 0
+#endif
 
 #if CLOCK_W == 5 && CLOCK_H == 5
 

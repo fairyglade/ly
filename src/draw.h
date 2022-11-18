@@ -87,5 +87,6 @@ void animate(struct term_buf* buf);
 bool cascade(struct term_buf* buf, uint8_t* fails);
 
 void draw_bigclock(struct term_buf *buf);
+void draw_clock(struct term_buf *buf);
 
 #endif

@@ -179,16 +179,17 @@ void draw_box(struct term_buf* buf)
 	}
 }
 
-char* bigclock_str()
+char* time_str(char* fmt, int maxlen)
 {
 	time_t timer;
-	char* buffer = malloc(6);
+	char* buffer = malloc(maxlen);
 	struct tm* tm_info;
 
 	timer = time(NULL);
 	tm_info = localtime(&timer);
 
-	strftime(buffer, 6, "%H:%M", tm_info);
+	if (strftime(buffer, maxlen, fmt, tm_info) == 0)
+		buffer[0] = '\0';
 	
 	return buffer;
 }
@@ -239,7 +240,7 @@ void draw_bigclock(struct term_buf* buf)
 	int xo = buf->box_x + buf->box_width / 2 - (5 * (CLOCK_W + 1)) / 2;
 	int yo = buf->box_y - CLOCK_H - 2;
 
-	char* clockstr = bigclock_str();
+	char* clockstr = time_str("%H:%M", 6);
 	struct tb_cell* clockcell;
 
 	for (int i = 0; i < 5; i++)
@@ -252,6 +253,19 @@ void draw_bigclock(struct term_buf* buf)
 	free(clockstr);
 }
 
+void draw_clock(struct term_buf* buf)
+{
+	if (config.clock == NULL || strlen(config.clock) == 0)
+		return;
+
+	char* clockstr = time_str(config.clock, 32);
+	int clockstrlen = strlen(clockstr);
+
+	struct tb_cell* cells = strn_cell(clockstr, clockstrlen);
+	tb_blit(buf->width - clockstrlen, 0, clockstrlen, 1, cells);
+
+	free(clockstr);
+}
 
 struct tb_cell* strn_cell(char* s, uint16_t len) // throws
 {

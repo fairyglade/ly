@@ -164,6 +164,7 @@ void config_load(const char *cfg_path)
 		{"bigclock", &config.bigclock, config_handle_bool},
 		{"blank_box", &config.blank_box, config_handle_bool},
 		{"blank_password", &config.blank_password, config_handle_bool},
+		{"clock", &config.clock, config_handle_str},
 		{"console_dev", &config.console_dev, config_handle_str},
 		{"default_input", &config.default_input, config_handle_u8},
 		{"fg", &config.fg, config_handle_u8},
@@ -273,6 +274,7 @@ void config_defaults()
 	config.bigclock = false;
 	config.blank_box = true;
 	config.blank_password = false;
+	config.clock = NULL;
 	config.console_dev = strdup("/dev/console");
 	config.default_input = LOGIN_INPUT;
 	config.fg = 9;
@@ -356,6 +358,7 @@ void lang_free()
 
 void config_free()
 {
+	free(config.clock);
 	free(config.console_dev);
 	free(config.lang);
 	free(config.mcookie_cmd);
