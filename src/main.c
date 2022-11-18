@@ -187,6 +187,7 @@ int main(int argc, char** argv)
 				(*input_handles[active_input])(input_structs[active_input], NULL);
 				tb_clear();
 				animate(&buf);
+				draw_clock(&buf);
 				draw_box(&buf);
 				draw_labels(&buf);
 				if(!config.hide_f1_commands)
