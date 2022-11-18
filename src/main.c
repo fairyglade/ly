@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <string.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <stdlib.h>
 
@@ -210,6 +211,10 @@ int main(int argc, char** argv)
 
 		if (config.animate) {
 			error = tb_peek_event(&event, config.min_refresh_delta);
+		} else if (config.clock) {
+			struct timeval tv;
+			gettimeofday(&tv, NULL);
+			error = tb_peek_event(&event, (60 - tv.tv_sec % 60) * 1000 - tv.tv_usec / 1000);
 		} else {
 			error = tb_poll_event(&event);
 		}
