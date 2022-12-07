@@ -618,8 +618,11 @@ void auth(
 		char vt[5];
 		snprintf(vt, 5, "vt%d", config.tty);
 
-		// set env
+		// set env (this clears the environment)
 		env_init(pwd);
+		// Re-add XDG environment variables from lines 508,509
+		env_xdg_session(desktop->display_server[desktop->cur]);
+		env_xdg(tty_id, desktop->list_simple[desktop->cur]);
 
 		if (dgn_catch())
 		{
