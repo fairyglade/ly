@@ -196,9 +196,7 @@ void input_desktop_add(
     target->list[target->cur] = name;
 
     int name_len = strlen(name);
-    char* name_simple = malloc(name_len);
-
-    memcpy(name_simple, name, name_len);
+    char* name_simple = strdup(name_len);
 
     if (strstr(name_simple, " ") != NULL)
     {
