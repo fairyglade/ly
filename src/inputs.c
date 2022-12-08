@@ -196,7 +196,7 @@ void input_desktop_add(
     target->list[target->cur] = name;
 
     int name_len = strlen(name);
-    char* name_simple = strdup(name_len);
+    char* name_simple = strdup(name);
 
     if (strstr(name_simple, " ") != NULL)
     {
