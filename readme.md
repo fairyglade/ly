@@ -1,8 +1,8 @@
 
-# Ly - a TUI display manager
-![Ly screenshot](https://user-images.githubusercontent.com/5473047/88958888-65efbf80-d2a1-11ea-8ae5-3f263bce9cce.png "Ly screenshot")
+# Ly Display Manager (ly) - a TUI display manager
+![Ly screenshot](https://user-images.githubusercontent.com/5473047/88958888-65efbf80-d2a1-11ea-8ae5-3f263bce9cce.png "Ly Display Manager")
 
-Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
+Ly Display Manager (ly for short) is a maintained fork of Ly with bug fixes and patches. Ly is a lightweight TUI (Text-based User Interface) display manager for Linux and BSD.
 
 ## Dependencies
  - a C99 compiler (tested with tcc and gcc)
@@ -16,8 +16,8 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
  - tput
  - shutdown
 
-On Debian-based distros running `apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you. 
-For Fedora try running `dnf install make automake gcc gcc-c++ kernel-devel pam-devel libxcb-devel`
+On Debian-based distros running `$ apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you.
+For Fedora try running `$ dnf install make automake gcc gcc-c++ kernel-devel pam-devel libxcb-devel`
 
 ## Support
 The following desktop environments were tested with success
@@ -27,7 +27,7 @@ The following desktop environments were tested with success
  - budgie
  - cinnamon
  - deepin
- - dwm 
+ - dwm
  - enlightenment
  - gnome
  - i3
@@ -35,12 +35,12 @@ The following desktop environments were tested with success
  - lxde
  - lxqt
  - mate
- - maxx 
+ - maxx
  - pantheon
  - qtile
  - spectrwm
  - sway
- - windowmaker 
+ - windowmaker
  - xfce
  - xmonad
 
@@ -56,12 +56,12 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-$ git clone --recurse-submodules https://github.com/fairyglade/ly
+$ git clone --recurse-submodules https://github.com/gnsbriellh/ly-display-manager.git
 ```
 
-Change the directory to ly
+Change the directory to ly-display-manager
 ```
-$ cd ly
+$ cd ly-display-manager
 ```
 
 Compile
@@ -77,18 +77,18 @@ or a terminal emulator (but desktop environments won't start)
 
 Install Ly and the provided systemd service file
 ```
-# make install installsystemd
+$ make install installsystemd
 ```
 
 Enable the service
 ```
-# systemctl enable ly.service
+$ systemctl enable ly.service
 ```
 
 If you need to switch between ttys after Ly's start you also have to
 disable getty on Ly's tty to prevent "login" from spawning on top of it
 ```
-# systemctl disable getty@tty2.service
+$ systemctl disable getty@tty2.service
 ```
 
 ### OpenRC
@@ -97,45 +97,84 @@ Clone, compile and test.
 
 Install Ly and the provided OpenRC service
 ```
-# make install installopenrc
+$ make install installopenrc
 ```
 
 Enable the service
 ```
-# rc-update add ly
+$ rc-update add ly
 ```
 
 You can edit which tty Ly will start on by editing the `tty` option in the configuration file.
 
 If you choose a tty that already has a login/getty running (has a basic login prompt), then you have to disable the getty so it doesn't respawn on top of ly
 ```
-# rc-update del agetty.tty2
+$ rc-update del agetty.tty2
 ```
 
 ### runit
 
 ```
 $ make
-# make install installrunit
-# ln -s /etc/sv/ly /var/service/
+$ make install installrunit
+$ ln -s /etc/sv/ly /var/service/
 ```
 
 Disable your existing display manager service if need be e.g.:
 
 ```
-# rm /var/service/lxdm
+$ rm /var/service/lxdm
 ```
 
 If you are running on `tty2` (check your `/etc/ly/config.ini`) you can disable e.g. `agetty` running there:
 
 ```
-# rm /var/service/agetty-tty2
+$ rm /var/service/agetty-tty2
 ```
 
-## Arch Linux Installation
-You can install ly from the [AUR](https://aur.archlinux.org/packages/ly), using yay for example:
-``` 
-$ yay -S ly
+## Arch Linux
+Clone, compile and test.
+
+### Dependencies
+ - make (include in "base-devel" -> RECOMMENDED)
+
+### Installation
+
+Clone the repository
+```
+$ git clone --recurse-submodules https://github.com/gnsbriellh/ly-display-manager.git ;
+```
+
+Change the directory to ly-display-manager
+```
+$ cd ly-display-manager ;
+```
+
+Compile
+```
+$ make ;
+```
+
+Test in the configured tty (tty2 by default)
+or a terminal emulator (but desktop environments won't start)
+```
+$ make run ;
+```
+
+Install Ly and the provided systemd service file
+```
+$ make install installsystemd ;
+```
+
+Enable the service
+```
+$ systemctl enable ly.service ;
+```
+
+If you need to switch between ttys after Ly's start you also have to
+disable getty on Ly's tty to prevent "login" from spawning on top of it
+```
+$ systemctl disable getty@tty2.service ´
 ```
 
 ## Configuration
