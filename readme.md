@@ -16,7 +16,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
  - tput
  - shutdown
 
-On Debian-based distros running `apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you. 
+On Debian-based distros running `apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you.
 For Fedora try running `dnf install make automake gcc gcc-c++ kernel-devel pam-devel libxcb-devel`
 
 ## Support
@@ -27,7 +27,7 @@ The following desktop environments were tested with success
  - budgie
  - cinnamon
  - deepin
- - dwm 
+ - dwm
  - enlightenment
  - gnome
  - i3
@@ -36,12 +36,12 @@ The following desktop environments were tested with success
  - lxde
  - lxqt
  - mate
- - maxx 
+ - maxx
  - pantheon
  - qtile
  - spectrwm
  - sway
- - windowmaker 
+ - windowmaker
  - xfce
  - xmonad
 
@@ -121,7 +121,7 @@ $ make
 # ln -s /etc/sv/ly /var/service/
 ```
 
-By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini` 
+By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini`
 
 You should as well disable your existing display manager service if needed, e.g.:
 

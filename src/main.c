@@ -136,7 +136,7 @@ int main(int argc, char** argv)
 	// init visible elements
 	struct tb_event event;
 	struct term_buf buf;
-	
+
 	//Place the curser on the login field if there is no saved username, if there is, place the curser on the password field
 	uint8_t active_input;
         if (config.default_input == LOGIN_INPUT && login.text != login.end){
@@ -192,8 +192,8 @@ int main(int argc, char** argv)
 				draw_box(&buf);
 				draw_clock(&buf);
 				draw_labels(&buf);
-				if(!config.hide_f1_commands)
-					draw_f_commands();
+				if(!config.hide_key_hints)
+					draw_key_hints();
 				draw_lock_state(&buf);
 				position_input(&buf, &desktop, &login, &password);
 				draw_desktop(&desktop);
@@ -242,15 +242,40 @@ int main(int argc, char** argv)
 
 		if (event.type == TB_EVENT_KEY)
 		{
+			char shutdown_key[4];
+			memset(shutdown_key, '\0', sizeof(shutdown_key));
+			strcpy(shutdown_key, config.shutdown_key);
+			memcpy(shutdown_key, "0", 1);
+
+			char restart_key[4];
+			memset(restart_key, '\0', sizeof(restart_key));
+			strcpy(restart_key, config.restart_key);
+			memcpy(restart_key, "0", 1);
+
 			switch (event.key)
 			{
 			case TB_KEY_F1:
-				shutdown = true;
-				run = false;
-				break;
 			case TB_KEY_F2:
-				reboot = true;
-				run = false;
+			case TB_KEY_F3:
+			case TB_KEY_F4:
+			case TB_KEY_F5:
+			case TB_KEY_F6:
+			case TB_KEY_F7:
+			case TB_KEY_F8:
+			case TB_KEY_F9:
+			case TB_KEY_F10:
+			case TB_KEY_F11:
+			case TB_KEY_F12:
+				if( 0xFFFF - event.key + 1 == atoi(shutdown_key) )
+				{
+					shutdown = true;
+					run = false;
+				}
+				if( 0xFFFF - event.key + 1 == atoi(restart_key) )
+				{
+					reboot = true;
+					run = false;
+				}
 				break;
 			case TB_KEY_CTRL_C:
 				run = false;
