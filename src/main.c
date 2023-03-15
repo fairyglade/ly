@@ -240,6 +240,7 @@ int main(int argc, char** argv)
 					update = true;
 				}
 				break;
+			case TB_KEY_CTRL_K:
 			case TB_KEY_ARROW_UP:
 				if (active_input > 0)
 				{
@@ -247,6 +248,7 @@ int main(int argc, char** argv)
 					update = true;
 				}
 				break;
+			case TB_KEY_CTRL_J:
 			case TB_KEY_ARROW_DOWN:
 				if (active_input < 2)
 				{
