@@ -112,6 +112,18 @@ If you choose a tty that already has a login/getty running (has a basic login pr
 # rc-update del agetty.tty2
 ```
 
+On Gentoo if previous command didn't work (there isn't such service), agetty can be disabled in `/etc/inittab` by commenting it out:
+
+```
+...
+# TERMINALS
+#x1:12345:respawn:/sbin/agetty 38400 console linux
+c1:12345:respawn:/sbin/agetty --noclear 38400 tty1 linux
+# c2:2345:respawn:/sbin/agetty 38400 tty2 linux # disable agetty on tty2
+c3:2345:respawn:/sbin/agetty 38400 tty3 linux
+...
+```
+
 ### runit
 
 ```
