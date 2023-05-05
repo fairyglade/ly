@@ -237,8 +237,8 @@ void draw_bigclock(struct term_buf* buf)
 	if (!config.bigclock)
 		return;
 
-	int xo = buf->box_x + buf->box_width / 2 - (5 * (CLOCK_W + 1)) / 2;
-	int yo = buf->box_y - CLOCK_H - 2;
+	int xo = buf->width / 2 - (5 * (CLOCK_W + 1)) / 2;
+	int yo = (buf->height - buf->box_height) / 2 - CLOCK_H - 2;
 
 	char* clockstr = time_str("%H:%M", 6);
 	struct tb_cell* clockcell;
