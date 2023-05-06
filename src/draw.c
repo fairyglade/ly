@@ -265,6 +265,7 @@ void draw_clock(struct term_buf* buf)
 	tb_blit(buf->width - clockstrlen, 0, clockstrlen, 1, cells);
 
 	free(clockstr);
+	free(cells);
 }
 
 struct tb_cell* strn_cell(char* s, uint16_t len) // throws
