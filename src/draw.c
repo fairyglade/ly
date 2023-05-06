@@ -776,17 +776,18 @@ static void doom(struct term_buf* term_buf)
 		{0x2588, 8, 4}, // white
 	};
 
+	if ((term_buf->width != term_buf->init_width) || (term_buf->height != term_buf->init_height))
+	{
+		doom_free(term_buf);
+		doom_init(term_buf);
+	}
+
 	uint16_t src;
 	uint16_t random;
 	uint16_t dst;
 
 	uint16_t w = term_buf->init_width;
 	uint8_t* tmp = term_buf->astate.doom->buf;
-
-	if ((term_buf->width != term_buf->init_width) || (term_buf->height != term_buf->init_height))
-	{
-		return;
-	}
 
 	struct tb_cell* buf = tb_cell_buffer();
 
@@ -823,6 +824,12 @@ static void doom(struct term_buf* term_buf)
 // Adapted from cmatrix
 static void matrix(struct term_buf* buf)
 {
+	if ((buf->width != buf->init_width) || (buf->height != buf->init_height))
+	{
+		matrix_free(buf);
+		matrix_init(buf);
+	}
+
 	static int frame = 3;
 	const int frame_delay = 8;
 	static int count = 0;
@@ -834,11 +841,6 @@ static void matrix(struct term_buf* buf)
 	const int randnum = 123 - randmin;
 	// Chars change mid-scroll
 	const bool changes = true;
-
-	if ((buf->width != buf->init_width) || (buf->height != buf->init_height))
-	{
-		return;
-	}
 
 	count += 1;
 	if (count > frame_delay)
