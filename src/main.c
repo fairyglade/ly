@@ -129,7 +129,11 @@ int main(int argc, char** argv)
 	load(&desktop, &login);
 
 	// start termbox
-	tb_init();
+	if (tb_init() != 0)
+	{
+		fprintf(stderr, "Failed to initialize termbox.\n");
+		abort();
+	}
 	tb_select_output_mode(TB_OUTPUT_NORMAL);
 	tb_clear();
 
