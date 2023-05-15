@@ -133,9 +133,9 @@ If you are running on `tty2` (check your `/etc/ly/config.ini`) you can disable e
 ```
 
 ## Arch Linux Installation
-You can install ly from the [AUR](https://aur.archlinux.org/packages/ly), using yay for example:
-``` 
-$ yay -S ly
+You can install ly from the [`[extra]` repos](https://archlinux.org/packages/extra/x86_64/ly/):
+```
+$ sudo pacman -S ly
 ```
 
 ## Configuration
