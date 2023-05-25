@@ -19,31 +19,6 @@ struct box
 	uint32_t right;
 };
 
-struct matrix_dot
-{
-	int val;
-	bool is_head;
-};
-
-struct matrix_state
-{
-	struct matrix_dot** grid;
-	int* length;
-	int* spaces;
-	int* updates;
-};
-
-struct doom_state
-{
-	uint8_t* buf;
-};
-
-union anim_state
-{
-	struct doom_state* doom;
-	struct matrix_state* matrix;
-};
-
 struct term_buf
 {
 	uint16_t width;
@@ -59,8 +34,11 @@ struct term_buf
 	uint16_t box_width;
 	uint16_t box_height;
 
-	union anim_state astate;
+    // void pointer allows not
+    // explicitly declaring animations
+    void* astate;
 };
+
 
 void draw_init(struct term_buf* buf);
 void draw_free(struct term_buf* buf);
@@ -82,8 +60,7 @@ void position_input(
 	struct text* login,
 	struct text* password);
 
-void animate_init(struct term_buf* buf);
-void animate(struct term_buf* buf);
+
 bool cascade(struct term_buf* buf, uint8_t* fails);
 
 #endif

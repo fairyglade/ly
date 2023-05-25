@@ -4,6 +4,7 @@
 #include "termbox.h"
 
 #include "draw.h"
+#include "animations.h"
 #include "inputs.h"
 #include "login.h"
 #include "utils.h"
@@ -314,7 +315,7 @@ int main(int argc, char** argv)
 	free_hostname();
 
 	// unload config
-	draw_free(&buf);
+	animate_free(&buf);
 	lang_free();
 
 	if (shutdown)

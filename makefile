@@ -2,7 +2,7 @@ NAME = ly
 CC = gcc
 FLAGS = -std=c99 -pedantic -g
 FLAGS+= -Wall -Wextra -Werror=vla -Wno-unused-parameter
-#FLAGS+= -DDEBUG
+FLAGS+= -DDEBUG
 FLAGS+= -DGIT_VERSION_STRING=\"$(shell git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g')\"
 LINK = -lpam -lxcb
 VALGRIND = --show-leak-kinds=all --track-origins=yes --leak-check=full --suppressions=../res/valgrind.supp
@@ -36,6 +36,7 @@ SRCS += $(SRCD)/draw.c
 SRCS += $(SRCD)/inputs.c
 SRCS += $(SRCD)/login.c
 SRCS += $(SRCD)/utils.c
+SRCS += $(SRCD)/animations.c
 SRCS += $(SUBD)/argoat/src/argoat.c
 SRCS += $(SUBD)/configator/src/configator.c
 SRCS += $(SUBD)/dragonfail/src/dragonfail.c
