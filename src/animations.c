@@ -23,10 +23,37 @@
 	#include <linux/kd.h>
 #endif
 
-#define DOOM_STEPS 13
+/****************************/
+/* Define Animation presets */
+/* for easy extendability   */
+/****************************/
 
+#define FUNC_PTR(X) (&X)
+#define ANIMATION_NUM 2
+// function prototypes are necessary
 static void doom_free(struct term_buf* buf);
+static void doom(struct term_buf* term_buf);
+static void doom_init(struct term_buf* buf);
+
 static void matrix_free(struct term_buf* buf);
+static void matrix(struct term_buf* term_buf);
+static void matrix_init(struct term_buf* buf);
+
+// create arrays for each type of function
+static const void* ANIM_INITS[] = {
+    FUNC_PTR(doom_init),
+    FUNC_PTR(matrix_init)
+};
+static const void* ANIM_RUNS[] = {
+    FUNC_PTR(doom),
+    FUNC_PTR(matrix)
+};
+static const void* ANIM_FREES[] = {
+    FUNC_PTR(doom_free),
+    FUNC_PTR(matrix_free)
+};
+
+#define DOOM_STEPS 13
 
 
 
@@ -347,15 +374,13 @@ void animate_free(struct term_buf* buf)
 {
 	if (config.animate)
 	{
-		switch (config.animation)
-		{
-			case 0:
-				doom_free(buf);
-				break;
-			case 1:
-				matrix_free(buf);
-				break;
-		}
+        int i;
+		if ((i = config.animation) < ANIMATION_NUM)
+        {
+            void (*fun_ptr)(struct term_buf*);
+            fun_ptr = ANIM_FREES[i];
+            (*fun_ptr)(buf);
+        }
 	}
 }
 
@@ -366,19 +391,13 @@ void animate(struct term_buf* buf)
 
 	if (config.animate)
 	{
-		switch(config.animation)
-		{
-			case 0:
-			{
-				doom(buf);
-				break;
-			}
-			case 1:
-			{
-				matrix(buf);
-				break;
-			}
-		}
+        int i;
+        if ((i = config.animation) < ANIMATION_NUM)
+        {
+            void (*fun_ptr)(struct term_buf*);
+            fun_ptr = ANIM_RUNS[i];
+            (*fun_ptr)(buf);
+        }
 	}
 }
 
@@ -386,19 +405,13 @@ void animate_init(struct term_buf* buf)
 {
 	if (config.animate)
 	{
-		switch(config.animation)
-		{
-			case 0:
-			{
-				doom_init(buf);
-				break;
-			}
-			case 1:
-			{
-				matrix_init(buf);
-				break;
-			}
-		}
+        int i;
+        if ((i = config.animation) < ANIMATION_NUM)
+        {
+            void (*fun_ptr)(struct term_buf*);
+            fun_ptr = ANIM_INITS[i];
+            (*fun_ptr)(buf);
+        }
 	}
 }
 
