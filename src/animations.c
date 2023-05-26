@@ -35,7 +35,7 @@ static void matrix_init(struct term_buf* buf)
 {
 	buf->init_width = buf->width;
 	buf->init_height = buf->height;
-	buf->astate = malloc(sizeof(struct matrix_state));
+	buf->astate = (struct matrix_state*)malloc(sizeof(struct matrix_state));
     // cast state to matrix_state pointer
 	struct matrix_state* s = (struct matrix_state*)buf->astate;
 
@@ -117,7 +117,7 @@ static void matrix_free(struct term_buf* buf)
 	free(((struct matrix_state*)buf->astate)->length);
 	free(((struct matrix_state*)buf->astate)->spaces);
 	free(((struct matrix_state*)buf->astate)->updates);
-	free(buf->astate);
+	free(((struct matrix_state*)buf->astate));
 }
 
 // Adapted from cmatrix
@@ -249,7 +249,7 @@ static void doom_init(struct term_buf* buf)
 {
 	buf->init_width = buf->width;
 	buf->init_height = buf->height;
-	buf->astate = malloc(sizeof(struct doom_state));
+	buf->astate = (struct doom_state*)malloc(sizeof(struct doom_state));
 
 	if (buf->astate == NULL)
 	{
@@ -275,7 +275,7 @@ static void doom_free(struct term_buf* buf)
 {
     // cast state to doom_state pointer
 	free(((struct doom_state*)buf->astate)->buf);
-	free(buf->astate);
+	free(((struct doom_state*)buf->astate));
 }
 
 static void doom(struct term_buf* term_buf)

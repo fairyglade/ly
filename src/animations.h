@@ -28,8 +28,8 @@ struct doom_state
 	uint8_t* buf;
 };
 
-void animate_init(struct term_buf*);
-void animate_free(struct term_buf*);
-void animate(struct term_buf*);
+void animate_init(struct term_buf* buf);
+void animate_free(struct term_buf* buf);
+void animate(struct term_buf* buf);
 
 #endif
