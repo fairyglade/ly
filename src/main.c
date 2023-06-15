@@ -19,8 +19,10 @@
 #include <stdlib.h>
 
 #define ARG_COUNT 7
-// things you can define:
-// GIT_VERSION_STRING
+
+#ifndef LY_VERSION
+#define LY_VERSION "0.6.0"
+#endif
 
 // global
 struct lang lang;
@@ -30,15 +32,12 @@ struct config config;
 void arg_help(void* data, char** pars, const int pars_count)
 {
 	printf("If you want to configure Ly, please check the config file, usually located at /etc/ly/config.ini.\n");
+    exit(0);
 }
 
 void arg_version(void* data, char** pars, const int pars_count)
 {
-#ifdef GIT_VERSION_STRING
-	printf("Ly version %s\n", GIT_VERSION_STRING);
-#else
-	printf("Ly version unknown\n");
-#endif
+    printf("Ly version %s\n", LY_VERSION);
 }
 
 // low-level error messages
@@ -345,8 +344,7 @@ int main(int argc, char** argv)
 	{
 		execl("/bin/sh", "sh", "-c", config.shutdown_cmd, NULL);
 	}
-
-	if (reboot)
+    else if (reboot)
 	{
 		execl("/bin/sh", "sh", "-c", config.restart_cmd, NULL);
 	}
