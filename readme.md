@@ -32,6 +32,7 @@ The following desktop environments were tested with success
  - gnome
  - i3
  - kde
+ - labwc
  - lxde
  - lxqt
  - mate
