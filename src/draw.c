@@ -189,7 +189,9 @@ char* time_str(char* fmt, int maxlen)
 	tm_info = localtime(&timer);
 
 	if (strftime(buffer, maxlen, fmt, tm_info) == 0)
-		buffer[0] = '\0';
+    {
+        buffer[0] = '\0';
+    }
 	
 	return buffer;
 }
@@ -203,7 +205,9 @@ struct tb_cell* clock_cell(char c)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	if (config.animate && c == ':' && tv.tv_usec / 500000)
-		c = ' ';
+    {
+        c = ' ';
+    }
 	uint32_t* clockchars = CLOCK_N(c);
 
 	for (int i = 0; i < CLOCK_W * CLOCK_H; i++)
@@ -227,7 +231,9 @@ void alpha_blit(struct tb_cell* buf, uint16_t x, uint16_t y, uint16_t w, uint16_
 		{
 			struct tb_cell cell = cells[i * w + j];
 			if (cell.ch)
-				buf[(y + i) * tb_width() + (x + j)] = cell;
+            {
+                buf[(y + i) * tb_width() + (x + j)] = cell;
+            }
 		}
 	}
 }
@@ -235,7 +241,9 @@ void alpha_blit(struct tb_cell* buf, uint16_t x, uint16_t y, uint16_t w, uint16_
 void draw_bigclock(struct term_buf* buf)
 {
 	if (!config.bigclock)
-		return;
+    {
+        return;
+    }
 
 	int xo = buf->width / 2 - (5 * (CLOCK_W + 1)) / 2;
 	int yo = (buf->height - buf->box_height) / 2 - CLOCK_H - 2;
@@ -256,7 +264,9 @@ void draw_bigclock(struct term_buf* buf)
 void draw_clock(struct term_buf* buf)
 {
 	if (config.clock == NULL || strlen(config.clock) == 0)
-		return;
+    {
+        return;
+    }
 
 	char* clockstr = time_str(config.clock, 32);
 	int clockstrlen = strlen(clockstr);
@@ -802,7 +812,8 @@ static void matrix(struct term_buf* buf)
 	}
 
 	count += 1;
-	if (count > frame_delay) {
+	if (count > frame_delay)
+    {
 		frame += 1;
 		if (frame > 4) frame = 1;
 		count = 0;
@@ -877,7 +888,8 @@ static void matrix(struct term_buf* buf)
 	uint32_t blank;
 	utf8_char_to_unicode(&blank, " ");
 
-	for (int j = 0; j < buf->width; j += 2) {
+	for (int j = 0; j < buf->width; j += 2)
+    {
 		for (int i = 1; i <= buf->height; ++i)
 		{
 			uint32_t c;

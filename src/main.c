@@ -227,9 +227,13 @@ int main(int argc, char** argv)
 		}
 
 		if (timeout == -1)
-			error = tb_poll_event(&event);
+        {
+            error = tb_poll_event(&event);
+        }
 		else
-			error = tb_peek_event(&event, timeout);
+        {
+            error = tb_peek_event(&event, timeout);
+        }
 
 		if (error < 0)
 		{
