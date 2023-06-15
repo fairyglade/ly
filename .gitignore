@@ -1,3 +1,6 @@
+.idea
 bin
 obj
 valgrind.log
+zig-cache
+zig-out

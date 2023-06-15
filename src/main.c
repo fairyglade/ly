@@ -21,7 +21,7 @@
 #define ARG_COUNT 7
 
 #ifndef LY_VERSION
-#define LY_VERSION "0.6.0"
+#define LY_VERSION "0.7.0"
 #endif
 
 // global
