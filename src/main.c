@@ -38,6 +38,7 @@ void arg_help(void* data, char** pars, const int pars_count)
 void arg_version(void* data, char** pars, const int pars_count)
 {
     printf("Ly version %s\n", LY_VERSION);
+    exit(0);
 }
 
 // low-level error messages
