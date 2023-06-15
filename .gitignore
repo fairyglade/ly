@@ -1,6 +1,4 @@
-.idea
-bin
-obj
+.idea/
+zig-cache/
+zig-out/
 valgrind.log
-zig-cache
-zig-out
