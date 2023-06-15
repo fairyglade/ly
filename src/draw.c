@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "config.h"
 #include "draw.h"
+#include "bigclock.h"
 
 #include <ctype.h>
 #include <fcntl.h>
@@ -14,7 +15,9 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
+#include <time.h>
 
 #if defined(__DragonFly__) || defined(__FreeBSD__)
 	#include <sys/kbio.h>
@@ -174,6 +177,95 @@ void draw_box(struct term_buf* buf)
 			}
 		}
 	}
+}
+
+char* time_str(char* fmt, int maxlen)
+{
+	time_t timer;
+	char* buffer = malloc(maxlen);
+	struct tm* tm_info;
+
+	timer = time(NULL);
+	tm_info = localtime(&timer);
+
+	if (strftime(buffer, maxlen, fmt, tm_info) == 0)
+		buffer[0] = '\0';
+	
+	return buffer;
+}
+
+extern inline uint32_t* CLOCK_N(char c);
+
+struct tb_cell* clock_cell(char c)
+{
+	struct tb_cell* cells = malloc(sizeof(struct tb_cell) * CLOCK_W * CLOCK_H);
+
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	if (config.animate && c == ':' && tv.tv_usec / 500000)
+		c = ' ';
+	uint32_t* clockchars = CLOCK_N(c);
+
+	for (int i = 0; i < CLOCK_W * CLOCK_H; i++)
+	{
+		cells[i].ch = clockchars[i];
+		cells[i].fg = config.fg;
+		cells[i].bg = config.bg;
+	}
+
+	return cells;
+}
+
+void alpha_blit(struct tb_cell* buf, uint16_t x, uint16_t y, uint16_t w, uint16_t h, struct tb_cell* cells)
+{
+	if (x + w >= tb_width() || y + h >= tb_height())
+		return;
+
+	for (int i = 0; i < h; i++)
+	{
+		for (int j = 0; j < w; j++)
+		{
+			struct tb_cell cell = cells[i * w + j];
+			if (cell.ch)
+				buf[(y + i) * tb_width() + (x + j)] = cell;
+		}
+	}
+}
+
+void draw_bigclock(struct term_buf* buf)
+{
+	if (!config.bigclock)
+		return;
+
+	int xo = buf->width / 2 - (5 * (CLOCK_W + 1)) / 2;
+	int yo = (buf->height - buf->box_height) / 2 - CLOCK_H - 2;
+
+	char* clockstr = time_str("%H:%M", 6);
+	struct tb_cell* clockcell;
+
+	for (int i = 0; i < 5; i++)
+	{
+		clockcell = clock_cell(clockstr[i]);
+		alpha_blit(tb_cell_buffer(), xo + i * (CLOCK_W + 1), yo, CLOCK_W, CLOCK_H, clockcell);
+		free(clockcell);
+	}
+
+	free(clockstr);
+}
+
+void draw_clock(struct term_buf* buf)
+{
+	if (config.clock == NULL || strlen(config.clock) == 0)
+		return;
+
+	char* clockstr = time_str(config.clock, 32);
+	int clockstrlen = strlen(clockstr);
+
+	struct tb_cell* cells = strn_cell(clockstr, clockstrlen);
+	tb_blit(buf->width - clockstrlen, 0, clockstrlen, 1, cells);
+
+	free(clockstr);
+	free(cells);
 }
 
 struct tb_cell* strn_cell(char* s, uint16_t len) // throws

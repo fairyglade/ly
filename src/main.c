@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <string.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <stdlib.h>
 
@@ -187,7 +188,9 @@ int main(int argc, char** argv)
 				(*input_handles[active_input])(input_structs[active_input], NULL);
 				tb_clear();
 				animate(&buf);
+				draw_bigclock(&buf);
 				draw_box(&buf);
+				draw_clock(&buf);
 				draw_labels(&buf);
 				if(!config.hide_f1_commands)
 					draw_f_commands();
@@ -207,11 +210,26 @@ int main(int argc, char** argv)
 			tb_present();
 		}
 
-		if (config.animate) {
-			error = tb_peek_event(&event, config.min_refresh_delta);
-		} else {
-			error = tb_poll_event(&event);
+		int timeout = -1;
+
+		if (config.animate)
+		{
+			timeout = config.min_refresh_delta;
 		}
+		else
+		{
+			struct timeval tv;
+			gettimeofday(&tv, NULL);
+			if (config.bigclock)
+				timeout = (60 - tv.tv_sec % 60) * 1000 - tv.tv_usec / 1000 + 1;
+			if (config.clock)
+				timeout = 1000 - tv.tv_usec / 1000 + 1;
+		}
+
+		if (timeout == -1)
+			error = tb_poll_event(&event);
+		else
+			error = tb_peek_event(&event, timeout);
 
 		if (error < 0)
 		{

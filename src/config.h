@@ -65,8 +65,10 @@ struct config
 	uint8_t animation;
 	char asterisk;
 	uint8_t bg;
+	bool bigclock;
 	bool blank_box;
 	bool blank_password;
+	char* clock;
 	char* console_dev;
 	uint8_t default_input;
 	uint8_t fg;
