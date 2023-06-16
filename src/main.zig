@@ -1,6 +1,5 @@
 const std = @import("std");
 const c = @cImport({
-    @cInclude("argoat.h");
     @cInclude("configator.h");
     @cInclude("dragonfail.h");
     @cInclude("termbox.h");
@@ -49,36 +48,40 @@ pub fn main() !void {
     log_init(c.dgn_init());
 
     // Parse command line arguments
-    var config_path: [*c]u8 = undefined;
-    const sprigs = [_]c.struct_argoat_sprig{
-        .{ .flag = undefined, .pars_max = 0, .data = undefined, .func = undefined },
-        .{ .flag = "config", .pars_max = 0, .data = config_path, .func = arg_config },
-        .{ .flag = "c", .pars_max = 0, .data = config_path, .func = arg_config },
-        .{ .flag = "help", .pars_max = 0, .data = undefined, .func = arg_help },
-        .{ .flag = "h", .pars_max = 0, .data = undefined, .func = arg_help },
-        .{ .flag = "version", .pars_max = 0, .data = undefined, .func = arg_version },
-        .{ .flag = "v", .pars_max = 0, .data = undefined, .func = arg_version },
-    };
-
-    var args = c.struct_argoat{
-        .sprigs = &sprigs,
-        .sprigs_count = sprigs.len,
-        .unflagged = undefined,
-        .unflagged_count = 0,
-        .unflagged_max = 0,
-    };
+    var config_path: []const u8 = undefined;
 
     var process_args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, process_args);
 
-    const argv = try allocator.allocSentinel(?[*:0]u8, process_args.len, null);
-    defer allocator.free(argv);
+    if (process_args.len > 1) {
+        var first_arg = process_args[1];
 
-    for (process_args, 0..) |arg, i| {
-        argv[i] = (try allocator.dupeZ(u8, arg)).ptr;
+        if (std.mem.eql(u8, first_arg, "--help") or std.mem.eql(u8, first_arg, "-h")) {
+            std.debug.print("--help (-h)            | Shows this help message.\n", .{});
+            std.debug.print("--version (-v)         | Shows the version of Ly.\n", .{});
+            std.debug.print("--config (-c) <path>   | Overrides the configuration file path.\n", .{});
+            std.debug.print("\n", .{});
+            std.debug.print("If you want to configure Ly, please check the config file, usually located at /etc/ly/config.ini.\n", .{});
+            std.os.exit(0);
+            return;
+        } else if (std.mem.eql(u8, first_arg, "--version") or std.mem.eql(u8, first_arg, "-v")) {
+            std.debug.print("Ly version {s}.\n", .{LY_VERSION});
+            std.os.exit(0);
+            return;
+        } else if (std.mem.eql(u8, first_arg, "--config") or std.mem.eql(u8, first_arg, "-c")) {
+            if (process_args.len != 3) {
+                std.debug.print("Invalid usage! Correct usage: 'ly --config <path>'.\n", .{});
+                std.os.exit(1);
+                return;
+            }
+
+            config_path = process_args[2];
+        } else {
+            std.debug.print("Invalid argument: '{s}'.\n", .{first_arg});
+            std.os.exit(1);
+            return;
+        }
     }
-
-    c.argoat_graze(&args, @intCast(c_int, process_args.len), argv.ptr);
 
     // Initialize inputs
     var desktop = try allocator.create(c.struct_desktop);
@@ -98,9 +101,10 @@ pub fn main() !void {
         c.config_free();
         c.lang_free();
         std.os.exit(1);
+        return;
     }
 
-    c.config_load(config_path);
+    c.config_load(config_path.ptr);
     c.lang_load();
 
     c.desktop_load(desktop);
@@ -373,29 +377,4 @@ fn log_init(log: [*c][*c]u8) void {
     log[c.DGN_USER_UID] = lang.err_user_uid;
     log[c.DGN_PAM] = lang.err_pam;
     log[c.DGN_HOSTNAME] = lang.err_hostname;
-}
-
-// Sets the Ly configuration path
-fn arg_config(data: ?*anyopaque, pars: [*c][*c]u8, pars_count: c_int) callconv(.C) void {
-    _ = pars_count;
-    _ = pars;
-    _ = data;
-    // TODO
-    //@ptrCast([*c][*c]u8, @alignCast(8, data.?)).* = pars.*;
-}
-
-// Shows the help message
-fn arg_help(data: ?*anyopaque, pars: [*c][*c]u8, pars_count: c_int) callconv(.C) void {
-    _ = pars_count;
-    _ = pars;
-    _ = data;
-    std.debug.print("If you want to configure Ly, please check the config file, usually located at /etc/ly/config.ini.\n", .{});
-}
-
-// Shows the version of Ly
-fn arg_version(data: ?*anyopaque, pars: [*c][*c]u8, pars_count: c_int) callconv(.C) void {
-    _ = pars_count;
-    _ = pars;
-    _ = data;
-    std.debug.print("Ly version {s}.\n", .{LY_VERSION});
 }

@@ -29,8 +29,6 @@ pub fn build(b: *std.Build) void {
     exe.linkLibC();
 
     exe.addIncludePath("src");
-    exe.addIncludePath("dep/argoat/src");
-    exe.addIncludePath("dep/argoat/dep/testoasterror/src");
     exe.addIncludePath("dep/configator/src");
     exe.addIncludePath("dep/dragonfail/src");
     exe.addIncludePath("dep/termbox_next/src");
@@ -39,10 +37,7 @@ pub fn build(b: *std.Build) void {
     exe.addCSourceFile("src/draw.c", &c_args);
     exe.addCSourceFile("src/inputs.c", &c_args);
     exe.addCSourceFile("src/login.c", &c_args);
-    //exe.addCSourceFile("src/main.c", &c_args);
     exe.addCSourceFile("src/utils.c", &c_args);
-    exe.addCSourceFile("dep/argoat/src/argoat.c", &c_args);
-    exe.addCSourceFile("dep/argoat/dep/testoasterror/src/testoasterror.c", &c_args);
     exe.addCSourceFile("dep/configator/src/configator.c", &c_args);
     exe.addCSourceFile("dep/dragonfail/src/dragonfail.c", &c_args);
     exe.addCSourceFile("dep/termbox_next/src/input.c", &c_args);
