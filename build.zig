@@ -19,6 +19,7 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "ly",
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -38,7 +39,7 @@ pub fn build(b: *std.Build) void {
     exe.addCSourceFile("src/draw.c", &c_args);
     exe.addCSourceFile("src/inputs.c", &c_args);
     exe.addCSourceFile("src/login.c", &c_args);
-    exe.addCSourceFile("src/main.c", &c_args);
+    //exe.addCSourceFile("src/main.c", &c_args);
     exe.addCSourceFile("src/utils.c", &c_args);
     exe.addCSourceFile("dep/argoat/src/argoat.c", &c_args);
     exe.addCSourceFile("dep/argoat/dep/testoasterror/src/testoasterror.c", &c_args);
