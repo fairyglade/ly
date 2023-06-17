@@ -1,5 +1,6 @@
 const std = @import("std");
-const c = @cImport({
+
+pub const c = @cImport({
     @cInclude("configator.h");
     @cInclude("dragonfail.h");
     @cInclude("termbox.h");
@@ -17,11 +18,12 @@ const MAX_AUTH_FAILS = 10;
 
 // Main allocator for Ly
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-const allocator = gpa.allocator();
+
+pub const allocator = gpa.allocator();
 
 // Ly general and language configuration
-var config: c.struct_config = undefined;
-var lang: c.struct_lang = undefined;
+pub var config: c.struct_config = undefined;
+pub var lang: c.struct_lang = undefined;
 
 comptime {
     @export(config, .{ .name = "config" });
@@ -314,7 +316,7 @@ pub fn main() !void {
                     c.load(desktop, username);
 
                     // Reset cursor to its normal state
-                    _ = std.ChildProcess.exec(.{ .argv = &[_][]const u8{ "/sbin/tput", "cnorm" }, .allocator = allocator }) catch return;
+                    _ = std.ChildProcess.exec(.{ .argv = &[_][]const u8{ "/usr/bin/tput", "cnorm" }, .allocator = allocator }) catch return;
 
                     update = true;
                 },
