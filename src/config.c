@@ -113,13 +113,13 @@ void lang_load()
 		{"err_user_uid", &lang.err_user_uid, lang_handle},
 		{"err_xsessions_dir", &lang.err_xsessions_dir, lang_handle},
 		{"err_xsessions_open", &lang.err_xsessions_open, lang_handle},
-		{"f1", &lang.f1, lang_handle},
-		{"f2", &lang.f2, lang_handle},
 		{"login", &lang.login, lang_handle},
 		{"logout", &lang.logout, lang_handle},
 		{"numlock", &lang.numlock, lang_handle},
 		{"password", &lang.password, lang_handle},
+		{"restart", &lang.restart, lang_handle},
 		{"shell", &lang.shell, lang_handle},
+		{"shutdown", &lang.shutdown, lang_handle},
 		{"wayland", &lang.wayland, lang_handle},
 		{"xinitrc", &lang.xinitrc, lang_handle},
 	};
@@ -169,7 +169,7 @@ void config_load(const char *cfg_path)
 		{"default_input", &config.default_input, config_handle_u8},
 		{"fg", &config.fg, config_handle_u8},
 		{"hide_borders", &config.hide_borders, config_handle_bool},
-		{"hide_f1_commands", &config.hide_f1_commands, config_handle_bool},
+		{"hide_key_hints", &config.hide_key_hints, config_handle_bool},
 		{"input_len", &config.input_len, config_handle_u8},
 		{"lang", &config.lang, config_handle_str},
 		{"load", &config.load, config_handle_bool},
@@ -182,10 +182,12 @@ void config_load(const char *cfg_path)
 		{"min_refresh_delta", &config.min_refresh_delta, config_handle_u16},
 		{"path", &config.path, config_handle_str},
 		{"restart_cmd", &config.restart_cmd, config_handle_str},
+		{"restart_key", &config.restart_key, config_handle_str},
 		{"save", &config.save, config_handle_bool},
 		{"save_file", &config.save_file, config_handle_str},
 		{"service_name", &config.service_name, config_handle_str},
 		{"shutdown_cmd", &config.shutdown_cmd, config_handle_str},
+		{"shutdown_key", &config.shutdown_key, config_handle_str},
 		{"term_reset_cmd", &config.term_reset_cmd, config_handle_str},
 		{"tty", &config.tty, config_handle_u8},
 		{"wayland_cmd", &config.wayland_cmd, config_handle_str},
@@ -198,7 +200,7 @@ void config_load(const char *cfg_path)
 		{"xsessions", &config.xsessions, config_handle_str},
 	};
 
-	uint16_t map_len[] = {34};
+	uint16_t map_len[] = {41};
 	struct configator_param* map[] =
 	{
 		map_no_section,
@@ -254,13 +256,13 @@ void lang_defaults()
 	lang.err_user_uid = strdup("failed to set user UID");
 	lang.err_xsessions_dir = strdup("failed to find sessions folder");
 	lang.err_xsessions_open = strdup("failed to open sessions folder");
-	lang.f1 = strdup("F1 shutdown");
-	lang.f2 = strdup("F2 reboot");
 	lang.login = strdup("login:");
 	lang.logout = strdup("logged out");
 	lang.numlock = strdup("numlock");
 	lang.password = strdup("password:");
+	lang.restart = strdup("reboot");
 	lang.shell = strdup("shell");
+	lang.shutdown = strdup("shutdown");
 	lang.wayland = strdup("wayland");
 	lang.xinitrc = strdup("xinitrc");
 }
@@ -279,6 +281,7 @@ void config_defaults()
 	config.default_input = LOGIN_INPUT;
 	config.fg = 9;
 	config.hide_borders = false;
+	config.hide_key_hints = false;
 	config.input_len = 34;
 	config.lang = strdup("en");
 	config.load = true;
@@ -291,10 +294,12 @@ void config_defaults()
 	config.min_refresh_delta = 5;
 	config.path = strdup("/sbin:/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin");
 	config.restart_cmd = strdup("/sbin/shutdown -r now");
+	config.restart_key = strdup("F2");
 	config.save = true;
 	config.save_file = strdup("/etc/ly/save");
 	config.service_name = strdup("ly");
 	config.shutdown_cmd = strdup("/sbin/shutdown -a now");
+	config.shutdown_key = strdup("F1");
 	config.term_reset_cmd = strdup("/usr/bin/tput reset");
 	config.tty = 2;
 	config.wayland_cmd = strdup(DATADIR "/wsetup.sh");
@@ -345,13 +350,13 @@ void lang_free()
 	free(lang.err_user_uid);
 	free(lang.err_xsessions_dir);
 	free(lang.err_xsessions_open);
-	free(lang.f1);
-	free(lang.f2);
 	free(lang.login);
 	free(lang.logout);
 	free(lang.numlock);
 	free(lang.password);
+	free(lang.restart);
 	free(lang.shell);
+	free(lang.shutdown);
 	free(lang.wayland);
 	free(lang.xinitrc);
 }
@@ -364,9 +369,11 @@ void config_free()
 	free(config.mcookie_cmd);
 	free(config.path);
 	free(config.restart_cmd);
+	free(config.restart_key);
 	free(config.save_file);
 	free(config.service_name);
 	free(config.shutdown_cmd);
+	free(config.shutdown_key);
 	free(config.term_reset_cmd);
 	free(config.wayland_cmd);
 	free(config.waylandsessions);
