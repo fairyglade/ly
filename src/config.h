@@ -105,12 +105,4 @@ struct config
 extern struct lang lang;
 extern struct config config;
 
-void config_handle_str(void* data, char** pars, const int pars_count);
-void lang_load();
-void config_load(const char *cfg_path);
-void lang_defaults();
-void config_defaults();
-void lang_free();
-void config_free();
-
 #endif

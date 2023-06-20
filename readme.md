@@ -5,9 +5,8 @@
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 ## Dependencies
- - a C99 compiler (tested with tcc and gcc)
+ - zig
  - a C standard library
- - GNU make
  - pam
  - xcb
  - xorg
@@ -17,7 +16,9 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
  - shutdown
 
 On Debian-based distros running `apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you. 
-For Fedora try running `dnf install make automake gcc gcc-c++ kernel-devel pam-devel libxcb-devel`
+For Fedora try running `dnf install kernel-devel pam-devel libxcb-devel`
+
+You can download Zig [here](https://ziglang.org/download/).
 
 ## Support
 The following desktop environments were tested with success
@@ -57,7 +58,7 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-$ git clone --recurse-submodules https://github.com/fairyglade/ly
+$ git clone https://github.com/fairyglade/ly
 ```
 
 Change the directory to ly
@@ -67,18 +68,18 @@ $ cd ly
 
 Compile
 ```
-$ make
+$ zig build
 ```
 
 Test in the configured tty (tty2 by default)
 or a terminal emulator (but desktop environments won't start)
 ```
-# make run
+# zig build run
 ```
 
 Install Ly and the provided systemd service file
 ```
-# make install installsystemd
+# zig build installsystemd
 ```
 
 Enable the service
@@ -98,7 +99,7 @@ Clone, compile and test.
 
 Install Ly and the provided OpenRC service
 ```
-# make install installopenrc
+# zig build installopenrc
 ```
 
 Enable the service
@@ -116,8 +117,7 @@ If you choose a tty that already has a login/getty running (has a basic login pr
 ### runit
 
 ```
-$ make
-# make install installrunit
+# zig build installrunit
 # ln -s /etc/sv/ly /var/service/
 ```
 
