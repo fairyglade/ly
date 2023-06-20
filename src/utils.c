@@ -19,6 +19,16 @@
 	#include <linux/vt.h>
 #endif
 
+static void config_handle_str(void* data, char** pars, const int pars_count)
+{
+	if (*((char**)data) != NULL)
+	{
+		free(*((char**)data));
+	}
+
+	*((char**)data) = strdup(*pars);
+}
+
 void desktop_crawl(
 	struct desktop* target,
 	char* sessions,

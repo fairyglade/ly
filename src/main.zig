@@ -1,7 +1,7 @@
 const std = @import("std");
+const configuration = @import("config.zig");
 
 pub const c = @cImport({
-    @cInclude("configator.h");
     @cInclude("dragonfail.h");
     @cInclude("termbox.h");
 
@@ -42,15 +42,11 @@ pub fn main() !void {
     config = config_ptr.*;
     lang = lang_ptr.*;
 
-    // Load configuration
-    c.config_defaults();
-    c.lang_defaults();
-
     // Initialize error library
     log_init(c.dgn_init());
 
     // Parse command line arguments
-    var config_path: []const u8 = undefined;
+    var config_path: []const u8 = "";
 
     var process_args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, process_args);
@@ -65,24 +61,30 @@ pub fn main() !void {
             std.debug.print("\n", .{});
             std.debug.print("If you want to configure Ly, please check the config file, usually located at /etc/ly/config.ini.\n", .{});
             std.os.exit(0);
-            return;
         } else if (std.mem.eql(u8, first_arg, "--version") or std.mem.eql(u8, first_arg, "-v")) {
             std.debug.print("Ly version {s}.\n", .{LY_VERSION});
             std.os.exit(0);
-            return;
         } else if (std.mem.eql(u8, first_arg, "--config") or std.mem.eql(u8, first_arg, "-c")) {
             if (process_args.len != 3) {
                 std.debug.print("Invalid usage! Correct usage: 'ly --config <path>'.\n", .{});
                 std.os.exit(1);
-                return;
             }
 
             config_path = process_args[2];
         } else {
             std.debug.print("Invalid argument: '{s}'.\n", .{first_arg});
             std.os.exit(1);
-            return;
         }
+    }
+
+    // Load configuration and language
+    try configuration.config_load(config_path);
+    try configuration.lang_load();
+
+    if (c.dgn_catch() != 0) {
+        configuration.config_free();
+        configuration.lang_free();
+        std.os.exit(1);
     }
 
     // Initialize inputs
@@ -98,16 +100,6 @@ pub fn main() !void {
     c.input_desktop(desktop);
     c.input_text(username, config.max_login_len);
     c.input_text(password, config.max_password_len);
-
-    if (c.dgn_catch() != 0) {
-        c.config_free();
-        c.lang_free();
-        std.os.exit(1);
-        return;
-    }
-
-    c.config_load(config_path.ptr);
-    c.lang_load();
 
     c.desktop_load(desktop);
     c.load(desktop, username);
@@ -338,14 +330,14 @@ pub fn main() !void {
 
     // Unload configuration
     c.draw_free(buffer);
-    c.lang_free();
+    configuration.lang_free();
 
     if (shutdown) {
         var shutdown_cmd = try std.fmt.allocPrint(allocator, "{s}", .{config.shutdown_cmd});
         // This will never be freed! But it's fine, we're shutting down the system anyway
         defer allocator.free(shutdown_cmd);
 
-        c.config_free();
+        configuration.config_free();
 
         std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", shutdown_cmd }) catch return;
     } else if (reboot) {
@@ -353,11 +345,11 @@ pub fn main() !void {
         // This will never be freed! But it's fine, we're rebooting the system anyway
         defer allocator.free(restart_cmd);
 
-        c.config_free();
+        configuration.config_free();
 
         std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", restart_cmd }) catch return;
     } else {
-        c.config_free();
+        configuration.config_free();
     }
 }
 

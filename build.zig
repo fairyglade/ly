@@ -33,7 +33,6 @@ pub fn build(b: *std.Build) void {
     exe.addIncludePath("dep/dragonfail/src");
     exe.addIncludePath("dep/termbox_next/src");
 
-    exe.addCSourceFile("src/config.c", &c_args);
     exe.addCSourceFile("src/draw.c", &c_args);
     exe.addCSourceFile("src/inputs.c", &c_args);
     exe.addCSourceFile("src/login.c", &c_args);
