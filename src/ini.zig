@@ -1,116 +1,92 @@
 const std = @import("std");
 
-// we ignore whitespace and comments
 pub const Token = union(enum) { comment, section: []const u8, key: []const u8, value: []const u8 };
 
-pub const State = enum { normal, section, key, value, comment };
-
-pub fn getTok(data: []const u8, pos: *usize, state: *State) ?Token {
-    // if the position advances to the end of the data, there's no more tokens for us
-    if (pos.* >= data.len) return null;
-    var cur: u8 = 0;
-    // used for slicing
-    var start = pos.*;
-    var end = start;
+pub fn getTok(data: []const u8, pos: *usize) ?Token {
+    // If the position advances to the end of the data, there's no more tokens for us
+    if (pos.* >= data.len) {
+        return null;
+    }
 
     while (pos.* < data.len) {
-        cur = data[pos.*];
+        var current = data[pos.*];
         pos.* += 1;
-        switch (state.*) {
-            .normal => {
-                switch (cur) {
-                    '[' => {
-                        state.* = .section;
-                        start = pos.*;
-                        end = start;
-                    },
-                    '=' => {
-                        state.* = .value;
-                        start = pos.*;
-                        if (std.ascii.isWhitespace(data[start])) start += 1;
-                        end = start;
-                    },
-                    ';', '#' => {
-                        state.* = .comment;
-                    },
-                    // if it is whitespace itgets skipped over anyways
-                    else => if (!std.ascii.isWhitespace(cur)) {
-                        state.* = .key;
-                        start = pos.* - 1;
-                        end = start;
-                    },
+
+        switch (current) {
+            ' ', '\t', '\r', '\n' => {},
+            '[' => {
+                var start = pos.*;
+
+                current = data[pos.*];
+
+                while (current != ']') : (pos.* += 1) {
+                    current = data[pos.*];
                 }
+
+                return Token{ .section = data[start .. pos.* - 1] };
             },
-            .section => {
-                end += 1;
-                switch (cur) {
-                    ']' => {
-                        state.* = .normal;
-                        pos.* += 1;
-                        return Token{ .section = data[start .. end - 1] };
-                    },
-                    else => {},
+            '=' => {
+                current = data[pos.*];
+
+                while (current == ' ' or current == '\t') {
+                    pos.* += 1;
+                    current = data[pos.*];
                 }
+
+                var start = pos.*;
+
+                while (current != '\n') : (pos.* += 1) {
+                    current = data[pos.*];
+                }
+
+                return Token{ .value = if (start == pos.*) "" else data[start .. pos.* - 1] };
             },
-            .value => {
-                switch (cur) {
-                    ';', '#' => {
-                        state.* = .comment;
-                        return Token{ .value = data[start .. end - 2] };
-                    },
-                    else => {
-                        end += 1;
-                        switch (cur) {
-                            '\n' => {
-                                state.* = .normal;
-                                return Token{ .value = data[start .. end - 2] };
-                            },
-                            else => {},
-                        }
-                    },
+            ';', '#' => {
+                current = data[pos.*];
+
+                while (current != '\n') : (pos.* += 1) {
+                    current = data[pos.*];
                 }
+
+                return Token.comment;
             },
-            .comment => {
-                end += 1;
-                switch (cur) {
-                    '\n' => {
-                        state.* = .normal;
-                        return Token.comment;
-                    },
-                    else => {},
+            else => {
+                var start = pos.* - 1;
+
+                current = data[pos.*];
+
+                while (std.ascii.isAlphanumeric(current) or current == '_') : (pos.* += 1) {
+                    current = data[pos.*];
                 }
-            },
-            .key => {
-                end += 1;
-                if (!(std.ascii.isAlphanumeric(cur) or cur == '_')) {
-                    state.* = .normal;
-                    return Token{ .key = data[start..end] };
-                }
+
+                pos.* -= 1;
+
+                return Token{ .key = data[start..pos.*] };
             },
         }
     }
+
     return null;
 }
 pub fn readToStruct(comptime T: type, data: []const u8) !T {
     var namespace: []const u8 = "";
     var pos: usize = 0;
-    var state: State = .normal;
     var ret = std.mem.zeroes(T);
-    while (getTok(data, &pos, &state)) |tok| {
+    while (getTok(data, &pos)) |tok| {
         switch (tok) {
             .comment => {},
             .section => |ns| {
                 namespace = ns;
             },
             .key => |key| {
-                var next_tok = getTok(data, &pos, &state);
+                var next_tok = getTok(data, &pos);
                 // if there's nothing just give a comment which is also a syntax error
                 switch (next_tok orelse .comment) {
                     .value => |value| {
                         // now we have the namespace, key, and value
                         // namespace and key are runtime values, so we need to loop the struct instead of using @field
                         inline for (std.meta.fields(T)) |ns_info| {
-                            if (std.mem.eql(u8, ns_info.name, namespace)) {
+                            if (eql(ns_info.name, namespace)) {
                                 // @field(ret, ns_info.name) contains the inner struct now
                                 // loop over the fields of the inner struct, and check for key matches
                                 inline for (std.meta.fields(@TypeOf(@field(ret, ns_info.name)))) |key_info| {
@@ -124,11 +100,11 @@ pub fn readToStruct(comptime T: type, data: []const u8) !T {
                         }
                     },
                     // after a key, a value must follow
-                    else => return error.SyntaxError,
+                    else => return error.NoValueAfterKey,
                 }
             },
             // if we get a value with no key, that's a bit nonsense
-            .value => return error.SyntaxError,
+            .value => return error.ValueWithNoKey,
         }
     }
     return ret;
@@ -171,6 +147,7 @@ pub fn writeStruct(struct_value: anytype, writer: anytype) !void {
         }
     }
 }
+// Checks if the string is actually a single ASCII character, else, parse as an integer
 fn parseInt(comptime T: type, buf: []const u8, base: u8) std.fmt.ParseIntError!T {
     if (buf.len == 1) {
         var first_char = buf[0];
@@ -181,4 +158,22 @@ fn parseInt(comptime T: type, buf: []const u8, base: u8) std.fmt.ParseIntError!T
     }
 
     return std.fmt.parseInt(T, buf, base);
+}
+// Checks if 2 strings are equal, but comparing " " with "_"
+fn eql(a: []const u8, b: []const u8) bool {
+    if (a.len != b.len) {
+        return false;
+    }
+
+    if (a.ptr == b.ptr) {
+        return true;
+    }
+
+    for (a, b) |a_elem, b_elem| {
+        if (a_elem != if (b_elem == ' ') '_' else b_elem) {
+            return false;
+        }
+    }
+
+    return true;
 }

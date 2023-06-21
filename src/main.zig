@@ -1,5 +1,6 @@
 const std = @import("std");
-const configuration = @import("config.zig");
+const config = @import("config.zig");
+const utils = @import("utils.zig");
 
 pub const c = @cImport({
     @cInclude("dragonfail.h");
@@ -22,12 +23,12 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 pub const allocator = gpa.allocator();
 
 // Ly general and language configuration
-pub var config: c.struct_config = undefined;
-pub var lang: c.struct_lang = undefined;
+pub var c_config: c.struct_config = undefined;
+pub var c_lang: c.struct_lang = undefined;
 
 comptime {
-    @export(config, .{ .name = "config" });
-    @export(lang, .{ .name = "lang" });
+    @export(c_config, .{ .name = "config" });
+    @export(c_lang, .{ .name = "lang" });
 }
 
 // Main function
@@ -39,8 +40,8 @@ pub fn main() !void {
     var lang_ptr = try allocator.create(c.struct_lang);
     defer allocator.destroy(lang_ptr);
 
-    config = config_ptr.*;
-    lang = lang_ptr.*;
+    c_config = config_ptr.*;
+    c_lang = lang_ptr.*;
 
     // Initialize error library
     log_init(c.dgn_init());
@@ -78,12 +79,12 @@ pub fn main() !void {
     }
 
     // Load configuration and language
-    try configuration.config_load(config_path);
-    try configuration.lang_load();
+    try config.config_load(config_path);
+    try config.lang_load();
 
     if (c.dgn_catch() != 0) {
-        configuration.config_free();
-        configuration.lang_free();
+        config.config_free();
+        config.lang_free();
         std.os.exit(1);
     }
 
@@ -98,11 +99,11 @@ pub fn main() !void {
     defer allocator.destroy(password);
 
     c.input_desktop(desktop);
-    c.input_text(username, config.max_login_len);
-    c.input_text(password, config.max_password_len);
+    c.input_text(username, config.ly_config.ly.max_login_len);
+    c.input_text(password, config.ly_config.ly.max_password_len);
 
-    c.desktop_load(desktop);
-    c.load(desktop, username);
+    utils.desktop_load(desktop);
+    try utils.load(desktop, username);
 
     // Start termbox
     _ = c.tb_init();
@@ -119,10 +120,10 @@ pub fn main() !void {
     // Place the cursor on the login field if there is no saved username
     // If there is, place the curser on the password field
     var active_input: u8 = 0;
-    if (config.default_input == c.LOGIN_INPUT and username.text != username.end) {
+    if (config.ly_config.ly.default_input == c.LOGIN_INPUT and username.text != username.end) {
         active_input = c.PASSWORD_INPUT;
     } else {
-        active_input = config.default_input;
+        active_input = config.ly_config.ly.default_input;
     }
 
     // Initialize drawing code
@@ -146,11 +147,11 @@ pub fn main() !void {
         else => unreachable,
     }
 
-    if (config.animate) {
+    if (config.ly_config.ly.animate) {
         c.animate_init(buffer);
 
         if (c.dgn_catch() != 0) {
-            config.animate = false;
+            config.ly_config.ly.animate = false;
             c.dgn_reset();
         }
     }
@@ -188,7 +189,7 @@ pub fn main() !void {
                 c.draw_box(buffer);
                 c.draw_clock(buffer);
                 c.draw_labels(buffer);
-                if (!config.hide_f1_commands) {
+                if (!config.ly_config.ly.hide_f1_commands) {
                     c.draw_f_commands();
                 }
                 c.draw_lock_state(buffer);
@@ -196,7 +197,7 @@ pub fn main() !void {
                 c.draw_desktop(desktop);
                 c.draw_input(username);
                 c.draw_input_mask(password);
-                update = config.animate;
+                update = config.ly_config.ly.animate;
             } else {
                 std.time.sleep(10000000); // Sleep 0.01 seconds
                 update = c.cascade(buffer, &auth_fails);
@@ -207,8 +208,8 @@ pub fn main() !void {
 
         var timeout: c_int = -1;
 
-        if (config.animate) {
-            timeout = config.min_refresh_delta;
+        if (config.ly_config.ly.animate) {
+            timeout = config.ly_config.ly.min_refresh_delta;
         } else {
             // TODO: Use the Zig standard library directly
             var time = try allocator.create(std.os.linux.timeval);
@@ -216,9 +217,9 @@ pub fn main() !void {
 
             _ = std.os.linux.gettimeofday(time, undefined);
 
-            if (config.bigclock) {
+            if (config.ly_config.ly.bigclock) {
                 timeout = @intCast(c_int, (60 - @mod(time.tv_sec, 60)) * 1000 - @divTrunc(time.tv_usec, 1000) + 1);
-            } else if (config.clock != undefined) {
+            } else if (config.ly_config.ly.clock.len > 0) {
                 timeout = @intCast(c_int, 1000 - @divTrunc(time.tv_usec, 1000) + 1);
             }
         }
@@ -283,7 +284,7 @@ pub fn main() !void {
                     update = true;
                 },
                 c.TB_KEY_ENTER => {
-                    c.save(desktop, username);
+                    try utils.save(desktop, username);
                     c.auth(desktop, username, password, buffer);
 
                     if (c.dgn_catch() != 0) {
@@ -296,16 +297,16 @@ pub fn main() !void {
                             buffer.info_line = c.dgn_output_log();
                         }
 
-                        if (config.blank_password) {
+                        if (config.ly_config.ly.blank_password) {
                             c.input_text_clear(password);
                         }
 
                         c.dgn_reset();
                     } else {
-                        buffer.info_line = lang.logout;
+                        buffer.info_line = c_lang.logout;
                     }
 
-                    c.load(desktop, username);
+                    try utils.load(desktop, username);
 
                     // Reset cursor to its normal state
                     _ = std.ChildProcess.exec(.{ .argv = &[_][]const u8{ "/usr/bin/tput", "cnorm" }, .allocator = allocator }) catch return;
@@ -330,45 +331,45 @@ pub fn main() !void {
 
     // Unload configuration
     c.draw_free(buffer);
-    configuration.lang_free();
+    config.lang_free();
 
     if (shutdown) {
-        var shutdown_cmd = try std.fmt.allocPrint(allocator, "{s}", .{config.shutdown_cmd});
+        var shutdown_cmd = try std.fmt.allocPrint(allocator, "{s}", .{config.ly_config.ly.shutdown_cmd});
         // This will never be freed! But it's fine, we're shutting down the system anyway
         defer allocator.free(shutdown_cmd);
 
-        configuration.config_free();
+        config.config_free();
 
         std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", shutdown_cmd }) catch return;
     } else if (reboot) {
-        var restart_cmd = try std.fmt.allocPrint(allocator, "{s}", .{config.restart_cmd});
+        var restart_cmd = try std.fmt.allocPrint(allocator, "{s}", .{config.ly_config.ly.restart_cmd});
         // This will never be freed! But it's fine, we're rebooting the system anyway
         defer allocator.free(restart_cmd);
 
-        configuration.config_free();
+        config.config_free();
 
         std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", restart_cmd }) catch return;
     } else {
-        configuration.config_free();
+        config.config_free();
     }
 }
 
 // Low-level error messages
 fn log_init(log: [*c][*c]u8) void {
-    log[c.DGN_OK] = lang.err_dgn_oob;
-    log[c.DGN_NULL] = lang.err_null;
-    log[c.DGN_ALLOC] = lang.err_alloc;
-    log[c.DGN_BOUNDS] = lang.err_bounds;
-    log[c.DGN_DOMAIN] = lang.err_domain;
-    log[c.DGN_MLOCK] = lang.err_mlock;
-    log[c.DGN_XSESSIONS_DIR] = lang.err_xsessions_dir;
-    log[c.DGN_XSESSIONS_OPEN] = lang.err_xsessions_open;
-    log[c.DGN_PATH] = lang.err_path;
-    log[c.DGN_CHDIR] = lang.err_chdir;
-    log[c.DGN_PWNAM] = lang.err_pwnam;
-    log[c.DGN_USER_INIT] = lang.err_user_init;
-    log[c.DGN_USER_GID] = lang.err_user_gid;
-    log[c.DGN_USER_UID] = lang.err_user_uid;
-    log[c.DGN_PAM] = lang.err_pam;
-    log[c.DGN_HOSTNAME] = lang.err_hostname;
+    log[c.DGN_OK] = c_lang.err_dgn_oob;
+    log[c.DGN_NULL] = c_lang.err_null;
+    log[c.DGN_ALLOC] = c_lang.err_alloc;
+    log[c.DGN_BOUNDS] = c_lang.err_bounds;
+    log[c.DGN_DOMAIN] = c_lang.err_domain;
+    log[c.DGN_MLOCK] = c_lang.err_mlock;
+    log[c.DGN_XSESSIONS_DIR] = c_lang.err_xsessions_dir;
+    log[c.DGN_XSESSIONS_OPEN] = c_lang.err_xsessions_open;
+    log[c.DGN_PATH] = c_lang.err_path;
+    log[c.DGN_CHDIR] = c_lang.err_chdir;
+    log[c.DGN_PWNAM] = c_lang.err_pwnam;
+    log[c.DGN_USER_INIT] = c_lang.err_user_init;
+    log[c.DGN_USER_GID] = c_lang.err_user_gid;
+    log[c.DGN_USER_UID] = c_lang.err_user_uid;
+    log[c.DGN_PAM] = c_lang.err_pam;
+    log[c.DGN_HOSTNAME] = c_lang.err_hostname;
 }
