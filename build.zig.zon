@@ -1,0 +1,10 @@
+.{
+    .name = "ly",
+    .version = "0.7.0",
+    .dependencies = .{
+        .ini = .{
+            .url = "https://github.com/AnErrupTion/zig-ini/archive/a40f3cae04939de0d795812a73633e0563cf3132.tar.gz",
+            .hash = "1220b39fc35714d235fd9633422f5ba3c4aba44f1ecaf29cf91515963f0b08a3da89",
+        },
+    }
+}

@@ -24,6 +24,9 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const ini = b.dependency("ini", .{});
+    exe.addModule("ini", ini.module("ini"));
+
     exe.linkSystemLibrary("pam");
     exe.linkSystemLibrary("xcb");
     exe.linkLibC();

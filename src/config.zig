@@ -1,6 +1,6 @@
 const std = @import("std");
+const ini = @import("ini");
 const main = @import("main.zig");
-const ini = @import("ini.zig");
 const interop = @import("interop.zig");
 
 const INI_CONFIG_PATH: []const u8 = "/etc/ly/";
