@@ -454,6 +454,11 @@ void draw_lock_state(struct term_buf* buf)
 
 	// print text
 	uint16_t pos_x = buf->width - strlen(lang.numlock);
+	uint16_t pos_y = 1;
+	if (config.clock == NULL || strlen(config.clock) == 0)
+	{
+		pos_y = 0;
+	}
 
 	if (numlock_on)
 	{
@@ -465,7 +470,7 @@ void draw_lock_state(struct term_buf* buf)
 		}
 		else
 		{
-			tb_blit(pos_x, 0, strlen(lang.numlock), 1, numlock);
+			tb_blit(pos_x, pos_y, strlen(lang.numlock), 1, numlock);
 			free(numlock);
 		}
 	}
@@ -482,7 +487,7 @@ void draw_lock_state(struct term_buf* buf)
 		}
 		else
 		{
-			tb_blit(pos_x, 0, strlen(lang.capslock), 1, capslock);
+			tb_blit(pos_x, pos_y, strlen(lang.capslock), 1, capslock);
 			free(capslock);
 		}
 	}
