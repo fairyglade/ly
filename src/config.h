@@ -4,12 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-enum INPUTS {
-	SESSION_SWITCH,
-	LOGIN_INPUT,
-	PASSWORD_INPUT,
-};
-
 struct lang
 {
 	char* capslock;

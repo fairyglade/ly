@@ -119,9 +119,9 @@ pub fn main() !void {
 
     // Place the cursor on the login field if there is no saved username
     // If there is, place the curser on the password field
-    var active_input: u8 = 0;
-    if (config.ly_config.ly.default_input == c.LOGIN_INPUT and username.text != username.end) {
-        active_input = c.PASSWORD_INPUT;
+    var active_input: config.Inputs = undefined;
+    if (config.ly_config.ly.default_input == .login and username.text != username.end) {
+        active_input = .password;
     } else {
         active_input = config.ly_config.ly.default_input;
     }
@@ -135,16 +135,15 @@ pub fn main() !void {
     c.position_input(buffer, desktop, username, password);
 
     switch (active_input) {
-        c.SESSION_SWITCH => {
+        .session => {
             c.handle_desktop(desktop, event);
         },
-        c.LOGIN_INPUT => {
+        .login => {
             c.handle_text(username, event);
         },
-        c.PASSWORD_INPUT => {
+        .password => {
             c.handle_text(password, event);
         },
-        else => unreachable,
     }
 
     if (config.ly_config.ly.animate) {
@@ -171,16 +170,15 @@ pub fn main() !void {
         if (update) {
             if (auth_fails < MAX_AUTH_FAILS) {
                 switch (active_input) {
-                    c.SESSION_SWITCH => {
+                    .session => {
                         c.handle_desktop(desktop, event);
                     },
-                    c.LOGIN_INPUT => {
+                    .login => {
                         c.handle_text(username, event);
                     },
-                    c.PASSWORD_INPUT => {
+                    .password => {
                         c.handle_text(password, event);
                     },
-                    else => unreachable,
                 }
 
                 c.tb_clear();
@@ -218,9 +216,9 @@ pub fn main() !void {
             _ = std.os.linux.gettimeofday(time, undefined);
 
             if (config.ly_config.ly.bigclock) {
-                timeout = @intCast(c_int, (60 - @mod(time.tv_sec, 60)) * 1000 - @divTrunc(time.tv_usec, 1000) + 1);
+                timeout = @intCast((60 - @mod(time.tv_sec, 60)) * 1000 - @divTrunc(time.tv_usec, 1000) + 1);
             } else if (config.ly_config.ly.clock.len > 0) {
-                timeout = @intCast(c_int, 1000 - @divTrunc(time.tv_usec, 1000) + 1);
+                timeout = @intCast(1000 - @divTrunc(time.tv_usec, 1000) + 1);
             }
         }
 
@@ -248,12 +246,12 @@ pub fn main() !void {
                     run = false;
                 },
                 c.TB_KEY_CTRL_U => {
-                    if (active_input > c.SESSION_SWITCH) {
+                    if (active_input != .session) {
                         switch (active_input) {
-                            c.LOGIN_INPUT => {
+                            .login => {
                                 c.input_text_clear(username);
                             },
-                            c.PASSWORD_INPUT => {
+                            .password => {
                                 c.input_text_clear(password);
                             },
                             else => unreachable,
@@ -263,23 +261,33 @@ pub fn main() !void {
                     }
                 },
                 c.TB_KEY_CTRL_K, c.TB_KEY_ARROW_UP => {
-                    if (active_input > c.SESSION_SWITCH) {
-                        active_input -= 1;
+                    if (active_input != .session) {
+                        active_input = switch (active_input) {
+                            .login => .session,
+                            .password => .login,
+                            else => unreachable,
+                        };
+
                         update = true;
                     }
                 },
                 c.TB_KEY_CTRL_J, c.TB_KEY_ARROW_DOWN => {
-                    if (active_input < c.PASSWORD_INPUT) {
-                        active_input += 1;
+                    if (active_input != .password) {
+                        active_input = switch (active_input) {
+                            .session => .login,
+                            .login => .password,
+                            else => unreachable,
+                        };
+
                         update = true;
                     }
                 },
                 c.TB_KEY_TAB => {
-                    active_input += 1;
-
-                    if (active_input > c.PASSWORD_INPUT) {
-                        active_input = c.SESSION_SWITCH;
-                    }
+                    active_input = switch (active_input) {
+                        .session => .login,
+                        .login => .password,
+                        .password => .session,
+                    };
 
                     update = true;
                 },
@@ -291,7 +299,7 @@ pub fn main() !void {
                         auth_fails += 1;
 
                         // Move focus back to password input
-                        active_input = c.PASSWORD_INPUT;
+                        active_input = .password;
 
                         if (c.dgn_output_code() != c.DGN_PAM) {
                             buffer.info_line = c.dgn_output_log();

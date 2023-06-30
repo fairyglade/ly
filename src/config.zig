@@ -6,6 +6,12 @@ const interop = @import("interop.zig");
 const INI_CONFIG_PATH: []const u8 = "/etc/ly/";
 const INI_CONFIG_MAX_SIZE: usize = 16 * 1024;
 
+pub const Inputs = enum {
+    session,
+    login,
+    password,
+};
+
 pub const LyConfig = struct {
     ly: struct {
         animate: bool,
@@ -17,7 +23,7 @@ pub const LyConfig = struct {
         blank_password: bool,
         clock: []const u8,
         console_dev: []const u8,
-        default_input: u8,
+        default_input: Inputs,
         fg: u8,
         hide_borders: bool,
         hide_f1_commands: bool,
@@ -207,7 +213,7 @@ pub fn config_load(cfg_path: []const u8) !void {
     main.c_config.blank_password = ly_config.ly.blank_password;
     main.c_config.clock = config_clock.ptr;
     main.c_config.console_dev = config_console_dev.ptr;
-    main.c_config.default_input = ly_config.ly.default_input;
+    main.c_config.default_input = @intFromEnum(ly_config.ly.default_input);
     main.c_config.fg = ly_config.ly.fg;
     main.c_config.hide_borders = ly_config.ly.hide_borders;
     main.c_config.hide_f1_commands = ly_config.ly.hide_f1_commands;
