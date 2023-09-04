@@ -15,11 +15,11 @@ void handle_desktop(void* input_struct, struct tb_event* event)
 
 	if ((event != NULL) && (event->type == TB_EVENT_KEY))
 	{
-		if (event->key == TB_KEY_ARROW_LEFT)
+		if (event->key == TB_KEY_ARROW_LEFT || (event->key == TB_KEY_CTRL_H))
 		{
 			input_desktop_right(target);
 		}
-		else if (event->key == TB_KEY_ARROW_RIGHT)
+		else if (event->key == TB_KEY_ARROW_RIGHT || (event->key == TB_KEY_CTRL_L))
 		{
 			input_desktop_left(target);
 		}

@@ -56,6 +56,38 @@ static const void* ANIM_FREES[] = {
 #define DOOM_STEPS 13
 
 
+static void doom_init(struct term_buf* buf)
+{
+	buf->init_width = buf->width;
+	buf->init_height = buf->height;
+	buf->astate = (struct doom_state*)malloc(sizeof(struct doom_state));
+
+	if (buf->astate == NULL)
+	{
+		dgn_throw(DGN_ALLOC);
+	}
+
+	uint16_t tmp_len = buf->width * buf->height;
+    // cast the doom state to a pointer to the structure
+    struct doom_state* d = (struct doom_state*)buf->astate;
+	d->buf = malloc(tmp_len);
+	tmp_len -= buf->width;
+
+	if (d->buf == NULL)
+	{
+		dgn_throw(DGN_ALLOC);
+	}
+
+	memset(d->buf, 0, tmp_len);
+	memset(d->buf + tmp_len, DOOM_STEPS - 1, buf->width);
+}
+
+static void doom_free(struct term_buf* buf)
+{
+    struct doom_state* d = (struct doom_state*)buf->astate;
+	free(d->buf);
+	free(d);
+}
 
 // Adapted from cmatrix
 static void matrix_init(struct term_buf* buf)
@@ -63,8 +95,7 @@ static void matrix_init(struct term_buf* buf)
 	buf->init_width = buf->width;
 	buf->init_height = buf->height;
 	buf->astate = (struct matrix_state*)malloc(sizeof(struct matrix_state));
-    // cast state to matrix_state pointer
-	struct matrix_state* s = (struct matrix_state*)buf->astate;
+	struct matrix_state* s = buf->astate;
 
 	if (s == NULL)
 	{
@@ -138,13 +169,76 @@ static void matrix_init(struct term_buf* buf)
 
 static void matrix_free(struct term_buf* buf)
 {
-    // casting state to matrix_state pointer
-	free(((struct matrix_state*)buf->astate)->grid[0]);
-	free(((struct matrix_state*)buf->astate)->grid);
-	free(((struct matrix_state*)buf->astate)->length);
-	free(((struct matrix_state*)buf->astate)->spaces);
-	free(((struct matrix_state*)buf->astate)->updates);
-	free(((struct matrix_state*)buf->astate));
+	struct matrix_state* matrix = buf->astate;
+	free(matrix->grid[0]);
+	free(matrix->grid);
+	free(matrix->length);
+	free(matrix->spaces);
+	free(matrix->updates);
+	free(matrix);
+}
+
+static void doom(struct term_buf* term_buf)
+{
+	static struct tb_cell fire[DOOM_STEPS] =
+	{
+		{' ', 9, 0}, // default
+		{0x2591, 2, 0}, // red
+		{0x2592, 2, 0}, // red
+		{0x2593, 2, 0}, // red
+		{0x2588, 2, 0}, // red
+		{0x2591, 4, 2}, // yellow
+		{0x2592, 4, 2}, // yellow
+		{0x2593, 4, 2}, // yellow
+		{0x2588, 4, 2}, // yellow
+		{0x2591, 8, 4}, // white
+		{0x2592, 8, 4}, // white
+		{0x2593, 8, 4}, // white
+		{0x2588, 8, 4}, // white
+	};
+
+	uint16_t src;
+	uint16_t random;
+	uint16_t dst;
+
+	uint16_t w = term_buf->init_width;
+	uint8_t* tmp = ((struct doom_state*)term_buf->astate)->buf;
+
+	if ((term_buf->width != term_buf->init_width) || (term_buf->height != term_buf->init_height))
+	{
+		return;
+	}
+
+	struct tb_cell* buf = tb_cell_buffer();
+
+	for (uint16_t x = 0; x < w; ++x)
+	{
+		for (uint16_t y = 1; y < term_buf->init_height; ++y)
+		{
+			src = y * w + x;
+			random = ((rand() % 7) & 3);
+			dst = src - random + 1;
+
+			if (w > dst)
+			{
+				dst = 0;
+			}
+			else
+			{
+				dst -= w;
+			}
+
+			tmp[dst] = tmp[src] - (random & 1);
+
+			if (tmp[dst] > 12)
+			{
+				tmp[dst] = 0;
+			}
+
+			buf[dst] = fire[tmp[dst]];
+			buf[src] = fire[tmp[src]];
+		}
+	}
 }
 
 // Adapted from cmatrix
@@ -154,7 +248,7 @@ static void matrix(struct term_buf* buf)
 	const int frame_delay = 8;
 	static int count = 0;
 	bool first_col;
-	struct matrix_state* s = ((struct matrix_state*)buf->astate);
+	struct matrix_state* s = buf->astate;
 
 	// Allowed codepoints
 	const int randmin = 33;
@@ -168,7 +262,8 @@ static void matrix(struct term_buf* buf)
 	}
 
 	count += 1;
-	if (count > frame_delay) {
+	if (count > frame_delay)
+    {
 		frame += 1;
 		if (frame > 4) frame = 1;
 		count = 0;
@@ -243,7 +338,8 @@ static void matrix(struct term_buf* buf)
 	uint32_t blank;
 	utf8_char_to_unicode(&blank, " ");
 
-	for (int j = 0; j < buf->width; j += 2) {
+	for (int j = 0; j < buf->width; j += 2)
+    {
 		for (int i = 1; i <= buf->height; ++i)
 		{
 			uint32_t c;
@@ -271,102 +367,6 @@ static void matrix(struct term_buf* buf)
 	}
 }
 
-// doom functions 
-static void doom_init(struct term_buf* buf)
-{
-	buf->init_width = buf->width;
-	buf->init_height = buf->height;
-	buf->astate = (struct doom_state*)malloc(sizeof(struct doom_state));
-
-	if (buf->astate == NULL)
-	{
-		dgn_throw(DGN_ALLOC);
-	}
-
-	uint16_t tmp_len = buf->width * buf->height;
-    // cast state to doom_state pointer
-    struct doom_state* d = (struct doom_state*)buf->astate;
-	d->buf = malloc(tmp_len);
-	tmp_len -= buf->width;
-
-	if (((struct doom_state*)buf->astate)->buf == NULL)
-	{
-		dgn_throw(DGN_ALLOC);
-	}
-
-	memset(d->buf, 0, tmp_len);
-	memset(d->buf + tmp_len, DOOM_STEPS - 1, buf->width);
-}
-
-static void doom_free(struct term_buf* buf)
-{
-    // cast state to doom_state pointer
-	free(((struct doom_state*)buf->astate)->buf);
-	free(((struct doom_state*)buf->astate));
-}
-
-static void doom(struct term_buf* term_buf)
-{
-	static struct tb_cell fire[DOOM_STEPS] =
-	{
-		{' ', 9, 0}, // default
-		{0x2591, 2, 0}, // red
-		{0x2592, 2, 0}, // red
-		{0x2593, 2, 0}, // red
-		{0x2588, 2, 0}, // red
-		{0x2591, 4, 2}, // yellow
-		{0x2592, 4, 2}, // yellow
-		{0x2593, 4, 2}, // yellow
-		{0x2588, 4, 2}, // yellow
-		{0x2591, 8, 4}, // white
-		{0x2592, 8, 4}, // white
-		{0x2593, 8, 4}, // white
-		{0x2588, 8, 4}, // white
-	};
-
-	uint16_t src;
-	uint16_t random;
-	uint16_t dst;
-
-	uint16_t w = term_buf->init_width;
-	uint8_t* tmp = ((struct doom_state*)term_buf->astate)->buf;
-
-	if ((term_buf->width != term_buf->init_width) || (term_buf->height != term_buf->init_height))
-	{
-		return;
-	}
-
-	struct tb_cell* buf = tb_cell_buffer();
-
-	for (uint16_t x = 0; x < w; ++x)
-	{
-		for (uint16_t y = 1; y < term_buf->init_height; ++y)
-		{
-			src = y * w + x;
-			random = ((rand() % 7) & 3);
-			dst = src - random + 1;
-
-			if (w > dst)
-			{
-				dst = 0;
-			}
-			else
-			{
-				dst -= w;
-			}
-
-			tmp[dst] = tmp[src] - (random & 1);
-
-			if (tmp[dst] > 12)
-			{
-				tmp[dst] = 0;
-			}
-
-			buf[dst] = fire[tmp[dst]];
-			buf[src] = fire[tmp[src]];
-		}
-	}
-}
 
 
 

@@ -15,12 +15,15 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <string.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <stdlib.h>
 
 #define ARG_COUNT 7
-// things you can define:
-// GIT_VERSION_STRING
+
+#ifndef LY_VERSION
+#define LY_VERSION "0.6.0"
+#endif
 
 // global
 struct lang lang;
@@ -30,15 +33,13 @@ struct config config;
 void arg_help(void* data, char** pars, const int pars_count)
 {
 	printf("If you want to configure Ly, please check the config file, usually located at /etc/ly/config.ini.\n");
+    exit(0);
 }
 
 void arg_version(void* data, char** pars, const int pars_count)
 {
-#ifdef GIT_VERSION_STRING
-	printf("Ly version %s\n", GIT_VERSION_STRING);
-#else
-	printf("Ly version unknown\n");
-#endif
+    printf("Ly version %s\n", LY_VERSION);
+    exit(0);
 }
 
 // low-level error messages
@@ -136,7 +137,7 @@ int main(int argc, char** argv)
 	// init visible elements
 	struct tb_event event;
 	struct term_buf buf;
-	
+
 	//Place the curser on the login field if there is no saved username, if there is, place the curser on the password field
 	uint8_t active_input;
         if (config.default_input == LOGIN_INPUT && login.text != login.end){
@@ -189,10 +190,12 @@ int main(int argc, char** argv)
 				(*input_handles[active_input])(input_structs[active_input], NULL);
 				tb_clear();
 				animate(&buf);
+				draw_bigclock(&buf);
 				draw_box(&buf);
+				draw_clock(&buf);
 				draw_labels(&buf);
-				if(!config.hide_f1_commands)
-					draw_f_commands();
+				if(!config.hide_key_hints)
+					draw_key_hints();
 				draw_lock_state(&buf);
 				position_input(&buf, &desktop, &login, &password);
 				draw_desktop(&desktop);
@@ -209,11 +212,30 @@ int main(int argc, char** argv)
 			tb_present();
 		}
 
-		if (config.animate) {
-			error = tb_peek_event(&event, config.min_refresh_delta);
-		} else {
-			error = tb_poll_event(&event);
+		int timeout = -1;
+
+		if (config.animate)
+		{
+			timeout = config.min_refresh_delta;
 		}
+		else
+		{
+			struct timeval tv;
+			gettimeofday(&tv, NULL);
+			if (config.bigclock)
+				timeout = (60 - tv.tv_sec % 60) * 1000 - tv.tv_usec / 1000 + 1;
+			if (config.clock)
+				timeout = 1000 - tv.tv_usec / 1000 + 1;
+		}
+
+		if (timeout == -1)
+        {
+            error = tb_poll_event(&event);
+        }
+		else
+        {
+            error = tb_peek_event(&event, timeout);
+        }
 
 		if (error < 0)
 		{
@@ -222,15 +244,40 @@ int main(int argc, char** argv)
 
 		if (event.type == TB_EVENT_KEY)
 		{
+			char shutdown_key[4];
+			memset(shutdown_key, '\0', sizeof(shutdown_key));
+			strcpy(shutdown_key, config.shutdown_key);
+			memcpy(shutdown_key, "0", 1);
+
+			char restart_key[4];
+			memset(restart_key, '\0', sizeof(restart_key));
+			strcpy(restart_key, config.restart_key);
+			memcpy(restart_key, "0", 1);
+
 			switch (event.key)
 			{
 			case TB_KEY_F1:
-				shutdown = true;
-				run = false;
-				break;
 			case TB_KEY_F2:
-				reboot = true;
-				run = false;
+			case TB_KEY_F3:
+			case TB_KEY_F4:
+			case TB_KEY_F5:
+			case TB_KEY_F6:
+			case TB_KEY_F7:
+			case TB_KEY_F8:
+			case TB_KEY_F9:
+			case TB_KEY_F10:
+			case TB_KEY_F11:
+			case TB_KEY_F12:
+				if( 0xFFFF - event.key + 1 == atoi(shutdown_key) )
+				{
+					shutdown = true;
+					run = false;
+				}
+				if( 0xFFFF - event.key + 1 == atoi(restart_key) )
+				{
+					reboot = true;
+					run = false;
+				}
 				break;
 			case TB_KEY_CTRL_C:
 				run = false;
@@ -242,6 +289,7 @@ int main(int argc, char** argv)
 					update = true;
 				}
 				break;
+			case TB_KEY_CTRL_K:
 			case TB_KEY_ARROW_UP:
 				if (active_input > 0)
 				{
@@ -249,6 +297,7 @@ int main(int argc, char** argv)
 					update = true;
 				}
 				break;
+			case TB_KEY_CTRL_J:
 			case TB_KEY_ARROW_DOWN:
 				if (active_input < 2)
 				{
@@ -323,8 +372,7 @@ int main(int argc, char** argv)
 	{
 		execl("/bin/sh", "sh", "-c", config.shutdown_cmd, NULL);
 	}
-
-	if (reboot)
+    else if (reboot)
 	{
 		execl("/bin/sh", "sh", "-c", config.restart_cmd, NULL);
 	}

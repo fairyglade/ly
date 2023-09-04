@@ -51,6 +51,4 @@ case $SHELL in
     ;;
 esac
 
-# See https://github.com/fairyglade/ly/issues/433#issuecomment-1245306438
-export XDG_RUNTIME_DIR="/run/user/$UID"
-exec $@
+exec "$@"

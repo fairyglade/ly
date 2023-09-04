@@ -3,7 +3,7 @@ CC = gcc
 FLAGS = -std=c99 -pedantic -g
 FLAGS+= -Wall -Wextra -Werror=vla -Wno-unused-parameter
 #FLAGS+= -DDEBUG
-FLAGS+= -DGIT_VERSION_STRING=\"$(shell git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g')\"
+FLAGS+= -DLY_VERSION=\"$(shell git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g')\"
 LINK = -lpam -lxcb
 VALGRIND = --show-leak-kinds=all --track-origins=yes --leak-check=full --suppressions=../res/valgrind.supp
 CMD = ./$(NAME)
@@ -101,7 +101,6 @@ installopenrc:
 
 installrunit:
 	@echo "installing runit service"
-	@install -dZ ${DESTDIR}/etc/sv/ly-runit-service
 	@install -DZ $(RESD)/ly-runit-service/* -t ${DESTDIR}/etc/sv/ly
 
 uninstall:
@@ -112,6 +111,7 @@ uninstall:
 	@rm -f ${DESTDIR}/usr/lib/systemd/system/ly.service
 	@rm -f ${DESTDIR}/etc/pam.d/ly
 	@rm -f ${DESTDIR}/etc/init.d/${NAME}
+	@rm -rf ${DESTDIR}/etc/sv/ly
 
 clean:
 	@echo "cleaning"

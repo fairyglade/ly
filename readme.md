@@ -16,7 +16,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
  - tput
  - shutdown
 
-On Debian-based distros running `apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you. 
+On Debian-based distros running `apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you.
 For Fedora try running `dnf install make automake gcc gcc-c++ kernel-devel pam-devel libxcb-devel`
 
 ## Support
@@ -27,20 +27,21 @@ The following desktop environments were tested with success
  - budgie
  - cinnamon
  - deepin
- - dwm 
+ - dwm
  - enlightenment
  - gnome
  - i3
  - kde
+ - labwc
  - lxde
  - lxqt
  - mate
- - maxx 
+ - maxx
  - pantheon
  - qtile
  - spectrwm
  - sway
- - windowmaker 
+ - windowmaker
  - xfce
  - xmonad
 
@@ -120,22 +121,24 @@ $ make
 # ln -s /etc/sv/ly /var/service/
 ```
 
-Disable your existing display manager service if need be e.g.:
+By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini`
+
+You should as well disable your existing display manager service if needed, e.g.:
 
 ```
 # rm /var/service/lxdm
 ```
 
-If you are running on `tty2` (check your `/etc/ly/config.ini`) you can disable e.g. `agetty` running there:
+The agetty service for the tty console where you are running ly should be disabled. For instance, if you are running ly on tty2 (that's the default, check your `/etc/ly/config.ini`) you should disable the agetty-tty2 service like this:
 
 ```
 # rm /var/service/agetty-tty2
 ```
 
 ## Arch Linux Installation
-You can install ly from the [AUR](https://aur.archlinux.org/packages/ly), using yay for example:
-``` 
-$ yay -S ly
+You can install ly from the [`[extra]` repos](https://archlinux.org/packages/extra/x86_64/ly/):
+```
+$ sudo pacman -S ly
 ```
 
 ## Configuration
