@@ -41,7 +41,6 @@ struct term_buf
 
 
 void draw_init(struct term_buf* buf);
-void draw_free(struct term_buf* buf);
 void draw_box(struct term_buf* buf);
 
 struct tb_cell* strn_cell(char* s, uint16_t len);

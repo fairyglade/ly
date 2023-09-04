@@ -374,9 +374,11 @@ void animate_free(struct term_buf* buf)
 {
 	if (config.animate)
 	{
-        int i;
-		if ((i = config.animation) < ANIMATION_NUM)
+        int i = config.animation;
+        // make sure the animation chosen is valid
+        if (i < ANIMATION_NUM)
         {
+            // load appropriate free function and execute
             void (*fun_ptr)(struct term_buf*);
             fun_ptr = ANIM_FREES[i];
             (*fun_ptr)(buf);
@@ -391,9 +393,11 @@ void animate(struct term_buf* buf)
 
 	if (config.animate)
 	{
-        int i;
-        if ((i = config.animation) < ANIMATION_NUM)
+        int i = config.animation;
+        // make sure the animation chosen is valid
+        if (i < ANIMATION_NUM)
         {
+            // runs corresponding animation function
             void (*fun_ptr)(struct term_buf*);
             fun_ptr = ANIM_RUNS[i];
             (*fun_ptr)(buf);
@@ -405,9 +409,12 @@ void animate_init(struct term_buf* buf)
 {
 	if (config.animate)
 	{
-        int i;
-        if ((i = config.animation) < ANIMATION_NUM)
+        int i = config.animation;
+        // make sure the animation chosen is valid
+        if (i < ANIMATION_NUM)
         {
+            // grab the corresponding animation
+            // initialize function and execute
             void (*fun_ptr)(struct term_buf*);
             fun_ptr = ANIM_INITS[i];
             (*fun_ptr)(buf);

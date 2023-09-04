@@ -164,6 +164,7 @@ int main(int argc, char** argv)
 		if (dgn_catch())
 		{
 			config.animate = false;
+            animate_free(&buf);
 			dgn_reset();
 		}
 	}
