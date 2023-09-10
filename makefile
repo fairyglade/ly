@@ -36,6 +36,7 @@ SRCS += $(SRCD)/draw.c
 SRCS += $(SRCD)/inputs.c
 SRCS += $(SRCD)/login.c
 SRCS += $(SRCD)/utils.c
+SRCS += $(SRCD)/animations.c
 SRCS += $(SUBD)/argoat/src/argoat.c
 SRCS += $(SUBD)/configator/src/configator.c
 SRCS += $(SUBD)/dragonfail/src/dragonfail.c
