@@ -73,6 +73,8 @@ install: $(BIND)/$(NAME)
 	@echo "installing ly"
 	@install -dZ ${DESTDIR}/etc/ly
 	@install -DZ $(BIND)/$(NAME) -t ${DESTDIR}/usr/bin
+	@if [ -e ${DESTDIR}/etc/ly/config.ini ]; then \
+		cp ${DESTDIR}/etc/ly/config.ini ${DESTDIR}/etc/ly/config.ini.old; fi
 	@install -DZ $(RESD)/config.ini -t ${DESTDIR}/etc/ly
 	@install -DZ $(RESD)/xsetup.sh -t $(DATADIR)
 	@install -DZ $(RESD)/wsetup.sh -t $(DATADIR)
