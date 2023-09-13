@@ -239,8 +239,8 @@ void alpha_blit(struct tb_cell* buf, uint16_t x, uint16_t y, uint16_t w, uint16_
 }
 
 void draw_bigclock(struct term_buf* buf)
-{
-	if (!config.bigclock)
+{    
+    if (!config.bigclock && (config.clock == NULL || strlen(config.clock) == 0))
     {
         return;
     }
@@ -248,7 +248,7 @@ void draw_bigclock(struct term_buf* buf)
 	int xo = buf->width / 2 - (5 * (CLOCK_W + 1)) / 2;
 	int yo = (buf->height - buf->box_height) / 2 - CLOCK_H - 2;
 
-	char* clockstr = time_str("%H:%M", 6);
+	char* clockstr = time_str(config.clock, 32);
 	struct tb_cell* clockcell;
 
 	for (int i = 0; i < 5; i++)
