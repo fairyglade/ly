@@ -167,6 +167,7 @@ void config_load(const char *cfg_path)
 		{"clock", &config.clock, config_handle_str},
 		{"console_dev", &config.console_dev, config_handle_str},
 		{"default_input", &config.default_input, config_handle_u8},
+		{"enter_is_login", &config.enter_is_login, config_handle_bool},
 		{"fg", &config.fg, config_handle_u8},
 		{"hide_borders", &config.hide_borders, config_handle_bool},
 		{"hide_key_hints", &config.hide_key_hints, config_handle_bool},
@@ -279,6 +280,7 @@ void config_defaults()
 	config.clock = NULL;
 	config.console_dev = strdup("/dev/console");
 	config.default_input = LOGIN_INPUT;
+	config.enter_is_login = true;
 	config.fg = 9;
 	config.hide_borders = false;
 	config.hide_key_hints = false;

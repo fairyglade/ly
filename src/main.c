@@ -313,35 +313,44 @@ int main(int argc, char** argv)
 				update = true;
 				break;
 			case TB_KEY_ENTER:
-				save(&desktop, &login);
-				auth(&desktop, &login, &password, &buf);
-				update = true;
-
-				if (dgn_catch())
+				if (config.enter_is_login || active_input == PASSWORD_INPUT) 
 				{
-					++auth_fails;
-					// move focus back to password input
-					active_input = PASSWORD_INPUT;
+					save(&desktop, &login);
+					auth(&desktop, &login, &password, &buf);
+					update = true;
 
-					if (dgn_output_code() != DGN_PAM)
+					if (dgn_catch())
 					{
-						buf.info_line = dgn_output_log();
+						++auth_fails;
+						// move focus back to password input
+						active_input = PASSWORD_INPUT;
+
+						if (dgn_output_code() != DGN_PAM)
+						{
+							buf.info_line = dgn_output_log();
+						}
+
+						if (config.blank_password)
+						{
+							input_text_clear(&password);
+						}
+
+						dgn_reset();
+					}
+					else
+					{
+						buf.info_line = lang.logout;
 					}
 
-					if (config.blank_password)
-					{
-						input_text_clear(&password);
-					}
-
-					dgn_reset();
+					load(&desktop, &login);
+					system("tput cnorm");
 				}
-				else
+				else 
 				{
-					buf.info_line = lang.logout;
+					++active_input;
+					update = true;
 				}
 
-				load(&desktop, &login);
-				system("tput cnorm");
 				break;
 			default:
 				(*input_handles[active_input])(

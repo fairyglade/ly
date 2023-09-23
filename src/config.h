@@ -71,6 +71,7 @@ struct config
 	char* clock;
 	char* console_dev;
 	uint8_t default_input;
+	bool enter_is_login;
 	uint8_t fg;
 	bool hide_borders;
 	bool hide_key_hints;
