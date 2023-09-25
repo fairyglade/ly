@@ -107,30 +107,30 @@ void draw_box(struct term_buf* buf)
 			box_x - 1,
 			box_y - 1,
 			buf->box_chars.left_up,
-			config.fg,
+			config.border_fg,
 			config.bg);
 		tb_change_cell(
 			box_x2,
 			box_y - 1,
 			buf->box_chars.right_up,
-			config.fg,
+			config.border_fg,
 			config.bg);
 		tb_change_cell(
 			box_x - 1,
 			box_y2,
 			buf->box_chars.left_down,
-			config.fg,
+			config.border_fg,
 			config.bg);
 		tb_change_cell(
 			box_x2,
 			box_y2,
 			buf->box_chars.right_down,
-			config.fg,
+			config.border_fg,
 			config.bg);
 
 		// top and bottom
-		struct tb_cell c1 = {buf->box_chars.top, config.fg, config.bg};
-		struct tb_cell c2 = {buf->box_chars.bot, config.fg, config.bg};
+		struct tb_cell c1 = {buf->box_chars.top, config.border_fg, config.bg};
+		struct tb_cell c2 = {buf->box_chars.bot, config.border_fg, config.bg};
 
 		for (uint16_t i = 0; i < buf->box_width; ++i)
 		{
@@ -164,7 +164,7 @@ void draw_box(struct term_buf* buf)
 
 	if (config.blank_box)
 	{
-		struct tb_cell blank = {' ', config.fg, config.bg};
+		struct tb_cell blank = {' ', config.border_fg, config.bg};
 
 		for (uint16_t i = 0; i < buf->box_height; ++i)
 		{

@@ -168,6 +168,7 @@ void config_load(const char *cfg_path)
 		{"console_dev", &config.console_dev, config_handle_str},
 		{"default_input", &config.default_input, config_handle_u8},
 		{"fg", &config.fg, config_handle_u8},
+		{"border_fg", &config.border_fg, config_handle_u8},
 		{"hide_borders", &config.hide_borders, config_handle_bool},
 		{"hide_key_hints", &config.hide_key_hints, config_handle_bool},
 		{"input_len", &config.input_len, config_handle_u8},
@@ -280,6 +281,7 @@ void config_defaults()
 	config.console_dev = strdup("/dev/console");
 	config.default_input = LOGIN_INPUT;
 	config.fg = 9;
+	config.border_fg = 9;
 	config.hide_borders = false;
 	config.hide_key_hints = false;
 	config.input_len = 34;
