@@ -353,6 +353,7 @@ int main(int argc, char** argv)
 		}
 	}
 
+	tb_clear();
 	// stop termbox
 	tb_shutdown();
 
