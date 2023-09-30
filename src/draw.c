@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -373,10 +374,16 @@ void draw_labels(struct term_buf* buf) // throws
 	}
 }
 
+size_t utf8_strlen(char* s) {
+    size_t len = 0;
+    while (*s) len += (*s++ & 0xc0) != 0x80;
+    return len;
+}
+
 void draw_key_hints()
 {
 	struct tb_cell* shutdown_key = str_cell(config.shutdown_key);
-	int len = strlen(config.shutdown_key);
+	uint16_t len = utf8_strlen(config.shutdown_key);
 	if (dgn_catch())
 	{
 		dgn_reset();
@@ -395,31 +402,31 @@ void draw_key_hints()
 	}
 	else
 	{
-		tb_blit(len, 0, strlen(lang.shutdown), 1, shutdown);
+		tb_blit(len, 0, utf8_strlen(lang.shutdown), 1, shutdown);
 		free(shutdown);
 	}
 
 	struct tb_cell* restart_key = str_cell(config.restart_key);
-	len += strlen(lang.shutdown) + 1;
+	len += utf8_strlen(lang.shutdown) + 1;
 	if (dgn_catch())
 	{
 		dgn_reset();
 	}
 	else
 	{
-		tb_blit(len, 0, strlen(config.restart_key), 1, restart_key);
+		tb_blit(len, 0, utf8_strlen(config.restart_key), 1, restart_key);
 		free(restart_key);
 	}
 
 	struct tb_cell* restart = str_cell(lang.restart);
-	len += strlen(config.restart_key) + 1;
+	len += utf8_strlen(config.restart_key) + 1;
 	if (dgn_catch())
 	{
 		dgn_reset();
 	}
 	else
 	{
-		tb_blit(len, 0, strlen(lang.restart), 1, restart);
+		tb_blit(len, 0, utf8_strlen(lang.restart), 1, restart);
 		free(restart);
 	}
 }

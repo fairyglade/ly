@@ -5,6 +5,7 @@
 #include "inputs.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 struct box
@@ -88,5 +89,7 @@ bool cascade(struct term_buf* buf, uint8_t* fails);
 
 void draw_bigclock(struct term_buf *buf);
 void draw_clock(struct term_buf *buf);
+
+size_t utf8_strlen(char* s);
 
 #endif
