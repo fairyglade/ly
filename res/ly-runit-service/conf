@@ -8,5 +8,5 @@ fi
 BAUD_RATE=38400
 TERM_NAME=linux
 
-auxtty=$(/bin/cat /etc/ly/config.ini 2>/dev/null 1| /bin/sed -n 's/\(^[[:space:]]*tty[[:space:]]*=[[:space:]]*\)\([[:digit:]][[:digit:]]*\)\(.*\)/\2/p')
+auxtty=$(/bin/cat ~/.config/ly/config.ini 2>/dev/null 1| /bin/sed -n 's/\(^[[:space:]]*tty[[:space:]]*=[[:space:]]*\)\([[:digit:]][[:digit:]]*\)\(.*\)/\2/p')
 TTY=tty${auxtty:-2}

@@ -121,7 +121,7 @@ $ make
 # ln -s /etc/sv/ly /var/service/
 ```
 
-By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini`
+By default, ly will run on tty2. To change the tty it must be set in `~/.config/ly/config.ini`
 
 You should as well disable your existing display manager service if needed, e.g.:
 
@@ -129,7 +129,7 @@ You should as well disable your existing display manager service if needed, e.g.
 # rm /var/service/lxdm
 ```
 
-The agetty service for the tty console where you are running ly should be disabled. For instance, if you are running ly on tty2 (that's the default, check your `/etc/ly/config.ini`) you should disable the agetty-tty2 service like this:
+The agetty service for the tty console where you are running ly should be disabled. For instance, if you are running ly on tty2 (that's the default, check your `~/.config/ly/.config.ini` or `/etc/ly/config.ini`) you should disable the agetty-tty2 service like this:
 
 ```
 # rm /var/service/agetty-tty2
@@ -142,8 +142,8 @@ $ sudo pacman -S ly
 ```
 
 ## Configuration
-You can find all the configuration in `/etc/ly/config.ini`.
-The file is commented, and includes the default values.
+You can find the default configuration in `/etc/ly/config.ini`. The file is commented, and includes the default values.
+Copy it to `~/.config/ly/config.ini`.
 
 ## Controls
 Use the up and down arrow keys to change the current field, and the
@@ -169,7 +169,7 @@ Take a look at your .xsession if X doesn't start, as it can interfere
 
 ## PSX DOOM fire animation
 To enable the famous PSX DOOM fire described by [Fabien Sanglard](http://fabiensanglard.net/doom_fire_psx/index.html),
-just uncomment `animate = true` in `/etc/ly/config.ini`. You may also
+just uncomment `animate = true` in `~/.config/ly/config.ini`. You may also
 disable the main box borders with `hide_borders = true`.
 
 ## Additional Information
