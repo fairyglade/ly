@@ -12,7 +12,7 @@
 
 #ifndef DEBUG
 	#define INI_LANG DATADIR "/lang/%s.ini"
-	#define INI_CONFIG strcat(getenv("HOME"), "/.config/ly/config.ni")
+	#define INI_CONFIG strcat(getenv("HOME"), "/.config/ly/config.ini")
 #else
 	#define INI_LANG "../res/lang/%s.ini"
 	#define INI_CONFIG "../res/config.ini"
