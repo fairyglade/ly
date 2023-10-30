@@ -159,6 +159,7 @@ void config_load(const char *cfg_path)
 	{
 		{"animate", &config.animate, config_handle_bool},
 		{"animation", &config.animation, config_handle_u8},
+		{"animation_fg", &config.animation_fg, config_handle_u8},
 		{"asterisk", &config.asterisk, config_handle_char},
 		{"bg", &config.bg, config_handle_u8},
 		{"bigclock", &config.bigclock, config_handle_bool},
@@ -271,6 +272,7 @@ void config_defaults()
 {
 	config.animate = false;
 	config.animation = 0;
+	config.animation_fg = 3;
 	config.asterisk = '*';
 	config.bg = 0;
 	config.bigclock = false;
