@@ -63,6 +63,7 @@ struct config
 {
 	bool animate;
 	uint8_t animation;
+	uint8_t animation_fg;
 	char asterisk;
 	uint8_t bg;
 	bool bigclock;
@@ -72,7 +73,6 @@ struct config
 	char* console_dev;
 	uint8_t default_input;
 	uint8_t fg;
-	uint8_t animation_fg;
 	bool hide_borders;
 	bool hide_key_hints;
 	uint8_t input_len;
