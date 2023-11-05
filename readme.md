@@ -135,6 +135,22 @@ The agetty service for the tty console where you are running ly should be disabl
 # rm /var/service/agetty-tty2
 ```
 
+### dinit
+
+```
+$ make
+# make install installdinit
+# dinitctl enable ly
+```
+
+In addition to the steps above, you will also have to keep a tty free within `/etc/dinit.d/config/console.conf`.
+~~To do that, change `ACTIVE_CONSOLES` so that the tty that ly should use in `/etc/ly/config.ini` is free.~~
+
+It seems that the `tty` option within `/etc/ly/config.ini` is ignored for any tty other than `tty1`.
+As such, `ACTIVE_CONSOLES` should be changed to keep tty1 free for use by `ly`.
+For example by changing the default `/dev/tty[1-6]` to `/dev/tty[2-6]`.
+
+
 ## Arch Linux Installation
 You can install ly from the [`[extra]` repos](https://archlinux.org/packages/extra/x86_64/ly/):
 ```
