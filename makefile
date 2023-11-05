@@ -106,7 +106,7 @@ installrunit:
 
 installdinit:
 	@echo "installing dinit service"
-	@install -DZ $(RESD)/ly-dinit -t ${DESTDIR}/etc/dinit.d/ly
+	@install -DZ $(RESD)/ly-dinit -T ${DESTDIR}/etc/dinit.d/
 	@echo "note: you will need to edit /etc/dinit.d/config/console.conf accordingly"
 
 uninstall:
