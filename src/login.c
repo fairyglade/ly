@@ -501,8 +501,8 @@ void auth(
 {
 	int ok;
 
-    char tty_id [3];
-    snprintf(tty_id, 3, "%d", config.tty);
+    char tty_id [4];
+    snprintf(tty_id, 4, "%d", config.tty);
 
     // Add XDG environment variables
     env_xdg_session(desktop->display_server[desktop->cur]);
@@ -615,8 +615,8 @@ void auth(
 		}
 
 		// get a display
-		char vt[5];
-		snprintf(vt, 5, "vt%d", config.tty);
+		char vt[6];
+		snprintf(vt, 6, "vt%d", config.tty);
 
 		// set env (this clears the environment)
 		env_init(pwd);
@@ -712,4 +712,3 @@ void auth(
 		pam_diagnose(ok, buf);
 	}
 }
-
