@@ -625,17 +625,6 @@ static void get_term_size(int* w, int* h)
 	}
 }
 
-static void update_term_size(void)
-{
-	struct winsize sz;
-	memset(&sz, 0, sizeof(sz));
-
-	ioctl(out_fileno, TIOCGWINSZ, &sz);
-
-	termw = sz.ws_col;
-	termh = sz.ws_row;
-}
-
 static void send_attr(uint32_t fg, uint32_t bg)
 {
 #define LAST_ATTR_INIT 0xFFFFFFFF
@@ -787,6 +776,17 @@ static void update_size(void)
 	cellbuf_resize(&front_buffer, termw, termh);
 	cellbuf_clear(&front_buffer);
 	send_clear();
+}
+
+static void update_term_size(void)
+{
+	struct winsize sz;
+	memset(&sz, 0, sizeof(sz));
+
+	ioctl(out_fileno, TIOCGWINSZ, &sz);
+
+	termw = sz.ws_col;
+	termh = sz.ws_row;
 }
 
 static int wait_fill_event(struct tb_event* event, struct timeval* timeout)

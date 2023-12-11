@@ -1,6 +1,11 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
+    const data_directory = b.option([]const u8, "data_directory", "Specify a default data directory (default is /etc/ly)");
+
+    const build_options = b.addOptions();
+    build_options.addOption([]const u8, "data_directory", data_directory orelse "/etc/ly");
+
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -24,30 +29,26 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    exe.addOptions("build_options", build_options);
+
     const ini = b.dependency("ini", .{});
     exe.addModule("ini", ini.module("ini"));
+
+    const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
+    exe.addModule("clap", clap.module("clap"));
 
     exe.linkSystemLibrary("pam");
     exe.linkSystemLibrary("xcb");
     exe.linkLibC();
 
-    exe.addIncludePath("src");
-    exe.addIncludePath("dep/configator/src");
-    exe.addIncludePath("dep/dragonfail/src");
-    exe.addIncludePath("dep/termbox_next/src");
+    exe.addIncludePath(.{ .path = "dep/termbox_next/src" });
 
-    exe.addCSourceFile("src/draw.c", &c_args);
-    exe.addCSourceFile("src/inputs.c", &c_args);
-    exe.addCSourceFile("src/login.c", &c_args);
-    exe.addCSourceFile("src/utils.c", &c_args);
-    exe.addCSourceFile("dep/configator/src/configator.c", &c_args);
-    exe.addCSourceFile("dep/dragonfail/src/dragonfail.c", &c_args);
-    exe.addCSourceFile("dep/termbox_next/src/input.c", &c_args);
-    exe.addCSourceFile("dep/termbox_next/src/memstream.c", &c_args);
-    exe.addCSourceFile("dep/termbox_next/src/ringbuffer.c", &c_args);
-    exe.addCSourceFile("dep/termbox_next/src/term.c", &c_args);
-    exe.addCSourceFile("dep/termbox_next/src/termbox.c", &c_args);
-    exe.addCSourceFile("dep/termbox_next/src/utf8.c", &c_args);
+    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/input.c" }, .flags = &c_args });
+    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/memstream.c" }, .flags = &c_args });
+    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/ringbuffer.c" }, .flags = &c_args });
+    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/term.c" }, .flags = &c_args });
+    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/termbox.c" }, .flags = &c_args });
+    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/utf8.c" }, .flags = &c_args });
 
     b.installArtifact(exe);
 
@@ -55,9 +56,7 @@ pub fn build(b: *std.Build) void {
 
     run_cmd.step.dependOn(b.getInstallStep());
 
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    if (b.args) |args| run_cmd.addArgs(args);
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);

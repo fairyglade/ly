@@ -1,10 +1,14 @@
 .{
     .name = "ly",
-    .version = "0.7.0",
+    .version = "1.0.0",
     .dependencies = .{
         .ini = .{
-            .url = "https://github.com/AnErrupTion/zig-ini/archive/a40f3cae04939de0d795812a73633e0563cf3132.tar.gz",
-            .hash = "1220b39fc35714d235fd9633422f5ba3c4aba44f1ecaf29cf91515963f0b08a3da89",
+            .url = "https://github.com/AnErrupTion/zig-ini/archive/7ab77196a4dc63d1ede50e0a1af1a8325c152f2f.tar.gz",
+            .hash = "12204b1d133060dd0c4304d5e0fbdb33a70038118e7c112b14b5f8d176ea15cd5939",
+        },
+        .clap = .{
+            .url = "https://github.com/Hejsil/zig-clap/archive/f49b94700e0761b7514abdca0e4f0e7f3f938a93.tar.gz",
+            .hash = "1220f48518ce22882e102255ed3bcdb7aeeb4891f50b2cdd3bd74b5b2e24d3149ba2",
         },
     }
 }
