@@ -275,7 +275,7 @@ void config_defaults()
 	config.asterisk = '*';
 	config.bg = 0;
 	config.bigclock = false;
-  config.bigclock_format = "%H:%M";
+  config.bigclock_format = NULL;
 	config.blank_box = true;
 	config.blank_password = false;
 	config.clock = NULL;
