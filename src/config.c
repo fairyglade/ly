@@ -162,6 +162,7 @@ void config_load(const char *cfg_path)
 		{"asterisk", &config.asterisk, config_handle_char},
 		{"bg", &config.bg, config_handle_u8},
 		{"bigclock", &config.bigclock, config_handle_bool},
+    {"bigclock_format", &config.bigclock_format, config_handle_str},
 		{"blank_box", &config.blank_box, config_handle_bool},
 		{"blank_password", &config.blank_password, config_handle_bool},
 		{"clock", &config.clock, config_handle_str},

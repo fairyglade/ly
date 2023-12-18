@@ -109,6 +109,14 @@ uint32_t CLOCK_E[] = {
 	_,_,_,_,_
 };
 
+uint32_t CLOCK_D[] = {
+	_,_,_,_,_,
+	_,_,_,_,_,
+	_,X,X,X,_,
+	_,_,_,_,_,
+	_,_,_,_,_
+};
+
 #endif
 
 #undef X
@@ -140,6 +148,8 @@ static inline uint32_t* CLOCK_N(char c)
 			return CLOCK_9;
 		case ':':
 			return CLOCK_S;
+    case '-':
+      return CLOCK_D;
 		default:
 			return CLOCK_E;
 	}

@@ -244,14 +244,15 @@ void draw_bigclock(struct term_buf* buf)
     {
         return;
     }
-
-	int xo = buf->width / 2 - (5 * (CLOCK_W + 1)) / 2;
+  uint32_t bigclocklength = strlen(config.bigclock_format);
+	
+  int xo = (buf->width / 2) - bigclocklength * (CLOCK_W+1) / 2;
 	int yo = (buf->height - buf->box_height) / 2 - CLOCK_H - 2;
 
-	char* clockstr = time_str("%H:%M", 6);
+	char* clockstr = time_str(config.bigclock_format, 32);
 	struct tb_cell* clockcell;
 
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < bigclocklength; i++)
 	{
 		clockcell = clock_cell(clockstr[i]);
 		alpha_blit(tb_cell_buffer(), xo + i * (CLOCK_W + 1), yo, CLOCK_W, CLOCK_H, clockcell);

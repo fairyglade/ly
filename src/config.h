@@ -66,6 +66,7 @@ struct config
 	char asterisk;
 	uint8_t bg;
 	bool bigclock;
+  char* bigclock_format;
 	bool blank_box;
 	bool blank_password;
 	char* clock;
