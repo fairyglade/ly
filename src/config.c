@@ -162,6 +162,8 @@ void config_load(const char *cfg_path)
 		{"asterisk", &config.asterisk, config_handle_char},
 		{"bg", &config.bg, config_handle_u8},
 		{"bigclock", &config.bigclock, config_handle_bool},
+    {"bigclock_char", &config.bigclock_char, config_handle_u16},
+    {"bigclock_format", &config.bigclock_format, config_handle_str},
 		{"blank_box", &config.blank_box, config_handle_bool},
 		{"blank_password", &config.blank_password, config_handle_bool},
 		{"clock", &config.clock, config_handle_str},
@@ -274,6 +276,8 @@ void config_defaults()
 	config.asterisk = '*';
 	config.bg = 0;
 	config.bigclock = false;
+  config.bigclock_format = NULL;
+  config.bigclock_char = 0x2588;
 	config.blank_box = true;
 	config.blank_password = false;
 	config.clock = NULL;
@@ -364,6 +368,7 @@ void lang_free()
 void config_free()
 {
 	free(config.clock);
+  free(config.bigclock_format);
 	free(config.console_dev);
 	free(config.lang);
 	free(config.mcookie_cmd);
