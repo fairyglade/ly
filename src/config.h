@@ -67,6 +67,7 @@ struct config
 	uint8_t bg;
 	bool bigclock;
   char* bigclock_format;
+  uint32_t bigclock_char;
 	bool blank_box;
 	bool blank_password;
 	char* clock;

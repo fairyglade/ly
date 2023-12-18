@@ -3,7 +3,7 @@
 
 #include "inputs.h"
 #include "utils.h"
-#include "config.h"
+#include "config.h" 
 #include "draw.h"
 #include "bigclock.h"
 
@@ -70,6 +70,7 @@ void draw_init(struct term_buf* buf)
 	buf->box_chars.left = '|';
 	buf->box_chars.right = '|';
 #endif
+  bigclock_character_change();  
 }
 
 static void doom_free(struct term_buf* buf);
@@ -89,6 +90,20 @@ void draw_free(struct term_buf* buf)
 				break;
 		}
 	}
+}
+
+void bigclock_character_change(){
+  for(int i = 0; i < sizeof(CLOCK_CHARS)/sizeof(CLOCK_CHARS[0]);i++){ 
+    uint32_t* curent_clock_char = CLOCK_CHARS[i];
+
+    for(int j = 0;j < 25;j++){
+      uint32_t current_char = curent_clock_char[j];
+      
+      if(current_char!=0){
+        curent_clock_char[j] = config.bigclock_char;
+      }
+    }
+  } 
 }
 
 void draw_box(struct term_buf* buf)

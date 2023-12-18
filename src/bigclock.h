@@ -3,13 +3,8 @@
 #define CLOCK_W 5
 #define CLOCK_H 5
 
-#if defined(__linux__) || defined(__FreeBSD__)
-	#define X 0x2593
-	#define _ 0x0000
-#else
-	#define X '#'
-	#define _ 0
-#endif
+#define X '.'
+#define _ 0
 
 #if CLOCK_W == 5 && CLOCK_H == 5
 
@@ -121,6 +116,9 @@ uint32_t CLOCK_D[] = {
 
 #undef X
 #undef _
+
+// I wish these were in a premade dictionary... Writing this felt like hell
+uint32_t* CLOCK_CHARS[] = {CLOCK_0,CLOCK_1,CLOCK_2,CLOCK_3,CLOCK_4,CLOCK_5,CLOCK_6,CLOCK_7,CLOCK_8,CLOCK_9,CLOCK_S,CLOCK_E,CLOCK_D}; 
 
 static inline uint32_t* CLOCK_N(char c)
 {
