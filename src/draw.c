@@ -240,12 +240,12 @@ void alpha_blit(struct tb_cell* buf, uint16_t x, uint16_t y, uint16_t w, uint16_
 
 void draw_bigclock(struct term_buf* buf)
 {
-  uint32_t bigclocklength = strlen(config.bigclock_format);
-	if (!config.bigclock || bigclocklength == 0)
+	if (!config.bigclock || strlen(config.bigclock_format)==0)
     {
         return;
     }
-	
+   	
+  int bigclocklength = strlen(config.bigclock_format);
   int xo = (buf->width / 2) - bigclocklength * (CLOCK_W+1) / 2;
 	int yo = (buf->height - buf->box_height) / 2 - CLOCK_H - 2;
 
