@@ -275,6 +275,7 @@ void config_defaults()
 	config.asterisk = '*';
 	config.bg = 0;
 	config.bigclock = false;
+  config.bigclock_format = NULL;
 	config.blank_box = true;
 	config.blank_password = false;
 	config.clock = NULL;
@@ -365,6 +366,7 @@ void lang_free()
 void config_free()
 {
 	free(config.clock);
+  free(config.bigclock_format);
 	free(config.console_dev);
 	free(config.lang);
 	free(config.mcookie_cmd);
