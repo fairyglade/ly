@@ -619,11 +619,16 @@ void position_input(
 	password->visible_len = len;
 }
 
-static void doom_init(struct term_buf* buf)
+static void doom_reset(struct term_buf* buf)
 {
-	buf->init_width = buf->width;
-	buf->init_height = buf->height;
+	if(buf->astate.doom) 
+	{
+		doom_free(buf);
+	}
+	
 	buf->astate.doom = malloc(sizeof(struct doom_state));
+	buf->astate.doom->buffer_width = buf->width;
+	buf->astate.doom->buffer_height = buf->height;
 
 	if (buf->astate.doom == NULL)
 	{
@@ -649,13 +654,26 @@ static void doom_free(struct term_buf* buf)
 	free(buf->astate.doom);
 }
 
-// Adapted from cmatrix
-static void matrix_init(struct term_buf* buf)
+static void doom_init(struct term_buf* buf)
 {
-	buf->init_width = buf->width;
-	buf->init_height = buf->height;
+	buf->astate.doom = NULL;
+	doom_reset(buf);
+}
+
+static void matrix_free(struct term_buf* buf);
+// Adapted from cmatrix
+static void matrix_reset(struct term_buf* buf)
+{
+	if(buf->astate.matrix)
+	{
+		matrix_free(buf);
+	}
+	
 	buf->astate.matrix = malloc(sizeof(struct matrix_state));
 	struct matrix_state* s = buf->astate.matrix;
+
+	s->grid_width = buf->width;
+	s->grid_height = buf->height;
 
 	if (s == NULL)
 	{
@@ -709,6 +727,11 @@ static void matrix_init(struct term_buf* buf)
 		dgn_throw(DGN_ALLOC);
 	}
 
+	if(buf->height <= 3)
+	{
+		return;
+	}
+
 	// Initialize grid
 	for (int i = 0; i <= buf->height; ++i)
 	{
@@ -725,6 +748,12 @@ static void matrix_init(struct term_buf* buf)
 		s->grid[1][j].val = ' ';
 		s->updates[j] = (int) rand() % 3 + 1;
 	}
+}
+
+static void matrix_init(struct term_buf* buf)
+{
+	buf->astate.matrix = NULL;
+	matrix_reset(buf);
 }
 
 static void matrix_free(struct term_buf* buf)
@@ -776,23 +805,23 @@ static void doom(struct term_buf* term_buf)
 		{0x2588, 8, 4}, // white
 	};
 
+	if ((term_buf->width != term_buf->astate.doom->buffer_width) || (term_buf->height != term_buf->astate.doom->buffer_height))
+	{
+		doom_reset(term_buf);
+	}
+
 	uint16_t src;
 	uint16_t random;
 	uint16_t dst;
 
-	uint16_t w = term_buf->init_width;
+	uint16_t w = term_buf->astate.doom->buffer_width;
 	uint8_t* tmp = term_buf->astate.doom->buf;
-
-	if ((term_buf->width != term_buf->init_width) || (term_buf->height != term_buf->init_height))
-	{
-		return;
-	}
 
 	struct tb_cell* buf = tb_cell_buffer();
 
 	for (uint16_t x = 0; x < w; ++x)
 	{
-		for (uint16_t y = 1; y < term_buf->init_height; ++y)
+		for (uint16_t y = 1; y < term_buf->astate.doom->buffer_height; ++y)
 		{
 			src = y * w + x;
 			random = ((rand() % 7) & 3);
@@ -835,9 +864,14 @@ static void matrix(struct term_buf* buf)
 	// Chars change mid-scroll
 	const bool changes = true;
 
-	if ((buf->width != buf->init_width) || (buf->height != buf->init_height))
+	if ((buf->height <= 3))
 	{
 		return;
+	}
+
+	if ((buf->width != s->grid_width) || (buf->height != s->grid_height))
+	{
+		matrix_reset(buf);
 	}
 
 	count += 1;

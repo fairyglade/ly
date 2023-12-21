@@ -28,6 +28,8 @@ struct matrix_dot
 struct matrix_state
 {
 	struct matrix_dot** grid;
+	uint16_t grid_width;
+	uint16_t grid_height;
 	int* length;
 	int* spaces;
 	int* updates;
@@ -36,6 +38,8 @@ struct matrix_state
 struct doom_state
 {
 	uint8_t* buf;
+	uint16_t buffer_width;
+	uint16_t buffer_height;
 };
 
 union anim_state
@@ -48,8 +52,6 @@ struct term_buf
 {
 	uint16_t width;
 	uint16_t height;
-	uint16_t init_width;
-	uint16_t init_height;
 
 	struct box box_chars;
 	char* info_line;
