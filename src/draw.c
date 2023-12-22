@@ -709,6 +709,11 @@ static void matrix_init(struct term_buf* buf)
 		dgn_throw(DGN_ALLOC);
 	}
 
+	if(buf->height <= 3)
+	{
+		return;
+	}
+
 	// Initialize grid
 	for (int i = 0; i <= buf->height; ++i)
 	{
@@ -836,6 +841,11 @@ static void matrix(struct term_buf* buf)
 	const bool changes = true;
 
 	if ((buf->width != buf->init_width) || (buf->height != buf->init_height))
+	{
+		return;
+	}
+
+	if(buf->height <= 3)
 	{
 		return;
 	}
