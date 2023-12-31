@@ -35,14 +35,27 @@ pub fn authenticate(
     try setXdgEnv(allocator, tty_str, uid_str, current_environment.xdg_name);
 
     // Open the PAM session
-    var credentials = [_][]const u8{ login.text.items, password.text.items };
+    const login_text_z = try allocator.dupeZ(u8, login.text.items);
+    defer allocator.free(login_text_z);
+
+    const password_text_z = try allocator.dupeZ(u8, password.text.items);
+    defer allocator.free(password_text_z);
+
+    var credentials: [*c][*c]const u8 = undefined;
+    credentials[0] = login_text_z.ptr;
+    credentials[1] = password_text_z.ptr;
+    credentials[2] = 0;
+
     const conv = interop.pam.pam_conv{
         .conv = loginConv,
         .appdata_ptr = @ptrCast(&credentials),
     };
     var handle: ?*interop.pam.pam_handle = undefined;
 
-    var status = interop.pam.pam_start(service_name.ptr, null, &conv, &handle);
+    const service_name_z = try allocator.dupeZ(u8, service_name);
+    defer allocator.free(service_name_z);
+
+    var status = interop.pam.pam_start(service_name_z.ptr, null, &conv, &handle);
     defer status = interop.pam.pam_end(handle, status);
 
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
@@ -64,9 +77,6 @@ pub fn authenticate(
     password.clear();
 
     // Get password structure from username
-    const login_text_z = try allocator.dupeZ(u8, login.text.items);
-    defer allocator.free(login_text_z);
-
     const maybe_pwd = interop.getpwnam(login_text_z.ptr);
     interop.endpwent();
 
@@ -198,12 +208,12 @@ fn setXdgEnv(allocator: Allocator, tty_str: [:0]u8, uid_str: [:0]u8, desktop_nam
     const desktop_name_z = try allocator.dupeZ(u8, desktop_name);
     defer allocator.free(desktop_name_z);
 
-    _ = interop.setenv("XDG_RUNTIME_DIR", uid_str, 0);
+    _ = interop.setenv("XDG_RUNTIME_DIR", uid_str.ptr, 0);
     _ = interop.setenv("XDG_SESSION_CLASS", "user", 0);
     _ = interop.setenv("XDG_SESSION_ID", "1", 0);
-    _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name_z, 0);
+    _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name_z.ptr, 0);
     _ = interop.setenv("XDG_SEAT", "seat0", 0);
-    _ = interop.setenv("XDG_VTNR", tty_str, 0);
+    _ = interop.setenv("XDG_VTNR", tty_str.ptr, 0);
 }
 
 fn loginConv(

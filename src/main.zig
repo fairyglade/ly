@@ -138,15 +138,12 @@ pub fn main() !void {
         const reader = file.reader();
         const username_length = try reader.readIntLittle(u64);
 
-        const username_buffer = try reader.readAllAlloc(allocator, username_length);
+        const username_buffer = try allocator.alloc(u8, username_length);
         defer allocator.free(username_buffer);
 
         _ = try reader.read(username_buffer);
 
         const current_desktop = try reader.readIntLittle(u64);
-
-        const load_buffer = try reader.readAllAlloc(allocator, config.ly.max_login_len + 5);
-        defer allocator.free(load_buffer);
 
         if (username_buffer.len > 0) {
             try login.text.appendSlice(username_buffer);
