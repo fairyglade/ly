@@ -41,14 +41,15 @@ pub fn authenticate(
     const password_text_z = try allocator.dupeZ(u8, password.text.items);
     defer allocator.free(password_text_z);
 
-    var credentials: [*c][*c]const u8 = undefined;
+    var credentials = try allocator.allocSentinel([*c]const u8, 2, 0);
+    defer allocator.free(credentials);
+
     credentials[0] = login_text_z.ptr;
     credentials[1] = password_text_z.ptr;
-    credentials[2] = 0;
 
     const conv = interop.pam.pam_conv{
         .conv = loginConv,
-        .appdata_ptr = @ptrCast(&credentials),
+        .appdata_ptr = @ptrCast(credentials.ptr),
     };
     var handle: ?*interop.pam.pam_handle = undefined;
 
