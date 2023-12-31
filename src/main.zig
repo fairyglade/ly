@@ -470,7 +470,17 @@ pub fn main() !void {
 
                 var has_error = false;
 
-                auth.authenticate(allocator, config.ly.tty, buffer, desktop, login, password) catch {
+                auth.authenticate(
+                    allocator,
+                    config.ly.tty,
+                    desktop,
+                    login,
+                    &password,
+                    config.ly.service_name,
+                    config.ly.path,
+                    config.ly.term_reset_cmd,
+                    config.ly.wayland_cmd,
+                ) catch {
                     has_error = true;
                     auth_fails += 1;
                     active_input = .password;
