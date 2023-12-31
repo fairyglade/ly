@@ -80,6 +80,9 @@ pub fn main() !void {
     }
 
     // Initialize information line with host name
+    var got_host_name = false;
+    var host_name_buffer: []u8 = undefined;
+
     get_host_name: {
         const host_name_struct = interop.getHostName(allocator) catch |err| {
             if (err == error.CannotGetHostName) {
@@ -89,8 +92,9 @@ pub fn main() !void {
             }
             break :get_host_name;
         };
-        defer allocator.free(host_name_struct.buffer);
 
+        got_host_name = true;
+        host_name_buffer = host_name_struct.buffer;
         info_line = host_name_struct.slice;
     }
 
@@ -134,14 +138,14 @@ pub fn main() !void {
         const reader = file.reader();
         const username_length = try reader.readIntLittle(u64);
 
-        const username_buffer = try file.readToEndAlloc(allocator, username_length);
+        const username_buffer = try reader.readAllAlloc(allocator, username_length);
         defer allocator.free(username_buffer);
 
         _ = try reader.read(username_buffer);
 
         const current_desktop = try reader.readIntLittle(u64);
 
-        const load_buffer = try file.readToEndAlloc(allocator, config.ly.max_login_len + 5);
+        const load_buffer = try reader.readAllAlloc(allocator, config.ly.max_login_len + 5);
         defer allocator.free(load_buffer);
 
         if (username_buffer.len > 0) {
@@ -508,6 +512,8 @@ pub fn main() !void {
             },
         }
     }
+
+    if (got_host_name) allocator.free(host_name_buffer);
 
     if (shutdown) {
         return std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.ly.shutdown_cmd });

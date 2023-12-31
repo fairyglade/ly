@@ -103,7 +103,7 @@ pub fn addEnvironmentWithBuffer(self: *Desktop, entry_buffer: []u8, name: []cons
 }
 
 pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !void {
-    var directory = try std.fs.openDirAbsolute(path, .{});
+    var directory = std.fs.openDirAbsolute(path, .{}) catch return;
     defer directory.close();
 
     var iterable_directory = try std.fs.openIterableDirAbsolute(path, .{});
