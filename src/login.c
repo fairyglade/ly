@@ -615,8 +615,8 @@ void auth(
 		}
 
 		// get a display
-		char vt[5];
-		snprintf(vt, 5, "vt%d", config.tty);
+		char vt[6];
+		snprintf(vt, 6, "vt%d", config.tty);
 
 		// set env (this clears the environment)
 		env_init(pwd);
