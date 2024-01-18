@@ -501,8 +501,8 @@ void auth(
 {
 	int ok;
 
-    char tty_id [3];
-    snprintf(tty_id, 3, "%d", config.tty);
+    char tty_id [4];
+    snprintf(tty_id, 4, "%d", config.tty);
 
     // Add XDG environment variables
     env_xdg_session(desktop->display_server[desktop->cur]);
