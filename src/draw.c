@@ -196,7 +196,7 @@ char* time_str(char* fmt, int maxlen)
 	return buffer;
 }
 
-extern inline uint32_t* CLOCK_N(char c);
+extern inline uint32_t* CLOCK_N(uint8_t bigclock_lang, char c);
 
 struct tb_cell* clock_cell(char c)
 {
@@ -208,7 +208,7 @@ struct tb_cell* clock_cell(char c)
     {
         c = ' ';
     }
-	uint32_t* clockchars = CLOCK_N(c);
+	uint32_t* clockchars = CLOCK_N(config.bigclock_lang, c);
 
 	for (int i = 0; i < CLOCK_W * CLOCK_H; i++)
 	{
