@@ -104,6 +104,13 @@ installrunit:
 	@echo "installing runit service"
 	@install -DZ $(RESD)/ly-runit-service/* -t ${DESTDIR}/etc/sv/ly
 
+installs6:
+	@echo "installing s6 service"
+	@echo "\tIMPORTANT: PLEASE READ CAREFULLY!\nLy will not function properly if tty2 or the one set in config isn't disabled. \nTo do this edit "/etc/s6/config/tty2.conf" and set ' SPAWN="no" '\nThen either reboot the system or run in order\n"s6-rc -d change tty2", "kill $$\(pgrep ly-dm\)", "s6-rc -u change ly-srv"."
+	@touch ${DESTDIR}/etc/s6/adminsv/default/contents.d/ly-srv
+	@install -DZ $(RESD)/ly-s6/* -t ${DESTDIR}/etc/s6/sv/ly-srv
+	@s6-db-reload
+
 uninstall:
 	@echo "uninstalling"
 	@rm -rf ${DESTDIR}/etc/ly

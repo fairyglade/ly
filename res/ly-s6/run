@@ -1,0 +1,2 @@
+#!/bin/execlineb -P
+exec agetty -L -8 -n -l /usr/bin/ly-dm tty2 115200
