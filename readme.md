@@ -137,11 +137,9 @@ The agetty service for the tty console where you are running ly should be disabl
 ### s6
 
 ```
-
 $ make
 # make installs6
 # vim (or nano) /etc/s6/config/tty2.conf
-
 ```
 Set `SPAWN="no"`
 Exit and save configuration file.
@@ -151,11 +149,9 @@ Note: If ly is configured to run on another tty other than tty2, change the resp
 The makefile should add and enable ly by default, but here are the steps to enable the service manually.
 
 ```
-
 # s6-service add default ly-srv
 # s6-db-reload
 # s6-rc -u change ly-srv
-
 ```
 
 ## Arch Linux Installation
