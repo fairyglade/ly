@@ -137,11 +137,9 @@ The agetty service for the tty console where you are running ly should be disabl
 ### s6
 
 ```
-
 $ make
 # make installs6
 # vim (or nano) /etc/s6/config/tty2.conf
-
 ```
 Set `SPAWN="no"`
 Exit and save configuration file.
