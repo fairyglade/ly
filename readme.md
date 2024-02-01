@@ -151,11 +151,9 @@ Note: If ly is configured to run on another tty other than tty2, change the resp
 The makefile should add and enable ly by default, but here are the steps to enable the service manually.
 
 ```
-
 # s6-service add default ly-srv
 # s6-db-reload
 # s6-rc -u change ly-srv
-
 ```
 
 ## Arch Linux Installation
