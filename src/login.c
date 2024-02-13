@@ -220,11 +220,6 @@ void env_init(struct passwd* pwd)
 	setenv("SHELL", pwd->pw_shell, 1);
 	setenv("USER", pwd->pw_name, 1);
 	setenv("LOGNAME", pwd->pw_name, 1);
-
-	if (lang)
-	{
-		setenv("LANG", lang, 1);
-	}
 	
 	// Set PATH if specified in the configuration
 	if (strlen(config.path))
