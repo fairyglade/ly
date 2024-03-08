@@ -261,6 +261,7 @@ void env_xdg(const char* tty_id, const char* desktop_name)
 {
     char user[20];
     snprintf(user, 20, "/run/user/%d", getuid());
+    setenv("XDG_CURRENT_DESKTOP", desktop_name, 0);
     setenv("XDG_RUNTIME_DIR", user, 0);
     setenv("XDG_SESSION_CLASS", "user", 0);
     setenv("XDG_SESSION_ID", "1", 0);
