@@ -66,102 +66,92 @@ pub fn realloc(self: *Matrix) !void {
     self.lines = lines;
 }
 
-// TODO: Fix!!
 pub fn draw(self: *Matrix) void {
-    var first_column = false;
-
+    const buf_height = self.terminal_buffer.height;
+    const buf_width = self.terminal_buffer.width;
     self.count += 1;
     if (self.count > FRAME_DELAY) {
         self.frame += 1;
         if (self.frame > 4) self.frame = 1;
         self.count = 0;
 
-        var x: u64 = 0;
-        while (x < self.terminal_buffer.width) : (x += 2) {
-            var line = self.lines[x];
-            if (self.frame <= line.update) continue;
-
+        var j: u64 = 0;
+        while (j < self.terminal_buffer.width) : (j += 2) {
             var tail: u64 = 0;
-            if (self.dots[x].value == -1 and self.dots[self.terminal_buffer.width + x].value == ' ') {
-                if (line.space <= 0) {
-                    const random = self.terminal_buffer.random.int(i16);
-                    const h: isize = @intCast(self.terminal_buffer.height);
-                    line.length = @mod(random, h - 3) + 3;
-                    line.space = @mod(random, h) + 1;
-                    self.dots[x].value = @mod(random, MAX_CODEPOINT) + MIN_CODEPOINT;
-                } else {
-                    line.space -= 1;
+            if (self.frame > self.lines[j].update) {
+                if (self.dots[j].value == -1 and self.dots[self.terminal_buffer.width + j].value == ' ') {
+                    if (self.lines[j].space > 0) {
+                        self.lines[j].space -= 1;
+                    } else {
+                        const randint = self.terminal_buffer.random.int(i16);
+                        const h: isize = @intCast(self.terminal_buffer.height);
+                        self.lines[j].length = @mod(randint, h - 3) + 3;
+                        self.dots[j].value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                        self.lines[j].space = @mod(randint, h + 1);
+                    }
                 }
 
-                self.lines[x] = line;
-                first_column = true;
-
-                var y: u64 = 0;
-                var seg_length: u64 = 0;
-
-                while (y <= self.terminal_buffer.height) : (y += 1) {
-                    // TODO: Are all these y/height checks required?
-                    var dot = self.dots[y * self.terminal_buffer.width + x];
-
+                var i: u64 = 0;
+                var first_col = true;
+                var seg_len: u64 = 0;
+                while (i <= buf_height) {
                     // Skip over spaces
-                    while (dot.value == ' ' or dot.value == -1) {
-                        y += 1;
-                        if (y > self.terminal_buffer.height) break;
-
-                        dot = self.dots[y * self.terminal_buffer.width + x];
+                    while (i <= buf_height and (self.dots[buf_width * i + j].value == ' ' or self.dots[buf_width * i + j].value == -1)) {
+                        i += 1;
                     }
-                    if (y > self.terminal_buffer.height) break;
 
-                    // Find the head of this column
-                    tail = y;
-                    seg_length = 0;
-                    while (y <= self.terminal_buffer.height and dot.value != ' ' and dot.value != -1) {
-                        dot.is_head = false;
+                    if (i > buf_height) break;
+
+                    // Find the head of this col
+                    tail = i;
+                    seg_len = 0;
+                    while (i <= buf_height and (self.dots[buf_width * i + j].value != ' ' and self.dots[buf_width * i + j].value != -1)) {
+                        self.dots[buf_width * i + j].is_head = false;
                         if (MID_SCROLL_CHANGE) {
-                            const random = self.terminal_buffer.random.int(i16);
-                            if (@mod(random, 8) == 0) dot.value = @mod(random, MAX_CODEPOINT) + MIN_CODEPOINT;
+                            const randint = self.terminal_buffer.random.int(i16);
+                            if (@mod(randint, 8) == 0)
+                                self.dots[buf_width * i + j].value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
                         }
-                        self.dots[y * self.terminal_buffer.width + x] = dot;
-
-                        y += 1;
-                        seg_length += 1;
-                        dot = self.dots[y * self.terminal_buffer.width + x];
+                        i += 1;
+                        seg_len += 1;
                     }
 
-                    // The head is down offscreen
-                    if (y > self.terminal_buffer.height) {
-                        self.dots[tail * self.terminal_buffer.width + x].value = ' ';
-                        continue; // TODO: Shouldn't this be break?
+                    // Head's down offscreen
+                    if (i > buf_height) {
+                        self.dots[buf_width * tail + j].value = ' ';
+                        continue;
                     }
 
-                    const random = self.terminal_buffer.random.int(i16);
-                    self.dots[y * self.terminal_buffer.width + x].value = @mod(random, MAX_CODEPOINT) + MIN_CODEPOINT;
-                    self.dots[y * self.terminal_buffer.width + x].is_head = true;
+                    const randint = self.terminal_buffer.random.int(i16);
+                    self.dots[buf_width * i + j].value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                    self.dots[buf_width * i + j].is_head = true;
 
-                    if (seg_length > line.length or !first_column) {
-                        self.dots[tail * self.terminal_buffer.width + x].value = ' ';
-                        self.dots[x].value = -1;
+                    if (seg_len > self.lines[j].length or !first_col) {
+                        self.dots[buf_width * tail + j].value = ' ';
+                        self.dots[j].value = -1;
                     }
-                    first_column = false;
+                    first_col = false;
+                    i += 1;
                 }
             }
         }
     }
 
-    var x: u64 = 0;
-    while (x < self.terminal_buffer.width) : (x += 2) {
-        var y: u64 = 1;
-        while (y <= self.terminal_buffer.height) : (y += 1) {
-            const dot = self.dots[y * self.terminal_buffer.width + x];
+    // Fine
+    var j: u64 = 0;
+    while (j < buf_width) : (j += 2) {
+        var i: u64 = 1;
+        while (i <= self.terminal_buffer.height) : (i += 1) {
+            const dot = self.dots[buf_width * i + j];
             var fg: u32 = @intCast(termbox.TB_GREEN);
 
             if (dot.value == -1 or dot.value == ' ') {
-                termbox.tb_change_cell(@intCast(x), @intCast(y - 1), ' ', fg, termbox.TB_DEFAULT);
+                termbox.tb_change_cell(@intCast(j), @intCast(i - 1), ' ', fg, termbox.TB_DEFAULT);
                 continue;
             }
 
             if (dot.is_head) fg = @intCast(termbox.TB_WHITE | termbox.TB_BOLD);
-            termbox.tb_change_cell(@intCast(x), @intCast(y - 1), @intCast(dot.value), fg, termbox.TB_DEFAULT);
+            termbox.tb_change_cell(@intCast(j), @intCast(i - 1), @intCast(dot.value), fg, termbox.TB_DEFAULT);
         }
     }
 }

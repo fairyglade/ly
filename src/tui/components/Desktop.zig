@@ -3,6 +3,7 @@ const ini = @import("ini");
 const enums = @import("../../enums.zig");
 const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
+const Ini = @import("../../config/ini.zig").Ini;
 
 const Allocator = std.mem.Allocator;
 const EnvironmentList = std.ArrayList(Environment);
@@ -11,26 +12,23 @@ const DisplayServer = enums.DisplayServer;
 
 const termbox = interop.termbox;
 
-pub const DESKTOP_ENTRY_MAX_SIZE = 8 * 1024;
-
 const Desktop = @This();
 
 pub const Environment = struct {
-    has_entry_buffer: bool,
-    entry_buffer: []u8,
-    name: []const u8,
-    xdg_name: []const u8,
-    cmd: []const u8,
-    specifier: []const u8,
-    display_server: DisplayServer,
+    entry_ini: ?Ini(Entry) = null,
+    name: []const u8 = "",
+    xdg_name: []const u8 = "",
+    cmd: []const u8 = "",
+    specifier: []const u8 = "",
+    display_server: DisplayServer = .wayland,
 };
 
-pub const Entry = struct {
-    Desktop_Entry: struct {
-        Exec: []const u8,
-        Name: []const u8,
-    },
+const DesktopEntry = struct {
+    Exec: []const u8 = "",
+    Name: []const u8 = "",
 };
+
+pub const Entry = struct { Desktop_Entry: DesktopEntry = DesktopEntry{} };
 
 allocator: Allocator,
 buffer: *TerminalBuffer,
@@ -53,8 +51,8 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: u64) !Des
 }
 
 pub fn deinit(self: Desktop) void {
-    for (self.environments.items) |environment| {
-        if (environment.has_entry_buffer) self.allocator.free(environment.entry_buffer);
+    for (self.environments.items) |*environment| {
+        if (environment.entry_ini) |*entry_ini| entry_ini.deinit();
     }
 
     self.environments.deinit();
@@ -68,8 +66,7 @@ pub fn position(self: *Desktop, x: u64, y: u64, visible_length: u64) void {
 
 pub fn addEnvironment(self: *Desktop, name: []const u8, cmd: []const u8, display_server: DisplayServer) !void {
     try self.environments.append(.{
-        .has_entry_buffer = false,
-        .entry_buffer = undefined,
+        .entry_ini = null,
         .name = name,
         .xdg_name = name, // TODO
         .cmd = cmd,
@@ -84,10 +81,9 @@ pub fn addEnvironment(self: *Desktop, name: []const u8, cmd: []const u8, display
     self.current = self.environments.items.len - 1;
 }
 
-pub fn addEnvironmentWithBuffer(self: *Desktop, entry_buffer: []u8, name: []const u8, cmd: []const u8, display_server: DisplayServer) !void {
+pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), name: []const u8, cmd: []const u8, display_server: DisplayServer) !void {
     try self.environments.append(.{
-        .has_entry_buffer = true,
-        .entry_buffer = entry_buffer,
+        .entry_ini = entry_ini,
         .name = name,
         .xdg_name = name, // TODO
         .cmd = cmd,
@@ -103,21 +99,19 @@ pub fn addEnvironmentWithBuffer(self: *Desktop, entry_buffer: []u8, name: []cons
 }
 
 pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !void {
-    var directory = std.fs.openDirAbsolute(path, .{}) catch return;
-    defer directory.close();
-
     var iterable_directory = try std.fs.openIterableDirAbsolute(path, .{});
     defer iterable_directory.close();
 
     var iterator = iterable_directory.iterate();
     while (try iterator.next()) |item| {
-        var file = try directory.openFile(item.name, .{});
-        defer file.close();
+        if (std.mem.eql(u8, std.fs.path.extension(item.name), ".desktop")) {
+            const entry_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ path, item.name });
+            defer self.allocator.free(entry_path);
+            var entry_ini = Ini(Entry).init(self.allocator);
+            var entry = try entry_ini.readToStruct(entry_path);
 
-        const buffer = try file.readToEndAlloc(self.allocator, DESKTOP_ENTRY_MAX_SIZE);
-        const entry = try ini.readToStruct(Entry, buffer);
-
-        try self.addEnvironmentWithBuffer(buffer, entry.Desktop_Entry.Name, entry.Desktop_Entry.Exec, display_server);
+            try self.addEnvironmentWithIni(entry_ini, entry.Desktop_Entry.Name, entry.Desktop_Entry.Exec, display_server);
+        }
     }
 }
 

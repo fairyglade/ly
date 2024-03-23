@@ -2,6 +2,7 @@
 Description=TUI display manager
 After=systemd-user-sessions.service plymouth-quit-wait.service
 After=getty@tty2.service
+Conflicts=getty@tty2.service
 
 [Service]
 Type=idle

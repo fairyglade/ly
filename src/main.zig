@@ -11,9 +11,12 @@ const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const Desktop = @import("tui/components/Desktop.zig");
 const Text = @import("tui/components/Text.zig");
 const Config = @import("config/Config.zig");
-const ConfigReader = @import("config/ConfigReader.zig");
+const ini = @import("config/ini.zig");
 const Lang = @import("config/Lang.zig");
+const LogFile = @import("logger/LogFile.zig");
+const Save = @import("config/Save.zig");
 
+const Ini = ini.Ini;
 const termbox = interop.termbox;
 
 const LY_VERSION = "1.0.0";
@@ -55,8 +58,10 @@ pub fn main() !void {
     }
 
     // Load configuration file
-    var config_reader = ConfigReader.init(allocator);
-    defer config_reader.deinit();
+    var config_ini = Ini(Config).init(allocator);
+    defer config_ini.deinit();
+    var lang_ini = Ini(Lang).init(allocator);
+    defer lang_ini.deinit();
 
     if (res.args.config) |s| {
         const trailing_slash = if (s[s.len - 1] != '/') "/" else "";
@@ -64,20 +69,25 @@ pub fn main() !void {
         const config_path = try std.fmt.allocPrint(allocator, "{s}{s}config.ini", .{ s, trailing_slash });
         defer allocator.free(config_path);
 
-        config = try config_reader.readConfig(config_path);
+        config = config_ini.readToStruct(config_path) catch Config{};
 
-        const lang_path = try std.fmt.allocPrint(allocator, "{s}{s}lang/{s}.ini", .{ s, trailing_slash, config.ly.lang });
+        const lang_path = try std.fmt.allocPrint(allocator, "{s}{s}lang/{s}.ini", .{ s, trailing_slash, config.lang });
         defer allocator.free(lang_path);
 
-        lang = try config_reader.readLang(lang_path);
+        lang = lang_ini.readToStruct(lang_path) catch Lang{};
     } else {
-        config = try config_reader.readConfig(build_options.data_directory ++ "/config.ini");
+        config = config_ini.readToStruct(build_options.data_directory ++ "/config.ini") catch Config{};
 
-        const lang_path = try std.fmt.allocPrint(allocator, "{s}/lang/{s}.ini", .{ build_options.data_directory, config.ly.lang });
+        const lang_path = try std.fmt.allocPrint(allocator, "{s}/lang/{s}.ini", .{ build_options.data_directory, config.lang });
         defer allocator.free(lang_path);
 
-        lang = try config_reader.readLang(lang_path);
+        lang = lang_ini.readToStruct(lang_path) catch Lang{};
     }
+
+    const logger = LogFile.init(config.log_path);
+    defer logger.deinit();
+
+    logger.debug("Ly Started", .{});
 
     // Initialize information line with host name
     var got_host_name = false;
@@ -86,9 +96,9 @@ pub fn main() !void {
     get_host_name: {
         const host_name_struct = interop.getHostName(allocator) catch |err| {
             if (err == error.CannotGetHostName) {
-                info_line = lang.ly.err_hostname;
+                info_line = lang.err_hostname;
             } else {
-                info_line = lang.ly.err_alloc;
+                info_line = lang.err_alloc;
             }
             break :get_host_name;
         };
@@ -98,66 +108,69 @@ pub fn main() !void {
         info_line = host_name_struct.slice;
     }
 
+    defer {
+        if (got_host_name) allocator.free(host_name_buffer);
+    }
+
     // Initialize termbox
     _ = termbox.tb_init();
-    defer termbox.tb_shutdown();
+    defer {
+        termbox.tb_clear();
+        termbox.tb_shutdown();
+    }
 
     _ = termbox.tb_select_output_mode(termbox.TB_OUTPUT_NORMAL);
     termbox.tb_clear();
 
     // Initialize terminal buffer
-    const labels_max_length = @max(lang.ly.login.len, lang.ly.password.len);
+    const labels_max_length = @max(lang.login.len, lang.password.len);
 
-    var buffer = TerminalBuffer.init(config.ly.margin_box_v, config.ly.margin_box_h, config.ly.input_len, labels_max_length, config.ly.fg, config.ly.bg);
+    var buffer = TerminalBuffer.init(config.margin_box_v, config.margin_box_h, config.input_len, labels_max_length, config.fg, config.bg, config.border_fg);
 
     // Initialize components
-    var desktop = try Desktop.init(allocator, &buffer, config.ly.max_desktop_len);
+    var desktop = try Desktop.init(allocator, &buffer, config.max_desktop_len);
     defer desktop.deinit();
 
-    desktop.addEnvironment(lang.ly.shell, "", .shell) catch {
-        info_line = lang.ly.err_alloc;
+    desktop.addEnvironment(lang.shell, "", .shell) catch {
+        info_line = lang.err_alloc;
     };
-    desktop.addEnvironment(lang.ly.xinitrc, config.ly.xinitrc, .xinitrc) catch {
-        info_line = lang.ly.err_alloc;
-    };
-
-    try desktop.crawl(config.ly.waylandsessions, .wayland);
-    try desktop.crawl(config.ly.xsessions, .x11);
-
-    var login = try Text.init(allocator, &buffer, config.ly.max_login_len);
-    defer login.deinit();
-
-    var password = try Text.init(allocator, &buffer, config.ly.max_password_len);
-    defer password.deinit();
-
-    // Load last saved username and desktop selection, if any
-    if (config.ly.load) load_last_saved: {
-        var file = std.fs.openFileAbsolute(config.ly.save_file, .{}) catch break :load_last_saved;
-        defer file.close();
-
-        const reader = file.reader();
-        const username_length = try reader.readIntLittle(u64);
-
-        const username_buffer = try allocator.alloc(u8, username_length);
-        defer allocator.free(username_buffer);
-
-        _ = try reader.read(username_buffer);
-
-        const current_desktop = try reader.readIntLittle(u64);
-
-        if (username_buffer.len > 0) {
-            try login.text.appendSlice(username_buffer);
-            login.end = username_buffer.len;
-        }
-
-        if (current_desktop < desktop.environments.items.len) desktop.current = current_desktop;
+    if (config.xinitrc) |xinitrc| {
+        desktop.addEnvironment(lang.xinitrc, xinitrc, .xinitrc) catch {
+            info_line = lang.err_alloc;
+        };
     }
 
-    var active_input = if (config.ly.default_input == .login and login.text.items.len != login.end) .password else config.ly.default_input;
+    try desktop.crawl(config.waylandsessions, .wayland);
+    try desktop.crawl(config.xsessions, .x11);
+
+    var login = try Text.init(allocator, &buffer, config.max_login_len);
+    defer login.deinit();
+
+    var password = try Text.init(allocator, &buffer, config.max_password_len);
+    defer password.deinit();
+
+    var active_input = config.default_input;
+
+    // Load last saved username and desktop selection, if any
+    if (config.load) {
+        var save_ini = Ini(Save).init(allocator);
+        defer save_ini.deinit();
+        const save = save_ini.readToStruct(config.save_file) catch Save{};
+
+        if (save.user) |user| {
+            try login.text.appendSlice(user);
+            login.end = user.len;
+            active_input = .password;
+        }
+
+        if (save.session_index) |session_index| {
+            if (session_index < desktop.environments.items.len) desktop.current = session_index;
+        }
+    }
 
     // Place components on the screen
     {
-        buffer.drawBoxCenter(!config.ly.hide_borders, config.ly.blank_box);
+        buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
 
         const coordinates = buffer.calculateComponentCoordinates();
         desktop.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
@@ -167,10 +180,10 @@ pub fn main() !void {
         switch (active_input) {
             .session => desktop.handle(null),
             .login => login.handle(null) catch {
-                info_line = lang.ly.err_alloc;
+                info_line = lang.err_alloc;
             },
             .password => password.handle(null) catch {
-                info_line = lang.ly.err_alloc;
+                info_line = lang.err_alloc;
             },
         }
     }
@@ -179,23 +192,23 @@ pub fn main() !void {
     var doom: Doom = undefined;
     var matrix: Matrix = undefined;
 
-    switch (config.ly.animation) {
+    switch (config.animation) {
         .none => {},
         .doom => doom = try Doom.init(allocator, &buffer),
         .matrix => matrix = try Matrix.init(allocator, &buffer),
     }
     defer {
-        switch (config.ly.animation) {
+        switch (config.animation) {
             .none => {},
             .doom => doom.deinit(),
             .matrix => matrix.deinit(),
         }
     }
 
-    const animate = config.ly.animation != .none;
-    const has_clock = config.ly.clock.len > 0;
-    const shutdown_key = try std.fmt.parseInt(u8, config.ly.shutdown_key[1..], 10);
-    const restart_key = try std.fmt.parseInt(u8, config.ly.restart_key[1..], 10);
+    const animate = config.animation != .none;
+    const shutdown_key = try std.fmt.parseInt(u8, config.shutdown_key[1..], 10);
+    const restart_key = try std.fmt.parseInt(u8, config.restart_key[1..], 10);
+    const sleep_key = try std.fmt.parseInt(u8, config.sleep_key[1..], 10);
 
     var event = std.mem.zeroes(termbox.tb_event);
     var run = true;
@@ -207,8 +220,8 @@ pub fn main() !void {
 
     // Switch to selected TTY if possible
     open_console_dev: {
-        const console_dev_z = allocator.dupeZ(u8, config.ly.console_dev) catch {
-            info_line = lang.ly.err_alloc;
+        const console_dev_z = allocator.dupeZ(u8, config.console_dev) catch {
+            info_line = lang.err_alloc;
             break :open_console_dev;
         };
         defer allocator.free(console_dev_z);
@@ -217,17 +230,17 @@ pub fn main() !void {
         defer _ = std.c.close(fd);
 
         if (fd < 0) {
-            info_line = lang.ly.err_console_dev;
+            info_line = lang.err_console_dev;
             break :open_console_dev;
         }
 
-        _ = std.c.ioctl(fd, interop.VT_ACTIVATE, config.ly.tty);
-        _ = std.c.ioctl(fd, interop.VT_WAITACTIVE, config.ly.tty);
+        _ = std.c.ioctl(fd, interop.VT_ACTIVATE, config.tty);
+        _ = std.c.ioctl(fd, interop.VT_WAITACTIVE, config.tty);
     }
 
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
-        if (!update or config.ly.animation != .none) {
+        if (!update or config.animation != .none) {
             if (!update) std.time.sleep(100_000_000);
 
             termbox.tb_present(); // Required to update tb_width(), tb_height() and tb_cell_buffer()
@@ -249,13 +262,13 @@ pub fn main() !void {
             if (resolution_changed) {
                 buffer.buffer = termbox.tb_cell_buffer();
 
-                switch (config.ly.animation) {
+                switch (config.animation) {
                     .none => {},
                     .doom => doom.realloc() catch {
-                        info_line = lang.ly.err_alloc;
+                        info_line = lang.err_alloc;
                     },
                     .matrix => matrix.realloc() catch {
-                        info_line = lang.ly.err_alloc;
+                        info_line = lang.err_alloc;
                     },
                 }
 
@@ -269,28 +282,28 @@ pub fn main() !void {
                 switch (active_input) {
                     .session => desktop.handle(null),
                     .login => login.handle(null) catch {
-                        info_line = lang.ly.err_alloc;
+                        info_line = lang.err_alloc;
                     },
                     .password => password.handle(null) catch {
-                        info_line = lang.ly.err_alloc;
+                        info_line = lang.err_alloc;
                     },
                 }
 
                 termbox.tb_clear();
 
-                switch (config.ly.animation) {
+                switch (config.animation) {
                     .none => {},
                     .doom => doom.draw(),
                     .matrix => matrix.draw(),
                 }
 
-                if (config.ly.bigclock and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) draw_big_clock: {
+                if (config.bigclock and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) draw_big_clock: {
                     const format = "%H:%M";
                     const xo = buffer.width / 2 - (format.len * (bigclock.WIDTH + 1)) / 2;
                     const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
 
                     const clock_str = interop.timeAsString(allocator, format, format.len + 1) catch {
-                        info_line = lang.ly.err_alloc;
+                        info_line = lang.err_alloc;
                         break :draw_big_clock;
                     };
                     defer allocator.free(clock_str);
@@ -301,11 +314,11 @@ pub fn main() !void {
                     }
                 }
 
-                buffer.drawBoxCenter(!config.ly.hide_borders, config.ly.blank_box);
+                buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
 
-                if (has_clock) draw_clock: {
-                    const clock_buffer = interop.timeAsString(allocator, config.ly.clock, 32) catch {
-                        info_line = lang.ly.err_alloc;
+                if (config.clock) |clock| draw_clock: {
+                    const clock_buffer = interop.timeAsString(allocator, clock, 32) catch {
+                        info_line = lang.err_alloc;
                         break :draw_clock;
                     };
                     defer allocator.free(clock_buffer);
@@ -326,46 +339,57 @@ pub fn main() !void {
                 const label_x = buffer.box_x + buffer.margin_box_h;
                 const label_y = buffer.box_y + buffer.margin_box_v;
 
-                buffer.drawLabel(lang.ly.login, label_x, label_y + 4);
-                buffer.drawLabel(lang.ly.password, label_x, label_y + 6);
+                buffer.drawLabel(lang.login, label_x, label_y + 4);
+                buffer.drawLabel(lang.password, label_x, label_y + 6);
 
                 if (info_line.len > 0) {
                     const x = buffer.box_x + ((buffer.box_width - info_line.len) / 2);
                     buffer.drawLabel(info_line, x, label_y);
                 }
 
-                if (!config.ly.hide_key_hints) {
+                if (!config.hide_key_hints) {
                     var length: u64 = 0;
 
-                    buffer.drawLabel(config.ly.shutdown_key, length, 0);
-                    length += config.ly.shutdown_key.len + 1;
+                    buffer.drawLabel(config.shutdown_key, length, 0);
+                    length += config.shutdown_key.len + 1;
+                    buffer.drawLabel(" ", length - 1, 0);
 
-                    buffer.drawLabel(lang.ly.shutdown, length, 0);
-                    length += lang.ly.shutdown.len + 1;
+                    buffer.drawLabel(lang.shutdown, length, 0);
+                    length += lang.shutdown.len + 1;
 
-                    buffer.drawLabel(config.ly.restart_key, length, 0);
-                    length += config.ly.restart_key.len + 1;
+                    buffer.drawLabel(config.restart_key, length, 0);
+                    length += config.restart_key.len + 1;
+                    buffer.drawLabel(" ", length - 1, 0);
 
-                    buffer.drawLabel(lang.ly.restart, length, 0);
-                    length += lang.ly.restart.len + 1;
+                    buffer.drawLabel(lang.restart, length, 0);
+                    length += lang.restart.len + 1;
+
+                    if (config.sleep_cmd != null) {
+                        buffer.drawLabel(config.sleep_key, length, 0);
+                        length += config.sleep_key.len + 1;
+                        buffer.drawLabel(" ", length - 1, 0);
+
+                        buffer.drawLabel(lang.sleep, length, 0);
+                    }
+                    // length += lang.sleep.len + 1;
                 }
 
                 draw_lock_state: {
-                    const lock_state = interop.getLockState(allocator, config.ly.console_dev) catch |err| {
+                    const lock_state = interop.getLockState(allocator, config.console_dev) catch |err| {
                         if (err == error.CannotOpenConsoleDev) {
-                            info_line = lang.ly.err_console_dev;
+                            info_line = lang.err_console_dev;
                         } else {
-                            info_line = lang.ly.err_alloc;
+                            info_line = lang.err_alloc;
                         }
                         break :draw_lock_state;
                     };
 
-                    var lock_state_x = buffer.width - lang.ly.numlock.len;
-                    const lock_state_y: u64 = if (has_clock) 1 else 0;
+                    var lock_state_x = buffer.width - lang.numlock.len;
+                    const lock_state_y: u64 = if (config.clock != null) 1 else 0;
 
-                    if (lock_state.numlock) buffer.drawLabel(lang.ly.numlock, lock_state_x, lock_state_y);
-                    lock_state_x -= lang.ly.capslock.len + 1;
-                    if (lock_state.capslock) buffer.drawLabel(lang.ly.capslock, lock_state_x, lock_state_y);
+                    if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
+                    lock_state_x -= lang.capslock.len + 1;
+                    if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
                 }
 
                 if (resolution_changed) {
@@ -379,7 +403,7 @@ pub fn main() !void {
 
                 desktop.draw();
                 login.draw();
-                password.drawMasked(config.ly.asterisk);
+                password.drawMasked(config.asterisk);
 
                 update = animate;
             } else {
@@ -399,13 +423,13 @@ pub fn main() !void {
 
         // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for the event indefinitely instead
         if (animate) {
-            timeout = config.ly.min_refresh_delta;
-        } else if (config.ly.bigclock and config.ly.clock.len == 0) {
+            timeout = config.min_refresh_delta;
+        } else if (config.bigclock and config.clock == null) {
             var tv = std.mem.zeroes(std.c.timeval);
             _ = std.c.gettimeofday(&tv, null);
 
             timeout = @intCast((60 - @rem(tv.tv_sec, 60)) * 1000 - @divTrunc(tv.tv_usec, 1000) + 1);
-        } else if (config.ly.clock.len > 0 or auth_fails >= 10) {
+        } else if (config.clock != null or auth_fails >= 10) {
             var tv = std.mem.zeroes(std.c.timeval);
             _ = std.c.gettimeofday(&tv, null);
 
@@ -424,6 +448,11 @@ pub fn main() !void {
                 } else if (0xFFFF - event.key + 1 == restart_key) {
                     restart = true;
                     run = false;
+                } else if (0xFFFF - event.key + 1 == sleep_key and config.sleep_cmd != null) {
+                    const pid = std.c.fork();
+                    if (pid == 0) {
+                        std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.sleep_cmd.? }) catch {};
+                    }
                 }
             },
             termbox.TB_KEY_CTRL_C => run = false,
@@ -459,50 +488,50 @@ pub fn main() !void {
                 update = true;
             },
             termbox.TB_KEY_ENTER => authenticate: {
-                if (config.ly.save) save_last_settings: {
-                    var file = std.fs.createFileAbsolute(config.ly.save_file, .{}) catch break :save_last_settings;
+                if (config.save) save_last_settings: {
+                    var file = std.fs.createFileAbsolute(config.save_file, .{}) catch break :save_last_settings;
                     defer file.close();
 
-                    const writer = file.writer();
-                    try writer.writeIntLittle(u64, login.end);
-                    _ = try writer.write(login.text.items);
-                    try writer.writeIntLittle(u64, desktop.current);
+                    const save_data = Save{
+                        .user = login.text.items,
+                        .session_index = desktop.current,
+                    };
+                    ini.writeFromStruct(save_data, file.writer(), null) catch break :save_last_settings;
                 }
 
                 var has_error = false;
 
                 auth.authenticate(
                     allocator,
-                    config.ly.tty,
+                    config,
                     desktop,
                     login,
                     &password,
-                    config.ly.service_name,
-                    config.ly.path,
-                    config.ly.term_reset_cmd,
-                    config.ly.wayland_cmd,
-                ) catch {
+                ) catch |err| {
                     has_error = true;
                     auth_fails += 1;
                     active_input = .password;
 
-                    // TODO: Errors in info_line
+                    info_line = getAuthErrorMsg(err, lang);
 
-                    if (config.ly.blank_password) password.clear();
+                    if (config.clear_password) password.clear();
                 };
                 update = true;
 
-                if (!has_error) info_line = lang.ly.logout;
-                std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.ly.term_restore_cursor_cmd }) catch break :authenticate;
+                if (!has_error) info_line = lang.logout;
+                const pid = try std.os.fork();
+                if (pid == 0) {
+                    std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }) catch break :authenticate;
+                }
             },
             else => {
                 switch (active_input) {
                     .session => desktop.handle(&event),
                     .login => login.handle(&event) catch {
-                        info_line = lang.ly.err_alloc;
+                        info_line = lang.err_alloc;
                     },
                     .password => password.handle(&event) catch {
-                        info_line = lang.ly.err_alloc;
+                        info_line = lang.err_alloc;
                     },
                 }
                 update = true;
@@ -510,11 +539,36 @@ pub fn main() !void {
         }
     }
 
-    if (got_host_name) allocator.free(host_name_buffer);
-
     if (shutdown) {
-        return std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.ly.shutdown_cmd });
+        return std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.shutdown_cmd });
     } else if (restart) {
-        return std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.ly.restart_cmd });
+        return std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.restart_cmd });
     }
+}
+
+fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
+    return switch (err) {
+        error.GetPasswordNameFailed => lang.err_pwnam,
+        error.GroupInitializationFailed => lang.err_user_init,
+        error.SetUserGidFailed => lang.err_user_gid,
+        error.SetUserUidFailed => lang.err_user_uid,
+        error.ChangeDirectoryFailed => lang.err_perm_dir,
+        error.SetPathFailed => lang.err_path,
+        error.PamAccountExpired => lang.err_pam_acct_expired,
+        error.PamAuthError => lang.err_pam_auth,
+        error.PamAuthInfoUnavailable => lang.err_pam_authinfo_unavail,
+        error.PamBufferError => lang.err_pam_buf,
+        error.PamCredentialsError => lang.err_pam_cred_err,
+        error.PamCredentialsExpired => lang.err_pam_cred_expired,
+        error.PamCredentialsInsufficient => lang.err_pam_cred_insufficient,
+        error.PamCredentialsUnavailable => lang.err_pam_cred_unavail,
+        error.PamMaximumTries => lang.err_pam_maxtries,
+        error.PamNewAuthTokenRequired => lang.err_pam_authok_reqd,
+        error.PamPermissionDenied => lang.err_pam_perm_denied,
+        error.PamSessionError => lang.err_pam_session,
+        error.PamSystemError => lang.err_pam_sys,
+        error.PamUserUnknown => lang.err_pam_user_unknown,
+        error.PamAbort => lang.err_pam_abort,
+        else => "An unknown error occurred",
+    };
 }

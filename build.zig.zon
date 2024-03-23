@@ -3,12 +3,12 @@
     .version = "1.0.0",
     .dependencies = .{
         .ini = .{
-            .url = "https://github.com/AnErrupTion/zig-ini/archive/7ab77196a4dc63d1ede50e0a1af1a8325c152f2f.tar.gz",
-            .hash = "12204b1d133060dd0c4304d5e0fbdb33a70038118e7c112b14b5f8d176ea15cd5939",
+            .url = "https://github.com/ziglibs/ini/archive/2b11e8fef86d0eefb225156e695be1c1d5c35cbc.tar.gz",
+            .hash = "1220ed24f7dda09121a175601ddd5c86c1cc937d061a97d38aef049ee4af76e2f594",
         },
         .clap = .{
             .url = "https://github.com/Hejsil/zig-clap/archive/f49b94700e0761b7514abdca0e4f0e7f3f938a93.tar.gz",
             .hash = "1220f48518ce22882e102255ed3bcdb7aeeb4891f50b2cdd3bd74b5b2e24d3149ba2",
         },
-    }
+    },
 }
