@@ -13,8 +13,8 @@ const Text = @import("tui/components/Text.zig");
 const Config = @import("config/Config.zig");
 const ini = @import("config/ini.zig");
 const Lang = @import("config/Lang.zig");
-const LogFile = @import("logger/LogFile.zig");
 const Save = @import("config/Save.zig");
+const LogFile = @import("logger/LogFile.zig");
 
 const Ini = ini.Ini;
 const termbox = interop.termbox;
@@ -125,7 +125,7 @@ pub fn main() !void {
     // Initialize terminal buffer
     const labels_max_length = @max(lang.login.len, lang.password.len);
 
-    var buffer = TerminalBuffer.init(config.margin_box_v, config.margin_box_h, config.input_len, labels_max_length, config.fg, config.bg, config.border_fg);
+    var buffer = TerminalBuffer.init(config, labels_max_length);
 
     // Initialize components
     var desktop = try Desktop.init(allocator, &buffer, config.max_desktop_len);
@@ -371,7 +371,6 @@ pub fn main() !void {
 
                         buffer.drawLabel(lang.sleep, length, 0);
                     }
-                    // length += lang.sleep.len + 1;
                 }
 
                 draw_lock_state: {

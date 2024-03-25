@@ -8,7 +8,6 @@ const Config = @import("config/Config.zig");
 const Allocator = std.mem.Allocator;
 const utmp = interop.utmp;
 const Utmp = utmp.utmp;
-//const LogFile = @import("logger/LogFile.zig");
 
 pub fn authenticate(
     allocator: Allocator,
@@ -142,7 +141,7 @@ pub fn authenticate(
             .xinitrc, .x11 => {
                 var vt_buf: [5]u8 = undefined;
                 const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{config.tty});
-                try executeX11Cmd(pwd.pw_shell, pwd.pw_dir, config.x_cmd, config.x_cmd_setup, current_environment.cmd, config.xauth_cmd, config.mcookie_cmd, vt);
+                try executeX11Cmd(pwd.pw_shell, pwd.pw_dir, config, current_environment.cmd, vt);
             },
         }
 
@@ -172,12 +171,10 @@ pub fn authenticate(
 
 fn initEnv(allocator: Allocator, pwd: *interop.passwd, path: ?[]const u8) !void {
     const term = interop.getenv("TERM");
-    //const lang = interop.getenv("LANG");
 
     _ = interop.clearenv();
 
     if (term[0] != 0) _ = interop.setenv("TERM", term, 1);
-    //if (lang[0] != 0) _ = interop.setenv("LANG", lang, 1);
     _ = interop.setenv("HOME", pwd.pw_dir, 1);
     _ = interop.setenv("PWD", pwd.pw_dir, 1);
     _ = interop.setenv("SHELL", pwd.pw_shell, 1);
@@ -375,16 +372,16 @@ fn executeWaylandCmd(shell: [*:0]const u8, wayland_cmd: []const u8, desktop_cmd:
     _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
 }
 
-fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, x_cmd: []const u8, x_cmd_setup: []const u8, desktop_cmd: []const u8, xauth_cmd: []const u8, mcookie_cmd: []const u8, vt: []const u8) !void {
+fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, desktop_cmd: []const u8, vt: []const u8) !void {
     const display_num = try getFreeDisplay();
     var buf: [5]u8 = undefined;
     var display_name: [:0]u8 = try std.fmt.bufPrintZ(&buf, ":{d}", .{display_num});
-    try xauth(display_name, shell, pw_dir, xauth_cmd, mcookie_cmd);
+    try xauth(display_name, shell, pw_dir, config.xauth_cmd, config.mcookie_cmd);
 
     const pid = std.c.fork();
     if (pid == 0) {
         var cmd_buffer = std.mem.zeroes([1024]u8);
-        const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ x_cmd, display_name, vt });
+        const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt });
         _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
         std.os.exit(0);
     }
@@ -406,12 +403,10 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, x_cmd: []const u8,
     // Pid can be fetched from /tmp/X{d}.lock
     const x_pid = try getXPid(display_num);
 
-    //logger.debug("Found X Server PID: {d}", .{x_pid});
-
     const xorg_pid = std.c.fork();
     if (xorg_pid == 0) {
         var cmd_buffer = std.mem.zeroes([1024]u8);
-        const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ x_cmd_setup, desktop_cmd });
+        const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd });
         _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
         std.os.exit(0);
     }
@@ -421,7 +416,6 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, x_cmd: []const u8,
 
     _ = std.c.kill(x_pid, 0);
     if (std.c._errno().* != interop.ESRCH) {
-        //logger.debug("X Server is alive. Sending SIGTERM to process. PID: {d}", .{pid});
         _ = std.c.kill(x_pid, interop.SIGTERM);
         _ = std.c.waitpid(x_pid, &status, 0);
     }

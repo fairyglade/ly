@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const interop = @import("../interop.zig");
 const utils = @import("utils.zig");
+const Config = @import("../config/Config.zig");
 
 const Allocator = std.mem.Allocator;
 const Random = std.rand.Random;
@@ -35,7 +36,7 @@ box_height: u64,
 margin_box_v: u8,
 margin_box_h: u8,
 
-pub fn init(margin_box_v: u8, margin_box_h: u8, input_length: u8, labels_max_length: u64, fg: u8, bg: u8, border_fg: u8) TerminalBuffer {
+pub fn init(config: Config, labels_max_length: u64) TerminalBuffer {
     var prng = std.rand.Isaac64.init(@intCast(std.time.timestamp()));
 
     return .{
@@ -43,9 +44,9 @@ pub fn init(margin_box_v: u8, margin_box_h: u8, input_length: u8, labels_max_len
         .width = @intCast(termbox.tb_width()),
         .height = @intCast(termbox.tb_height()),
         .buffer = termbox.tb_cell_buffer(),
-        .fg = fg,
-        .bg = bg,
-        .border_fg = border_fg,
+        .fg = config.fg,
+        .bg = config.bg,
+        .border_fg = config.border_fg,
         .box_chars = if (builtin.os.tag == .linux or builtin.os.tag.isBSD()) .{
             .left_up = 0x250C,
             .left_down = 0x2514,
@@ -68,10 +69,10 @@ pub fn init(margin_box_v: u8, margin_box_h: u8, input_length: u8, labels_max_len
         .labels_max_length = labels_max_length,
         .box_x = 0,
         .box_y = 0,
-        .box_width = (2 * margin_box_h) + input_length + 1 + labels_max_length,
-        .box_height = 7 + (2 * margin_box_v),
-        .margin_box_v = margin_box_v,
-        .margin_box_h = margin_box_h,
+        .box_width = (2 * config.margin_box_h) + config.input_len + 1 + labels_max_length,
+        .box_height = 7 + (2 * config.margin_box_v),
+        .margin_box_v = config.margin_box_v,
+        .margin_box_h = config.margin_box_h,
     };
 }
 
