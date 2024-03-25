@@ -78,53 +78,56 @@ pub fn draw(self: *Matrix) void {
         var j: u64 = 0;
         while (j < self.terminal_buffer.width) : (j += 2) {
             var tail: u64 = 0;
-            if (self.frame > self.lines[j].update) {
+            var line = &self.lines[j];
+            if (self.frame > line.update) {
                 if (self.dots[j].value == -1 and self.dots[self.terminal_buffer.width + j].value == ' ') {
-                    if (self.lines[j].space > 0) {
-                        self.lines[j].space -= 1;
+                    if (line.space > 0) {
+                        line.space -= 1;
                     } else {
                         const randint = self.terminal_buffer.random.int(i16);
                         const h: isize = @intCast(self.terminal_buffer.height);
-                        self.lines[j].length = @mod(randint, h - 3) + 3;
+                        line.length = @mod(randint, h - 3) + 3;
                         self.dots[j].value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
-                        self.lines[j].space = @mod(randint, h + 1);
+                        line.space = @mod(randint, h + 1);
                     }
                 }
 
                 var i: u64 = 0;
                 var first_col = true;
                 var seg_len: u64 = 0;
-                while (i <= buf_height) {
+                height_it: while (i <= buf_height) {
+                    var dot = &self.dots[buf_width * i + j];
                     // Skip over spaces
-                    while (i <= buf_height and (self.dots[buf_width * i + j].value == ' ' or self.dots[buf_width * i + j].value == -1)) {
+                    while (i <= buf_height and (dot.value == ' ' or dot.value == -1)) {
                         i += 1;
+                        if (i > buf_height) break :height_it;
+                        dot = &self.dots[buf_width * i + j];
                     }
-
-                    if (i > buf_height) break;
 
                     // Find the head of this col
                     tail = i;
                     seg_len = 0;
-                    while (i <= buf_height and (self.dots[buf_width * i + j].value != ' ' and self.dots[buf_width * i + j].value != -1)) {
-                        self.dots[buf_width * i + j].is_head = false;
+                    while (i <= buf_height and (dot.value != ' ' and dot.value != -1)) {
+                        dot.is_head = false;
                         if (MID_SCROLL_CHANGE) {
                             const randint = self.terminal_buffer.random.int(i16);
                             if (@mod(randint, 8) == 0)
-                                self.dots[buf_width * i + j].value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                                dot.value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
                         }
+
                         i += 1;
                         seg_len += 1;
-                    }
-
-                    // Head's down offscreen
-                    if (i > buf_height) {
-                        self.dots[buf_width * tail + j].value = ' ';
-                        continue;
+                        // Head's down offscreen
+                        if (i > buf_height) {
+                            self.dots[buf_width * tail + j].value = ' ';
+                            continue :height_it;
+                        }
+                        dot = &self.dots[buf_width * i + j];
                     }
 
                     const randint = self.terminal_buffer.random.int(i16);
-                    self.dots[buf_width * i + j].value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
-                    self.dots[buf_width * i + j].is_head = true;
+                    dot.value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                    dot.is_head = true;
 
                     if (seg_len > self.lines[j].length or !first_col) {
                         self.dots[buf_width * tail + j].value = ' ';
@@ -137,7 +140,6 @@ pub fn draw(self: *Matrix) void {
         }
     }
 
-    // Fine
     var j: u64 = 0;
     while (j < buf_width) : (j += 2) {
         var i: u64 = 1;
