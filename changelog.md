@@ -8,8 +8,9 @@ res/config.ini contains all of the available config options and their default va
 
 + border\_fg has been introduced to change the color of the borders.
 + term\_restore\_cursor\_cmd should restore the cursor to it's usual state.
-+ sleep\_key and sleep\_cmd.
 + log\_path is used to store ly.log and ly.log.old for debugging purposes (pretty much nothing is logged currently).
++ enable\_vi\_mode to enable vi keybindings.
++ sleep\_key and sleep\_cmd.
 
 Note: sleep\_cmd is unset by default, meaning it's hidden and has no effect. 
 

@@ -15,6 +15,7 @@ const ini = @import("config/ini.zig");
 const Lang = @import("config/Lang.zig");
 const Save = @import("config/Save.zig");
 const LogFile = @import("logger/LogFile.zig");
+const ViMode = @import("enums.zig").ViMode;
 
 const Ini = ini.Ini;
 const termbox = interop.termbox;
@@ -150,6 +151,7 @@ pub fn main() !void {
     defer password.deinit();
 
     var active_input = config.default_input;
+    var vi_mode: ViMode = if (config.vi_mode) .normal else .insert;
 
     // Load last saved username and desktop selection, if any
     if (config.load) {
@@ -178,11 +180,11 @@ pub fn main() !void {
         password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
 
         switch (active_input) {
-            .session => desktop.handle(null),
-            .login => login.handle(null) catch {
+            .session => desktop.handle(null, vi_mode),
+            .login => login.handle(null, vi_mode) catch {
                 info_line = lang.err_alloc;
             },
-            .password => password.handle(null) catch {
+            .password => password.handle(null, vi_mode) catch {
                 info_line = lang.err_alloc;
             },
         }
@@ -280,11 +282,11 @@ pub fn main() !void {
             // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
             if (auth_fails < 10) {
                 switch (active_input) {
-                    .session => desktop.handle(null),
-                    .login => login.handle(null) catch {
+                    .session => desktop.handle(null, vi_mode),
+                    .login => login.handle(null, vi_mode) catch {
                         info_line = lang.err_alloc;
                     },
-                    .password => password.handle(null) catch {
+                    .password => password.handle(null, vi_mode) catch {
                         info_line = lang.err_alloc;
                     },
                 }
@@ -373,6 +375,11 @@ pub fn main() !void {
                     }
                 }
 
+                if (config.vi_mode) {
+                    const label_txt = if (vi_mode == .normal) lang.normal else lang.insert;
+                    buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y - 1);
+                }
+
                 draw_lock_state: {
                     const lock_state = interop.getLockState(allocator, config.console_dev) catch |err| {
                         if (err == error.CannotOpenConsoleDev) {
@@ -440,15 +447,22 @@ pub fn main() !void {
         if (event_error < 0 or event.type != termbox.TB_EVENT_KEY) continue;
 
         switch (event.key) {
-            termbox.TB_KEY_F1, termbox.TB_KEY_F2, termbox.TB_KEY_F3, termbox.TB_KEY_F4, termbox.TB_KEY_F5, termbox.TB_KEY_F6, termbox.TB_KEY_F7, termbox.TB_KEY_F8, termbox.TB_KEY_F9, termbox.TB_KEY_F10, termbox.TB_KEY_F11, termbox.TB_KEY_F12 => {
-                if (0xFFFF - event.key + 1 == shutdown_key) {
+            termbox.TB_KEY_ESC => {
+                if (config.vi_mode and vi_mode != .normal) {
+                    vi_mode = .normal;
+                    update = true;
+                }
+            },
+            termbox.TB_KEY_F12...termbox.TB_KEY_F1 => {
+                const pressed_key = 0xFFFF - event.key + 1;
+                if (pressed_key == shutdown_key) {
                     shutdown = true;
                     run = false;
-                } else if (0xFFFF - event.key + 1 == restart_key) {
+                } else if (pressed_key == restart_key) {
                     restart = true;
                     run = false;
-                } else if (0xFFFF - event.key + 1 == sleep_key and config.sleep_cmd != null) {
-                    const pid = std.c.fork();
+                } else if (pressed_key == sleep_key and config.sleep_cmd != null) {
+                    const pid = try std.os.fork();
                     if (pid == 0) {
                         std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.sleep_cmd.? }) catch {};
                     }
@@ -524,12 +538,39 @@ pub fn main() !void {
                 }
             },
             else => {
+                if (vi_mode == .normal) {
+                    switch (event.ch) {
+                        'k' => {
+                            active_input = switch (active_input) {
+                                .session, .login => .session,
+                                .password => .login,
+                            };
+                            update = true;
+                            continue;
+                        },
+                        'j' => {
+                            active_input = switch (active_input) {
+                                .session => .login,
+                                .login, .password => .password,
+                            };
+                            update = true;
+                            continue;
+                        },
+                        'i' => {
+                            vi_mode = .insert;
+                            update = true;
+                            continue;
+                        },
+                        else => {},
+                    }
+                }
+
                 switch (active_input) {
-                    .session => desktop.handle(&event),
-                    .login => login.handle(&event) catch {
+                    .session => desktop.handle(&event, vi_mode),
+                    .login => login.handle(&event, vi_mode) catch {
                         info_line = lang.err_alloc;
                     },
-                    .password => password.handle(&event) catch {
+                    .password => password.handle(&event, vi_mode) catch {
                         info_line = lang.err_alloc;
                     },
                 }

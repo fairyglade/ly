@@ -355,7 +355,7 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     const pid = std.c.fork();
 
     if (pid == 0) {
-        var cmd_buffer = std.mem.zeroes([1024]u8);
+        var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . $({s})", .{ xauth_cmd, display_name, mcookie_cmd });
         _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
         std.os.exit(0);
@@ -366,7 +366,7 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
 }
 
 fn executeWaylandCmd(shell: [*:0]const u8, wayland_cmd: []const u8, desktop_cmd: []const u8) !void {
-    var cmd_buffer = std.mem.zeroes([1024]u8);
+    var cmd_buffer: [1024]u8 = undefined;
 
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ wayland_cmd, desktop_cmd });
     _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
@@ -380,7 +380,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
 
     const pid = std.c.fork();
     if (pid == 0) {
-        var cmd_buffer = std.mem.zeroes([1024]u8);
+        var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt });
         _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
         std.os.exit(0);
@@ -405,7 +405,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
 
     const xorg_pid = std.c.fork();
     if (xorg_pid == 0) {
-        var cmd_buffer = std.mem.zeroes([1024]u8);
+        var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd });
         _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
         std.os.exit(0);

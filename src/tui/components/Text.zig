@@ -2,6 +2,7 @@ const std = @import("std");
 const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const utils = @import("../utils.zig");
+const ViMode = @import("../../enums.zig").ViMode;
 
 const Allocator = std.mem.Allocator;
 const DynamicString = std.ArrayList(u8);
@@ -46,7 +47,7 @@ pub fn position(self: *Text, x: u64, y: u64, visible_length: u64) void {
     self.visible_length = visible_length;
 }
 
-pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event) !void {
+pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, vi_mode: ViMode) !void {
     if (maybe_event) |event| blk: {
         if (event.type != termbox.TB_EVENT_KEY) break :blk;
 
@@ -54,9 +55,27 @@ pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event) !void {
             termbox.TB_KEY_ARROW_LEFT => self.goLeft(),
             termbox.TB_KEY_ARROW_RIGHT => self.goRight(),
             termbox.TB_KEY_DELETE => self.delete(),
-            termbox.TB_KEY_BACKSPACE, termbox.TB_KEY_BACKSPACE2 => self.backspace(),
+            termbox.TB_KEY_BACKSPACE, termbox.TB_KEY_BACKSPACE2 => {
+                if (vi_mode == .insert) {
+                    self.backspace();
+                } else {
+                    self.goLeft();
+                }
+            },
             termbox.TB_KEY_SPACE => try self.write(' '),
-            else => if (event.ch > 31 and event.ch < 127) try self.write(@intCast(event.ch)),
+            else => {
+                if (event.ch > 31 and event.ch < 127) {
+                    if (vi_mode == .insert) {
+                        try self.write(@intCast(event.ch));
+                    } else {
+                        switch (event.ch) {
+                            'h' => self.goLeft(),
+                            'l' => self.goRight(),
+                            else => {},
+                        }
+                    }
+                }
+            },
         }
     }
 

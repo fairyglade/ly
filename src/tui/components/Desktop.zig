@@ -9,6 +9,7 @@ const Allocator = std.mem.Allocator;
 const EnvironmentList = std.ArrayList(Environment);
 
 const DisplayServer = enums.DisplayServer;
+const ViMode = enums.ViMode;
 
 const termbox = interop.termbox;
 
@@ -115,14 +116,22 @@ pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !v
     }
 }
 
-pub fn handle(self: *Desktop, maybe_event: ?*termbox.tb_event) void {
+pub fn handle(self: *Desktop, maybe_event: ?*termbox.tb_event, vi_mode: ViMode) void {
     if (maybe_event) |event| blk: {
         if (event.type != termbox.TB_EVENT_KEY) break :blk;
 
         switch (event.key) {
             termbox.TB_KEY_ARROW_LEFT, termbox.TB_KEY_CTRL_H => self.goLeft(),
             termbox.TB_KEY_ARROW_RIGHT, termbox.TB_KEY_CTRL_L => self.goRight(),
-            else => {},
+            else => {
+                if (vi_mode == .normal) {
+                    switch (event.ch) {
+                        'h' => self.goLeft(),
+                        'l' => self.goRight(),
+                        else => {},
+                    }
+                }
+            },
         }
     }
 

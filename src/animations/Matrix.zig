@@ -120,7 +120,7 @@ pub fn draw(self: *Matrix) void {
                         // Head's down offscreen
                         if (i > buf_height) {
                             self.dots[buf_width * tail + j].value = ' ';
-                            continue :height_it;
+                            break :height_it;
                         }
                         dot = &self.dots[buf_width * i + j];
                     }
