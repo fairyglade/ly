@@ -280,6 +280,7 @@ int main(int argc, char** argv)
 			case TB_KEY_CTRL_C:
 				run = false;
 				break;
+			case TB_KEY_CTRL_H: // equivalent to ctrl+backspace
 			case TB_KEY_CTRL_U:
 				if (active_input > 0)
 				{
