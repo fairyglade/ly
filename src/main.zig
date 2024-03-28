@@ -464,7 +464,8 @@ pub fn main() !void {
                 } else if (pressed_key == sleep_key and config.sleep_cmd != null) {
                     const pid = try std.os.fork();
                     if (pid == 0) {
-                        std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.sleep_cmd.? }) catch {};
+                        std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.sleep_cmd.? }) catch std.os.exit(1);
+                        std.os.exit(0);
                     }
                 }
             },
@@ -500,7 +501,7 @@ pub fn main() !void {
                 };
                 update = true;
             },
-            termbox.TB_KEY_ENTER => authenticate: {
+            termbox.TB_KEY_ENTER => {
                 if (config.save) save_last_settings: {
                     var file = std.fs.createFileAbsolute(config.save_file, .{}) catch break :save_last_settings;
                     defer file.close();
@@ -514,13 +515,7 @@ pub fn main() !void {
 
                 var has_error = false;
 
-                auth.authenticate(
-                    allocator,
-                    config,
-                    desktop,
-                    login,
-                    &password,
-                ) catch |err| {
+                auth.authenticate(allocator, config, desktop, login, &password) catch |err| {
                     has_error = true;
                     auth_fails += 1;
                     active_input = .password;
@@ -532,9 +527,11 @@ pub fn main() !void {
                 update = true;
 
                 if (!has_error) info_line = lang.logout;
+
                 const pid = try std.os.fork();
                 if (pid == 0) {
-                    std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }) catch break :authenticate;
+                    std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }) catch std.os.exit(1);
+                    std.os.exit(0);
                 }
             },
             else => {
