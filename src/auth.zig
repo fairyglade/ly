@@ -42,7 +42,6 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
     defer allocator.free(service_name_z);
 
     var status = interop.pam.pam_start(service_name_z.ptr, null, &conv, &handle);
-
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     // Do the PAM routine
@@ -57,9 +56,6 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
 
     status = interop.pam.pam_open_session(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
-
-    // Clear the password
-    password.clear();
 
     // Get password structure from username
     const maybe_pwd = interop.getpwnam(login_text_z.ptr);
@@ -86,11 +82,6 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
             }
         }
     }
-
-    // Restore the previous terminal mode
-    interop.termbox.tb_clear();
-    interop.termbox.tb_present();
-    interop.termbox.tb_shutdown();
 
     var shared_err = try SharedError.init();
     defer shared_err.deinit();
@@ -187,10 +178,6 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
     removeUtmpEntry(&entry);
 
     try resetTerminal(allocator, pwd.pw_shell, config.term_reset_cmd);
-
-    // Re-initialize termbox
-    _ = interop.termbox.tb_init();
-    _ = interop.termbox.tb_select_output_mode(interop.termbox.TB_OUTPUT_NORMAL);
 
     // Close the PAM session
     status = interop.pam.pam_close_session(handle, 0);

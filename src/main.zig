@@ -16,6 +16,7 @@ const Lang = @import("config/Lang.zig");
 const Save = @import("config/Save.zig");
 const LogFile = @import("logger/LogFile.zig");
 const ViMode = @import("enums.zig").ViMode;
+const SharedError = @import("SharedError.zig");
 
 const Ini = ini.Ini;
 const termbox = interop.termbox;
@@ -122,6 +123,9 @@ pub fn main() !void {
 
     _ = termbox.tb_select_output_mode(termbox.TB_OUTPUT_NORMAL);
     termbox.tb_clear();
+
+    // we need this to reset it after auth.
+    const orig_tios = try std.os.tcgetattr(std.os.STDIN_FILENO);
 
     // Initialize terminal buffer
     const labels_max_length = @max(lang.login.len, lang.password.len);
@@ -431,12 +435,12 @@ pub fn main() !void {
         if (animate) {
             timeout = config.min_refresh_delta;
         } else if (config.bigclock and config.clock == null) {
-            var tv = std.mem.zeroes(std.c.timeval);
+            var tv: std.c.timeval = undefined;
             _ = std.c.gettimeofday(&tv, null);
 
             timeout = @intCast((60 - @rem(tv.tv_sec, 60)) * 1000 - @divTrunc(tv.tv_usec, 1000) + 1);
         } else if (config.clock != null or auth_fails >= 10) {
-            var tv = std.mem.zeroes(std.c.timeval);
+            var tv: std.c.timeval = undefined;
             _ = std.c.gettimeofday(&tv, null);
 
             timeout = @intCast(1000 - @divTrunc(tv.tv_usec, 1000) + 1);
@@ -513,20 +517,36 @@ pub fn main() !void {
                     ini.writeFromStruct(save_data, file.writer(), null) catch break :save_last_settings;
                 }
 
-                var has_error = false;
+                var shared_err = try SharedError.init();
+                defer shared_err.deinit();
 
-                auth.authenticate(allocator, config, desktop, login, &password) catch |err| {
-                    has_error = true;
+                const session_pid = try std.os.fork();
+                if (session_pid == 0) {
+                    auth.authenticate(allocator, config, desktop, login, &password) catch |err| {
+                        shared_err.writeError(err);
+                        std.os.exit(1);
+                    };
+                    std.os.exit(0);
+                }
+
+                _ = std.os.waitpid(session_pid, 0);
+
+                var auth_err = shared_err.readError();
+                if (auth_err) |err| {
                     auth_fails += 1;
                     active_input = .password;
-
                     info_line = getAuthErrorMsg(err, lang);
-
                     if (config.clear_password) password.clear();
-                };
-                update = true;
+                } else {
+                    password.clear();
+                    info_line = lang.logout;
+                }
 
-                if (!has_error) info_line = lang.logout;
+                try std.os.tcsetattr(std.os.STDIN_FILENO, .FLUSH, orig_tios);
+                termbox.tb_clear();
+                termbox.tb_present();
+
+                update = true;
 
                 const pid = try std.os.fork();
                 if (pid == 0) {
