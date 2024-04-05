@@ -477,20 +477,26 @@ fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
     var buf: [4096]u8 = undefined;
     const ttyname = try std.os.getFdPath(0, &buf);
 
-    var ttyname_buf: [32]u8 = undefined;
-
+    var ttyname_buf: [32]u8 = std.mem.zeroes([32]u8);
     _ = try std.fmt.bufPrint(&ttyname_buf, "{s}", .{ttyname["/dev/".len..]});
 
     entry.ut_line = ttyname_buf;
     entry.ut_id = ttyname_buf["tty".len..7].*;
 
-    var username_buf: [32]u8 = undefined;
+    var username_buf: [32]u8 = std.mem.zeroes([32]u8);
     _ = try std.fmt.bufPrint(&username_buf, "{s}", .{username});
+
     entry.ut_user = username_buf;
 
     entry.ut_host = std.mem.zeroes([256]u8);
 
-    entry.ut_tv.tv_sec = @truncate(std.time.timestamp());
+    var tv: std.c.timeval = undefined;
+    _ = std.c.gettimeofday(&tv, null);
+
+    entry.ut_tv = .{
+        .tv_sec = @intCast(tv.tv_sec),
+        .tv_usec = @intCast(tv.tv_usec),
+    };
     entry.ut_addr_v6[0] = 0;
 
     utmp.setutent();

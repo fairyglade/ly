@@ -102,7 +102,7 @@ const E = [_]u32{
 pub fn clockCell(animate: bool, char: u8, fg: u8, bg: u8) [SIZE]termbox.tb_cell {
     var cells = std.mem.zeroes([SIZE]termbox.tb_cell);
 
-    var tv = std.mem.zeroes(std.c.timeval);
+    var tv: std.c.timeval = undefined;
     _ = std.c.gettimeofday(&tv, null);
 
     const clock_chars = toBigNumber(if (animate and char == ':' and @divTrunc(tv.tv_usec, 500000) != 0) ' ' else char);
