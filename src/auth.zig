@@ -227,7 +227,7 @@ fn setXdgEnv(allocator: Allocator, tty_str: [:0]u8, desktop_name: []const u8) !v
     defer allocator.free(desktop_name_z);
 
     const uid = interop.getuid();
-    var uid_buffer = std.mem.zeroes([10 + @sizeOf(u32) + 1]u8);
+    var uid_buffer: [10 + @sizeOf(u32) + 1]u8 = undefined;
     const uid_str = try std.fmt.bufPrintZ(&uid_buffer, "/run/user/{d}", .{uid});
 
     _ = interop.setenv("XDG_CURRENT_DESKTOP", desktop_name_z.ptr, 0);
@@ -291,15 +291,14 @@ fn resetTerminal(allocator: Allocator, shell: [*:0]const u8, term_reset_cmd: []c
     const term_reset_cmd_z = try allocator.dupeZ(u8, term_reset_cmd);
     defer allocator.free(term_reset_cmd_z);
 
-    const pid = std.c.fork();
+    const pid = try std.os.fork();
 
     if (pid == 0) {
         _ = interop.execl(shell, shell, "-c", term_reset_cmd_z.ptr, @as([*c]const u8, 0));
         std.os.exit(0);
     }
 
-    var status: c_int = undefined;
-    _ = std.c.waitpid(pid, &status, 0);
+    _ = std.os.waitpid(pid, 0);
 }
 
 fn getFreeDisplay() !u8 {
@@ -321,8 +320,8 @@ fn getXPid(display_num: u8) !i32 {
     var file_buf: [20]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&file_buf);
 
-    _ = try file.reader().streamUntilDelimiter(fbs.writer(), '\n', null);
-    const line = std.mem.sliceTo(&file_buf, 170);
+    _ = try file.reader().streamUntilDelimiter(fbs.writer(), '\n', 20);
+    const line = fbs.getWritten();
 
     return std.fmt.parseInt(i32, std.mem.trim(u8, line, " "), 10);
 }
@@ -335,7 +334,7 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
 
     if (xdg_rt_dir == null) {
         const xdg_cfg_home = std.os.getenv("XDG_CONFIG_HOME");
-        var sb: std.c.Stat = std.mem.zeroes(std.c.Stat);
+        var sb: std.c.Stat = undefined;
         if (xdg_cfg_home == null) {
             xauth_dir = try std.fmt.bufPrintZ(&xauth_buf, "{s}/.config", .{pwd});
             _ = std.c.stat(xauth_dir, &sb);
@@ -384,7 +383,7 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     _ = interop.setenv("XAUTHORITY", xauthority, 1);
     _ = interop.setenv("DISPLAY", display_name, 1);
 
-    const pid = std.c.fork();
+    const pid = try std.os.fork();
 
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
@@ -393,8 +392,7 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
         std.os.exit(0);
     }
 
-    var status: c_int = 0;
-    _ = std.c.waitpid(pid, &status, 0);
+    _ = std.os.waitpid(pid, 0);
 }
 
 fn executeWaylandCmd(shell: [*:0]const u8, wayland_cmd: []const u8, desktop_cmd: []const u8) !void {
@@ -410,15 +408,13 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     var display_name: [:0]u8 = try std.fmt.bufPrintZ(&buf, ":{d}", .{display_num});
     try xauth(display_name, shell, pw_dir, config.xauth_cmd, config.mcookie_cmd);
 
-    const pid = std.c.fork();
+    const pid = try std.os.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt }) catch std.os.exit(1);
         _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
         std.os.exit(0);
     }
-
-    var status: c_int = 0;
 
     var ok: c_int = undefined;
     var xcb: ?*interop.xcb.xcb_connection_t = null;
@@ -435,7 +431,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     // Pid can be fetched from /tmp/X{d}.lock
     const x_pid = try getXPid(display_num);
 
-    const xorg_pid = std.c.fork();
+    const xorg_pid = try std.os.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd }) catch std.os.exit(1);
@@ -443,13 +439,13 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
         std.os.exit(0);
     }
 
-    _ = std.c.waitpid(xorg_pid, &status, 0);
+    _ = std.os.waitpid(xorg_pid, 0);
     interop.xcb.xcb_disconnect(xcb);
 
     _ = std.c.kill(x_pid, 0);
     if (std.c._errno().* != interop.ESRCH) {
         _ = std.c.kill(x_pid, interop.SIGTERM);
-        _ = std.c.waitpid(x_pid, &status, 0);
+        _ = std.os.waitpid(x_pid, 0);
     }
 }
 

@@ -116,10 +116,7 @@ pub fn main() !void {
 
     // Initialize termbox
     _ = termbox.tb_init();
-    defer {
-        termbox.tb_clear();
-        termbox.tb_shutdown();
-    }
+    defer termbox.tb_shutdown();
 
     _ = termbox.tb_select_output_mode(termbox.TB_OUTPUT_NORMAL);
     termbox.tb_clear();
@@ -216,7 +213,7 @@ pub fn main() !void {
     const restart_key = try std.fmt.parseInt(u8, config.restart_key[1..], 10);
     const sleep_key = try std.fmt.parseInt(u8, config.sleep_key[1..], 10);
 
-    var event = std.mem.zeroes(termbox.tb_event);
+    var event: termbox.tb_event = undefined;
     var run = true;
     var update = true;
     var resolution_changed = false;

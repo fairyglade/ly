@@ -100,7 +100,7 @@ const E = [_]u32{
 // zig fmt: on
 
 pub fn clockCell(animate: bool, char: u8, fg: u8, bg: u8) [SIZE]termbox.tb_cell {
-    var cells = std.mem.zeroes([SIZE]termbox.tb_cell);
+    var cells: [SIZE]termbox.tb_cell = undefined;
 
     var tv: std.c.timeval = undefined;
     _ = std.c.gettimeofday(&tv, null);
