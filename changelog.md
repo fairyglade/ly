@@ -1,4 +1,4 @@
-# Zig Rewrite
+# Zig Rewrite (Version 1.0.0)
 
 ## Config Options
 
@@ -36,8 +36,10 @@ session_index = 0
 
 ## Misc
 
++ Display server name added next to selected session.
 + getty@tty2 has been added as a conflict in res/ly.service, so if it is running, ly should still be able to start.
 + XDG\_CURRENT\_DESKTOP is now set by ly.
 + LANG is no longer set by ly.
 + X Server PID is fetched from /tmp/X{d}.lock to be able to kill the process since it detaches.
 + Non .desktop files are now ignored in sessions directory.
++ PAM auth is now done in a child process. (Fixes some issues with logging out and back in).
