@@ -248,7 +248,7 @@ fn loginConv(
     const message_count: u32 = @intCast(num_msg);
     const messages = msg.?;
 
-    var allocator = std.heap.raw_c_allocator;
+    var allocator = std.heap.c_allocator;
     const response = allocator.alloc(interop.pam.pam_response, message_count) catch return interop.pam.PAM_BUF_ERR;
 
     var username: ?[:0]u8 = null;
