@@ -363,7 +363,7 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
 
     // Trim trailing slashes
     var i = xauth_dir.len - 1;
-    while (xauth_dir[i] == '/') : (i -= 1) {}
+    while (xauth_dir[i] == '/') i -= 1;
     const trimmed_xauth_dir = xauth_dir[0 .. i + 1];
 
     var buf: [256]u8 = undefined;

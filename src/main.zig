@@ -23,6 +23,11 @@ const termbox = interop.termbox;
 
 const LY_VERSION = "1.0.0";
 
+pub fn signalHandler(i: c_int) callconv(.C) void {
+    termbox.tb_shutdown();
+    std.c.exit(i);
+}
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -117,6 +122,13 @@ pub fn main() !void {
     // Initialize termbox
     _ = termbox.tb_init();
     defer termbox.tb_shutdown();
+
+    const act = std.os.Sigaction{
+        .handler = .{ .handler = &signalHandler },
+        .mask = std.os.empty_sigset,
+        .flags = 0,
+    };
+    try std.os.sigaction(std.os.SIG.TERM, &act, null);
 
     _ = termbox.tb_select_output_mode(termbox.TB_OUTPUT_NORMAL);
     termbox.tb_clear();
