@@ -14,7 +14,6 @@ const Config = @import("config/Config.zig");
 const ini = @import("config/ini.zig");
 const Lang = @import("config/Lang.zig");
 const Save = @import("config/Save.zig");
-const LogFile = @import("logger/LogFile.zig");
 const ViMode = @import("enums.zig").ViMode;
 const SharedError = @import("SharedError.zig");
 
@@ -90,11 +89,6 @@ pub fn main() !void {
 
         lang = lang_ini.readToStruct(lang_path) catch Lang{};
     }
-
-    const logger = LogFile.init(config.log_path);
-    defer logger.deinit();
-
-    logger.debug("Ly Started", .{});
 
     // Initialize information line with host name
     var got_host_name = false;

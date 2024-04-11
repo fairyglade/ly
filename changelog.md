@@ -8,7 +8,6 @@ res/config.ini contains all of the available config options and their default va
 
 + border\_fg has been introduced to change the color of the borders.
 + term\_restore\_cursor\_cmd should restore the cursor to it's usual state.
-+ log\_path is used to store ly.log and ly.log.old for debugging purposes (pretty much nothing is logged currently).
 + vi\_mode to enable vi keybindings.
 + sleep\_key and sleep\_cmd.
 
@@ -43,3 +42,4 @@ session_index = 0
 + X Server PID is fetched from /tmp/X{d}.lock to be able to kill the process since it detaches.
 + Non .desktop files are now ignored in sessions directory.
 + PAM auth is now done in a child process. (Fixes some issues with logging out and back in).
++ When ly receives SIGTERM, the terminal is now cleared.
