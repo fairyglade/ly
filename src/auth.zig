@@ -403,7 +403,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     var display_name: [:0]u8 = try std.fmt.bufPrintZ(&buf, ":{d}", .{display_num});
     try xauth(display_name, shell, pw_dir, config.xauth_cmd, config.mcookie_cmd);
 
-    const pid = try std.os.fork();
+    const pid = std.c.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt }) catch std.os.exit(1);
@@ -426,7 +426,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     // Pid can be fetched from /tmp/X{d}.lock
     const x_pid = try getXPid(display_num);
 
-    const xorg_pid = try std.os.fork();
+    const xorg_pid = std.c.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd }) catch std.os.exit(1);
@@ -434,13 +434,14 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
         std.os.exit(0);
     }
 
-    _ = std.os.waitpid(xorg_pid, 0);
+    var status: c_int = 0;
+    _ = std.c.waitpid(xorg_pid, &status, 0);
     interop.xcb.xcb_disconnect(xcb);
 
     _ = std.c.kill(x_pid, 0);
     if (std.c._errno().* != interop.ESRCH) {
         _ = std.c.kill(x_pid, interop.SIGTERM);
-        _ = std.os.waitpid(x_pid, 0);
+        _ = std.c.waitpid(x_pid, &status, 0);
     }
 }
 
