@@ -169,11 +169,7 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
     addUtmpEntry(&entry, pwd.pw_name, pid) catch {};
 
     // Wait for the session to stop
-    const ch_proc = std.os.waitpid(pid, 0);
-
-    var err = shared_err.readError();
-    if (ch_proc.status != 0 and err == null)
-        err = error.UnknownError;
+    _ = std.os.waitpid(pid, 0);
 
     removeUtmpEntry(&entry);
 
@@ -189,8 +185,7 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
     status = interop.pam.pam_end(handle, status);
     if (status != 0) return pamDiagnose(status);
 
-    if (err != null)
-        return err.?;
+    if (shared_err.readError()) |err| return err;
 }
 
 fn initEnv(allocator: Allocator, pwd: *interop.passwd, path: ?[]const u8) !void {

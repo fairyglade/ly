@@ -543,7 +543,7 @@ pub fn main() !void {
                     auth_fails += 1;
                     active_input = .password;
                     info_line = getAuthErrorMsg(err, lang);
-                    if (config.clear_password) password.clear();
+                    if (config.clear_password or err != error.PamAuthError) password.clear();
                 } else {
                     password.clear();
                     info_line = lang.logout;
