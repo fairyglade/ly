@@ -161,7 +161,13 @@ pub fn calculateComponentCoordinates(self: TerminalBuffer) struct {
 
 pub fn drawLabel(self: TerminalBuffer, text: []const u8, x: u64, y: u64) void {
     const yc: c_int = @intCast(y);
-    for (0..text.len) |xx| termbox.tb_change_cell(@intCast(x + xx), yc, text[xx], self.fg, self.bg);
+    const utf8view = std.unicode.Utf8View.init(text) catch return;
+    var utf8 = utf8view.iterator();
+
+    var i = x;
+    while (utf8.nextCodepoint()) |codepoint| : (i += 1) {
+        termbox.tb_change_cell(@intCast(i), yc, codepoint, self.fg, self.bg);
+    }
 }
 
 pub fn drawCharMultiple(self: TerminalBuffer, char: u8, x: u64, y: u64, length: u64) void {

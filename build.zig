@@ -1,10 +1,15 @@
 const std = @import("std");
 
+const ly_version = std.SemanticVersion{ .major = 1, .minor = 0, .patch = 0 };
+
 pub fn build(b: *std.Build) void {
     const data_directory = b.option([]const u8, "data_directory", "Specify a default data directory (default is /etc/ly)");
 
     const build_options = b.addOptions();
     build_options.addOption([]const u8, "data_directory", data_directory orelse "/etc/ly");
+    var version_str = b.fmt("{d}.{d}.{d}", .{ ly_version.major, ly_version.minor, ly_version.patch });
+
+    build_options.addOption([]const u8, "version", version_str);
 
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -29,10 +34,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    exe.addOptions("build_options", build_options);
+    const zigini = b.dependency("zigini", .{ .target = target, .optimize = optimize });
+    exe.addModule("zigini", zigini.module("zigini"));
 
-    const ini = b.dependency("ini", .{});
-    exe.addModule("ini", ini.module("ini"));
+    exe.addOptions("build_options", build_options);
 
     const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
     exe.addModule("clap", clap.module("clap"));

@@ -18,10 +18,6 @@ pub const xcb = @cImport({
     @cInclude("xcb/xcb.h");
 });
 
-pub const c_size = u64;
-pub const c_uid = u32;
-pub const c_gid = u32;
-pub const c_time = c_long;
 pub const tm = extern struct {
     tm_sec: c_int,
     tm_min: c_int,
@@ -37,8 +33,8 @@ pub const passwd = extern struct {
     pw_name: [*:0]u8,
     pw_passwd: [*:0]u8,
 
-    pw_uid: c_uid,
-    pw_gid: c_gid,
+    pw_uid: u32,
+    pw_gid: u32,
     pw_gecos: [*:0]u8,
     pw_dir: [*:0]u8,
     pw_shell: [*:0]u8,
@@ -68,20 +64,20 @@ pub const O_RDWR: c_uint = 0x02;
 
 pub extern "c" fn fileno(stream: *std.c.FILE) c_int;
 pub extern "c" fn sysconf(name: c_int) c_long;
-pub extern "c" fn time(second: ?*c_time) c_time;
-pub extern "c" fn localtime(timer: *const c_time) *tm;
-pub extern "c" fn strftime(str: [*:0]u8, maxsize: c_size, format: [*:0]const u8, timeptr: *const tm) c_size;
+pub extern "c" fn time(second: ?*c_long) c_long;
+pub extern "c" fn localtime(timer: *const c_long) *tm;
+pub extern "c" fn strftime(str: [*:0]u8, maxsize: u64, format: [*:0]const u8, timeptr: *const tm) u64;
 pub extern "c" fn setenv(name: [*:0]const u8, value: [*:0]const u8, overwrite: c_int) c_int;
 pub extern "c" fn getenv(name: [*:0]const u8) [*:0]u8;
 pub extern "c" fn putenv(name: [*:0]u8) c_int;
 pub extern "c" fn clearenv() c_int;
-pub extern "c" fn getuid() c_uid;
+pub extern "c" fn getuid() u32;
 pub extern "c" fn getpwnam(name: [*:0]const u8) ?*passwd;
 pub extern "c" fn endpwent() void;
 pub extern "c" fn setusershell() void;
 pub extern "c" fn getusershell() [*:0]u8;
 pub extern "c" fn endusershell() void;
-pub extern "c" fn initgroups(user: [*:0]const u8, group: c_gid) c_int;
+pub extern "c" fn initgroups(user: [*:0]const u8, group: u32) c_int;
 pub extern "c" fn chdir(path: [*:0]const u8) c_int;
 pub extern "c" fn execl(path: [*:0]const u8, arg: [*:0]const u8, ...) c_int;
 
@@ -93,6 +89,7 @@ pub fn getHostName(allocator: Allocator) !struct {
     const hostname_max_length: u64 = if (hostname_sysconf < 0) @intCast(_POSIX_HOST_NAME_MAX) else @intCast(hostname_sysconf);
 
     const buffer = try allocator.alloc(u8, hostname_max_length);
+    errdefer allocator.free(buffer);
 
     const error_code = std.c.gethostname(buffer.ptr, hostname_max_length);
     if (error_code < 0) return error.CannotGetHostName;
@@ -111,27 +108,21 @@ pub fn getHostName(allocator: Allocator) !struct {
     };
 }
 
-pub fn timeAsString(allocator: Allocator, format: []const u8, max_length: u64) ![:0]u8 {
+pub fn timeAsString(allocator: Allocator, format: [:0]const u8, max_length: u64) ![:0]u8 {
     const timer = time(null);
     const tm_info = localtime(&timer);
     const buffer = try allocator.allocSentinel(u8, max_length, 0);
 
-    const format_z = try allocator.dupeZ(u8, format);
-    defer allocator.free(format_z);
-
-    if (strftime(buffer, max_length, format_z, tm_info) < 0) return error.CannotGetFormattedTime;
+    if (strftime(buffer, max_length, format, tm_info) < 0) return error.CannotGetFormattedTime;
 
     return buffer;
 }
 
-pub fn getLockState(allocator: Allocator, console_dev: []const u8) !struct {
+pub fn getLockState(console_dev: [:0]const u8) !struct {
     numlock: bool,
     capslock: bool,
 } {
-    const console_dev_z = try allocator.dupeZ(u8, console_dev);
-    defer allocator.free(console_dev_z);
-
-    const fd = std.c.open(console_dev_z, O_RDONLY);
+    const fd = std.c.open(console_dev, O_RDONLY);
     if (fd < 0) return error.CannotOpenConsoleDev;
 
     var numlock = false;

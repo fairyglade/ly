@@ -1,9 +1,8 @@
 const std = @import("std");
-const ini = @import("ini");
 const enums = @import("../../enums.zig");
 const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
-const Ini = @import("../../config/ini.zig").Ini;
+const Ini = @import("zigini").Ini;
 
 const Allocator = std.mem.Allocator;
 const EnvironmentList = std.ArrayList(Environment);
@@ -74,7 +73,7 @@ pub fn addEnvironment(self: *Desktop, name: []const u8, cmd: []const u8, display
         .specifier = switch (display_server) {
             .wayland => "wayland",
             .x11 => "x11",
-            else => "other",
+            else => "",
         },
         .display_server = display_server,
     });
@@ -91,7 +90,7 @@ pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), name: []cons
         .specifier = switch (display_server) {
             .wayland => "wayland",
             .x11 => "x11",
-            else => "other",
+            else => "",
         },
         .display_server = display_server,
     });

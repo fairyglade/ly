@@ -11,16 +11,15 @@ const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const Desktop = @import("tui/components/Desktop.zig");
 const Text = @import("tui/components/Text.zig");
 const Config = @import("config/Config.zig");
-const ini = @import("config/ini.zig");
+const ini = @import("zigini");
 const Lang = @import("config/Lang.zig");
 const Save = @import("config/Save.zig");
 const ViMode = @import("enums.zig").ViMode;
 const SharedError = @import("SharedError.zig");
+const utils = @import("tui/utils.zig");
 
 const Ini = ini.Ini;
 const termbox = interop.termbox;
-
-const LY_VERSION = "1.0.0";
 
 pub fn signalHandler(i: c_int) callconv(.C) void {
     termbox.tb_shutdown();
@@ -59,7 +58,7 @@ pub fn main() !void {
         std.os.exit(0);
     }
     if (res.args.version != 0) {
-        _ = try stderr.write("Ly version " ++ LY_VERSION ++ "\n");
+        _ = try stderr.write("Ly version " ++ build_options.version ++ "\n");
         std.os.exit(0);
     }
 
@@ -352,8 +351,11 @@ pub fn main() !void {
                 buffer.drawLabel(lang.password, label_x, label_y + 6);
 
                 if (info_line.len > 0) {
-                    const x = buffer.box_x + ((buffer.box_width - info_line.len) / 2);
-                    buffer.drawLabel(info_line, x, label_y);
+                    const info_line_width = try utils.strWidth(info_line);
+                    if (buffer.box_width > info_line_width) {
+                        const x = buffer.box_x + ((buffer.box_width - info_line_width) / 2);
+                        buffer.drawLabel(info_line, x, label_y);
+                    }
                 }
 
                 if (!config.hide_key_hints) {
@@ -364,14 +366,16 @@ pub fn main() !void {
                     buffer.drawLabel(" ", length - 1, 0);
 
                     buffer.drawLabel(lang.shutdown, length, 0);
-                    length += lang.shutdown.len + 1;
+                    const shutdown_len = try utils.strWidth(lang.shutdown);
+                    length += shutdown_len + 1;
 
                     buffer.drawLabel(config.restart_key, length, 0);
                     length += config.restart_key.len + 1;
                     buffer.drawLabel(" ", length - 1, 0);
 
                     buffer.drawLabel(lang.restart, length, 0);
-                    length += lang.restart.len + 1;
+                    const restart_len = try utils.strWidth(lang.restart);
+                    length += restart_len + 1;
 
                     if (config.sleep_cmd != null) {
                         buffer.drawLabel(config.sleep_key, length, 0);
@@ -388,7 +392,7 @@ pub fn main() !void {
                 }
 
                 draw_lock_state: {
-                    const lock_state = interop.getLockState(allocator, config.console_dev) catch |err| {
+                    const lock_state = interop.getLockState(config.console_dev) catch |err| {
                         if (err == error.CannotOpenConsoleDev) {
                             info_line = lang.err_console_dev;
                         } else {
