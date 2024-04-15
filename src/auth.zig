@@ -243,7 +243,7 @@ fn loginConv(
     const message_count: u32 = @intCast(num_msg);
     const messages = msg.?;
 
-    var allocator = std.heap.c_allocator;
+    const allocator = std.heap.c_allocator;
     const response = allocator.alloc(interop.pam.pam_response, message_count) catch return interop.pam.PAM_BUF_ERR;
 
     var username: ?[:0]u8 = null;
@@ -306,10 +306,10 @@ fn getFreeDisplay() !u8 {
     return i;
 }
 
-fn getXPid(display_num: u8) !i32 {
+fn getXPID(display_num: u8) !i32 {
     var buf: [15]u8 = undefined;
     const file_name = try std.fmt.bufPrint(&buf, "/tmp/.X{d}-lock", .{display_num});
-    const file = try std.fs.openFileAbsolute(file_name, std.fs.File.OpenFlags{});
+    const file = try std.fs.openFileAbsolute(file_name, .{});
     defer file.close();
 
     var file_buf: [20]u8 = undefined;
@@ -363,8 +363,7 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
 
     var buf: [256]u8 = undefined;
     const xauthority: [:0]u8 = try std.fmt.bufPrintZ(&buf, "{s}/{s}", .{ trimmed_xauth_dir, xauth_file });
-    const createFlags = std.fs.File.CreateFlags{};
-    const file = try std.fs.createFileAbsolute(xauthority, createFlags);
+    const file = try std.fs.createFileAbsolute(xauthority, .{});
     file.close();
 
     return xauthority;
@@ -379,7 +378,6 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     _ = interop.setenv("DISPLAY", display_name, 1);
 
     const pid = try std.os.fork();
-
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . $({s})", .{ xauth_cmd, display_name, mcookie_cmd }) catch std.os.exit(1);
@@ -400,10 +398,10 @@ fn executeWaylandCmd(shell: [*:0]const u8, wayland_cmd: []const u8, desktop_cmd:
 fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, desktop_cmd: []const u8, vt: []const u8) !void {
     const display_num = try getFreeDisplay();
     var buf: [5]u8 = undefined;
-    var display_name: [:0]u8 = try std.fmt.bufPrintZ(&buf, ":{d}", .{display_num});
+    var display_name = try std.fmt.bufPrintZ(&buf, ":{d}", .{display_num});
     try xauth(display_name, shell, pw_dir, config.xauth_cmd, config.mcookie_cmd);
 
-    const pid = std.c.fork();
+    const pid = try std.os.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt }) catch std.os.exit(1);
@@ -417,16 +415,14 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
         xcb = interop.xcb.xcb_connect(null, null);
         ok = interop.xcb.xcb_connection_has_error(xcb);
         _ = std.c.kill(pid, 0);
-        if (std.c._errno().* == interop.ESRCH and ok != 0) {
-            return;
-        }
+        if (std.c._errno().* == interop.ESRCH and ok != 0) return;
     }
 
     // X Server detaches from the process.
-    // Pid can be fetched from /tmp/X{d}.lock
-    const x_pid = try getXPid(display_num);
+    // PID can be fetched from /tmp/X{d}.lock
+    const x_pid = try getXPID(display_num);
 
-    const xorg_pid = std.c.fork();
+    const xorg_pid = try std.os.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd }) catch std.os.exit(1);
@@ -435,7 +431,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     }
 
     var status: c_int = 0;
-    _ = std.c.waitpid(xorg_pid, &status, 0);
+    _ = std.os.waitpid(xorg_pid, 0);
     interop.xcb.xcb_disconnect(xcb);
 
     _ = std.c.kill(x_pid, 0);
@@ -456,14 +452,14 @@ fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
     var buf: [4096]u8 = undefined;
     const ttyname = try std.os.getFdPath(0, &buf);
 
-    var ttyname_buf: [32]u8 = std.mem.zeroes([32]u8);
-    _ = try std.fmt.bufPrint(&ttyname_buf, "{s}", .{ttyname["/dev/".len..]});
+    var ttyname_buf: [32]u8 = undefined;
+    _ = try std.fmt.bufPrintZ(&ttyname_buf, "{s}", .{ttyname["/dev/".len..]});
 
     entry.ut_line = ttyname_buf;
     entry.ut_id = ttyname_buf["tty".len..7].*;
 
-    var username_buf: [32]u8 = std.mem.zeroes([32]u8);
-    _ = try std.fmt.bufPrint(&username_buf, "{s}", .{username});
+    var username_buf: [32]u8 = undefined;
+    _ = try std.fmt.bufPrintZ(&username_buf, "{s}", .{username});
 
     entry.ut_user = username_buf;
 
@@ -480,12 +476,13 @@ fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
 
     utmp.setutent();
     _ = utmp.pututline(entry);
+    utmp.endutent();
 }
 
 fn removeUtmpEntry(entry: *Utmp) void {
     entry.ut_type = utmp.DEAD_PROCESS;
-    entry.ut_line = std.mem.zeroes([32]u8);
-    entry.ut_user = std.mem.zeroes([32]u8);
+    entry.ut_line[0] = 0;
+    entry.ut_user[0] = 0;
     utmp.setutent();
     _ = utmp.pututline(entry);
     utmp.endutent();

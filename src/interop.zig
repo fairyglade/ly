@@ -112,6 +112,7 @@ pub fn timeAsString(allocator: Allocator, format: [:0]const u8, max_length: u64)
     const timer = time(null);
     const tm_info = localtime(&timer);
     const buffer = try allocator.allocSentinel(u8, max_length, 0);
+    errdefer allocator.free(buffer);
 
     if (strftime(buffer, max_length, format, tm_info) < 0) return error.CannotGetFormattedTime;
 

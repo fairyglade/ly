@@ -3,6 +3,7 @@ const enums = @import("../../enums.zig");
 const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const Ini = @import("zigini").Ini;
+const Lang = @import("../../config/Lang.zig");
 
 const Allocator = std.mem.Allocator;
 const EnvironmentList = std.ArrayList(Environment);
@@ -37,8 +38,9 @@ current: u64,
 visible_length: u64,
 x: u64,
 y: u64,
+lang: Lang,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: u64) !Desktop {
+pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: u64, lang: Lang) !Desktop {
     return .{
         .allocator = allocator,
         .buffer = buffer,
@@ -47,6 +49,7 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: u64) !Des
         .visible_length = 0,
         .x = 0,
         .y = 0,
+        .lang = lang,
     };
 }
 
@@ -71,9 +74,9 @@ pub fn addEnvironment(self: *Desktop, name: []const u8, cmd: []const u8, display
         .xdg_name = name, // TODO
         .cmd = cmd,
         .specifier = switch (display_server) {
-            .wayland => "wayland",
-            .x11 => "x11",
-            else => "",
+            .wayland => self.lang.wayland,
+            .x11 => self.lang.x11,
+            else => self.lang.other,
         },
         .display_server = display_server,
     });
@@ -88,9 +91,9 @@ pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), name: []cons
         .xdg_name = name, // TODO
         .cmd = cmd,
         .specifier = switch (display_server) {
-            .wayland => "wayland",
-            .x11 => "x11",
-            else => "",
+            .wayland => self.lang.wayland,
+            .x11 => self.lang.x11,
+            else => self.lang.other,
         },
         .display_server = display_server,
     });
@@ -104,14 +107,14 @@ pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !v
 
     var iterator = iterable_directory.iterate();
     while (try iterator.next()) |item| {
-        if (std.mem.eql(u8, std.fs.path.extension(item.name), ".desktop")) {
-            const entry_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ path, item.name });
-            defer self.allocator.free(entry_path);
-            var entry_ini = Ini(Entry).init(self.allocator);
-            var entry = try entry_ini.readToStruct(entry_path);
+        if (!std.mem.eql(u8, std.fs.path.extension(item.name), ".desktop")) continue;
 
-            try self.addEnvironmentWithIni(entry_ini, entry.Desktop_Entry.Name, entry.Desktop_Entry.Exec, display_server);
-        }
+        const entry_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ path, item.name });
+        defer self.allocator.free(entry_path);
+        var entry_ini = Ini(Entry).init(self.allocator);
+        var entry = try entry_ini.readToStruct(entry_path);
+
+        try self.addEnvironmentWithIni(entry_ini, entry.Desktop_Entry.Name, entry.Desktop_Entry.Exec, display_server);
     }
 }
 

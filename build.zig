@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
 
     const build_options = b.addOptions();
     build_options.addOption([]const u8, "data_directory", data_directory orelse "/etc/ly");
-    var version_str = b.fmt("{d}.{d}.{d}", .{ ly_version.major, ly_version.minor, ly_version.patch });
+    const version_str = b.fmt("{d}.{d}.{d}", .{ ly_version.major, ly_version.minor, ly_version.patch });
 
     build_options.addOption([]const u8, "version", version_str);
 

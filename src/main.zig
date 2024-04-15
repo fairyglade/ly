@@ -10,6 +10,7 @@ const Matrix = @import("animations/Matrix.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const Desktop = @import("tui/components/Desktop.zig");
 const Text = @import("tui/components/Text.zig");
+const InfoLine = @import("tui/components/InfoLine.zig");
 const Config = @import("config/Config.zig");
 const ini = @import("zigini");
 const Lang = @import("config/Lang.zig");
@@ -49,7 +50,7 @@ pub fn main() !void {
 
     var config: Config = undefined;
     var lang: Lang = undefined;
-    var info_line: []const u8 = undefined;
+    var info_line = InfoLine{};
 
     if (res.args.help != 0) {
         try clap.help(stderr, clap.Help, &params, .{});
@@ -96,16 +97,16 @@ pub fn main() !void {
     get_host_name: {
         const host_name_struct = interop.getHostName(allocator) catch |err| {
             if (err == error.CannotGetHostName) {
-                info_line = lang.err_hostname;
+                try info_line.setText(lang.err_hostname);
             } else {
-                info_line = lang.err_alloc;
+                try info_line.setText(lang.err_alloc);
             }
             break :get_host_name;
         };
 
         got_host_name = true;
         host_name_buffer = host_name_struct.buffer;
-        info_line = host_name_struct.slice;
+        try info_line.setText(host_name_struct.slice);
     }
 
     defer {
@@ -127,7 +128,7 @@ pub fn main() !void {
     termbox.tb_clear();
 
     // we need this to reset it after auth.
-    const orig_tios = try std.os.tcgetattr(std.os.STDIN_FILENO);
+    const tb_termios = try std.os.tcgetattr(std.os.STDIN_FILENO);
 
     // Initialize terminal buffer
     const labels_max_length = @max(lang.login.len, lang.password.len);
@@ -135,15 +136,15 @@ pub fn main() !void {
     var buffer = TerminalBuffer.init(config, labels_max_length);
 
     // Initialize components
-    var desktop = try Desktop.init(allocator, &buffer, config.max_desktop_len);
+    var desktop = try Desktop.init(allocator, &buffer, config.max_desktop_len, lang);
     defer desktop.deinit();
 
     desktop.addEnvironment(lang.shell, "", .shell) catch {
-        info_line = lang.err_alloc;
+        try info_line.setText(lang.err_alloc);
     };
     if (config.xinitrc) |xinitrc| {
         desktop.addEnvironment(lang.xinitrc, xinitrc, .xinitrc) catch {
-            info_line = lang.err_alloc;
+            try info_line.setText(lang.err_alloc);
         };
     }
 
@@ -188,10 +189,10 @@ pub fn main() !void {
         switch (active_input) {
             .session => desktop.handle(null, vi_mode),
             .login => login.handle(null, vi_mode) catch {
-                info_line = lang.err_alloc;
+                try info_line.setText(lang.err_alloc);
             },
             .password => password.handle(null, vi_mode) catch {
-                info_line = lang.err_alloc;
+                try info_line.setText(lang.err_alloc);
             },
         }
     }
@@ -215,7 +216,9 @@ pub fn main() !void {
 
     const animate = config.animation != .none;
     const shutdown_key = try std.fmt.parseInt(u8, config.shutdown_key[1..], 10);
+    const shutdown_len = try utils.strWidth(lang.shutdown);
     const restart_key = try std.fmt.parseInt(u8, config.restart_key[1..], 10);
+    const restart_len = try utils.strWidth(lang.restart);
     const sleep_key = try std.fmt.parseInt(u8, config.sleep_key[1..], 10);
 
     var event: termbox.tb_event = undefined;
@@ -229,7 +232,7 @@ pub fn main() !void {
     // Switch to selected TTY if possible
     open_console_dev: {
         const console_dev_z = allocator.dupeZ(u8, config.console_dev) catch {
-            info_line = lang.err_alloc;
+            try info_line.setText(lang.err_alloc);
             break :open_console_dev;
         };
         defer allocator.free(console_dev_z);
@@ -238,7 +241,7 @@ pub fn main() !void {
         defer _ = std.c.close(fd);
 
         if (fd < 0) {
-            info_line = lang.err_console_dev;
+            try info_line.setText(lang.err_console_dev);
             break :open_console_dev;
         }
 
@@ -273,10 +276,10 @@ pub fn main() !void {
                 switch (config.animation) {
                     .none => {},
                     .doom => doom.realloc() catch {
-                        info_line = lang.err_alloc;
+                        try info_line.setText(lang.err_alloc);
                     },
                     .matrix => matrix.realloc() catch {
-                        info_line = lang.err_alloc;
+                        try info_line.setText(lang.err_alloc);
                     },
                 }
 
@@ -290,10 +293,10 @@ pub fn main() !void {
                 switch (active_input) {
                     .session => desktop.handle(null, vi_mode),
                     .login => login.handle(null, vi_mode) catch {
-                        info_line = lang.err_alloc;
+                        try info_line.setText(lang.err_alloc);
                     },
                     .password => password.handle(null, vi_mode) catch {
-                        info_line = lang.err_alloc;
+                        try info_line.setText(lang.err_alloc);
                     },
                 }
 
@@ -311,7 +314,7 @@ pub fn main() !void {
                     const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
 
                     const clock_str = interop.timeAsString(allocator, format, format.len + 1) catch {
-                        info_line = lang.err_alloc;
+                        try info_line.setText(lang.err_alloc);
                         break :draw_big_clock;
                     };
                     defer allocator.free(clock_str);
@@ -326,7 +329,7 @@ pub fn main() !void {
 
                 if (config.clock) |clock| draw_clock: {
                     const clock_buffer = interop.timeAsString(allocator, clock, 32) catch {
-                        info_line = lang.err_alloc;
+                        try info_line.setText(lang.err_alloc);
                         break :draw_clock;
                     };
                     defer allocator.free(clock_buffer);
@@ -350,11 +353,10 @@ pub fn main() !void {
                 buffer.drawLabel(lang.login, label_x, label_y + 4);
                 buffer.drawLabel(lang.password, label_x, label_y + 6);
 
-                if (info_line.len > 0) {
-                    const info_line_width = try utils.strWidth(info_line);
-                    if (buffer.box_width > info_line_width) {
-                        const x = buffer.box_x + ((buffer.box_width - info_line_width) / 2);
-                        buffer.drawLabel(info_line, x, label_y);
+                if (info_line.width > 0) {
+                    if (buffer.box_width > info_line.width) {
+                        const x = buffer.box_x + ((buffer.box_width - info_line.width) / 2);
+                        buffer.drawLabel(info_line.text, x, label_y);
                     }
                 }
 
@@ -366,7 +368,6 @@ pub fn main() !void {
                     buffer.drawLabel(" ", length - 1, 0);
 
                     buffer.drawLabel(lang.shutdown, length, 0);
-                    const shutdown_len = try utils.strWidth(lang.shutdown);
                     length += shutdown_len + 1;
 
                     buffer.drawLabel(config.restart_key, length, 0);
@@ -374,7 +375,6 @@ pub fn main() !void {
                     buffer.drawLabel(" ", length - 1, 0);
 
                     buffer.drawLabel(lang.restart, length, 0);
-                    const restart_len = try utils.strWidth(lang.restart);
                     length += restart_len + 1;
 
                     if (config.sleep_cmd != null) {
@@ -394,9 +394,9 @@ pub fn main() !void {
                 draw_lock_state: {
                     const lock_state = interop.getLockState(config.console_dev) catch |err| {
                         if (err == error.CannotOpenConsoleDev) {
-                            info_line = lang.err_console_dev;
+                            try info_line.setText(lang.err_console_dev);
                         } else {
-                            info_line = lang.err_alloc;
+                            try info_line.setText(lang.err_alloc);
                         }
                         break :draw_lock_state;
                     };
@@ -472,11 +472,13 @@ pub fn main() !void {
                 } else if (pressed_key == restart_key) {
                     restart = true;
                     run = false;
-                } else if (pressed_key == sleep_key and config.sleep_cmd != null) {
-                    const pid = try std.os.fork();
-                    if (pid == 0) {
-                        std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.sleep_cmd.? }) catch std.os.exit(1);
-                        std.os.exit(0);
+                } else if (pressed_key == sleep_key) {
+                    if (config.sleep_cmd) |sleep_cmd| {
+                        const pid = try std.os.fork();
+                        if (pid == 0) {
+                            std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", sleep_cmd }) catch std.os.exit(1);
+                            std.os.exit(0);
+                        }
                     }
                 }
             },
@@ -542,14 +544,14 @@ pub fn main() !void {
                 if (auth_err) |err| {
                     auth_fails += 1;
                     active_input = .password;
-                    info_line = getAuthErrorMsg(err, lang);
+                    try info_line.setText(getAuthErrorMsg(err, lang));
                     if (config.clear_password or err != error.PamAuthError) password.clear();
                 } else {
                     password.clear();
-                    info_line = lang.logout;
+                    try info_line.setText(lang.logout);
                 }
 
-                try std.os.tcsetattr(std.os.STDIN_FILENO, .FLUSH, orig_tios);
+                try std.os.tcsetattr(std.os.STDIN_FILENO, .FLUSH, tb_termios);
                 termbox.tb_clear();
                 termbox.tb_present();
 
@@ -592,10 +594,10 @@ pub fn main() !void {
                 switch (active_input) {
                     .session => desktop.handle(&event, vi_mode),
                     .login => login.handle(&event, vi_mode) catch {
-                        info_line = lang.err_alloc;
+                        try info_line.setText(lang.err_alloc);
                     },
                     .password => password.handle(&event, vi_mode) catch {
-                        info_line = lang.err_alloc;
+                        try info_line.setText(lang.err_alloc);
                     },
                 }
                 update = true;

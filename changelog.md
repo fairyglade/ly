@@ -6,21 +6,21 @@ res/config.ini contains all of the available config options and their default va
 
 ### Additions
 
-+ border\_fg has been introduced to change the color of the borders.
-+ term\_restore\_cursor\_cmd should restore the cursor to it's usual state.
-+ vi\_mode to enable vi keybindings.
-+ sleep\_key and sleep\_cmd.
++ `border_fg` has been introduced to change the color of the borders.
++ `term_restore_cursor_cmd` should restore the cursor to it's usual state.
++ `vi_mode` to enable vi keybindings.
++ `sleep_key` and `sleep_cmd`.
 
-Note: sleep\_cmd is unset by default, meaning it's hidden and has no effect. 
+Note: `sleep_cmd` is unset by default, meaning it's hidden and has no effect. 
 
 ### Changes
 
 + xinitrc can be set to null to hide it.
-+ blank\_password has been renamed to clear\_password.
++ `blank_password` has been renamed to `clear_password`.
 
 ### Removals
 
-+ wayland\_specifier has been removed.
++ `wayland_specifier` has been removed.
 
 ## Save File
 
@@ -37,7 +37,7 @@ session_index = 0
 
 + Display server name added next to selected session.
 + getty@tty2 has been added as a conflict in res/ly.service, so if it is running, ly should still be able to start.
-+ XDG\_CURRENT\_DESKTOP is now set by ly.
++ `XDG_CURRENT_DESKTOP` is now set by ly.
 + LANG is no longer set by ly.
 + X Server PID is fetched from /tmp/X{d}.lock to be able to kill the process since it detaches.
 + Non .desktop files are now ignored in sessions directory.
