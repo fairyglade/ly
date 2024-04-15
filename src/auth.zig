@@ -107,15 +107,8 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
             std.os.exit(1);
         }
 
-        // Set up the environment (this clears the currently set one)
+        // Set up the environment
         initEnv(allocator, pwd, config.path) catch |e| {
-            shared_err.writeError(e);
-            std.os.exit(1);
-        };
-
-        // Reset the XDG environment variables from before
-        setXdgSessionEnv(current_environment.display_server);
-        setXdgEnv(allocator, tty_str, current_environment.xdg_name) catch |e| {
             shared_err.writeError(e);
             std.os.exit(1);
         };
@@ -190,8 +183,6 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
 
 fn initEnv(allocator: Allocator, pwd: *interop.passwd, path: ?[]const u8) !void {
     const term_env = std.os.getenv("TERM");
-
-    std.c.environ[0] = null;
 
     if (term_env) |term| _ = interop.setenv("TERM", term, 1);
     _ = interop.setenv("HOME", pwd.pw_dir, 1);
