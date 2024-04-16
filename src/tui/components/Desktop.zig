@@ -1,36 +1,35 @@
 const std = @import("std");
-const ini = @import("ini");
 const enums = @import("../../enums.zig");
 const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
+const Ini = @import("zigini").Ini;
+const Lang = @import("../../config/Lang.zig");
 
 const Allocator = std.mem.Allocator;
 const EnvironmentList = std.ArrayList(Environment);
 
 const DisplayServer = enums.DisplayServer;
+const ViMode = enums.ViMode;
 
 const termbox = interop.termbox;
-
-pub const DESKTOP_ENTRY_MAX_SIZE = 8 * 1024;
 
 const Desktop = @This();
 
 pub const Environment = struct {
-    has_entry_buffer: bool,
-    entry_buffer: []u8,
-    name: []const u8,
-    xdg_name: []const u8,
-    cmd: []const u8,
-    specifier: []const u8,
-    display_server: DisplayServer,
+    entry_ini: ?Ini(Entry) = null,
+    name: []const u8 = "",
+    xdg_name: []const u8 = "",
+    cmd: []const u8 = "",
+    specifier: []const u8 = "",
+    display_server: DisplayServer = .wayland,
 };
 
-pub const Entry = struct {
-    Desktop_Entry: struct {
-        Exec: []const u8,
-        Name: []const u8,
-    },
+const DesktopEntry = struct {
+    Exec: []const u8 = "",
+    Name: []const u8 = "",
 };
+
+pub const Entry = struct { Desktop_Entry: DesktopEntry = DesktopEntry{} };
 
 allocator: Allocator,
 buffer: *TerminalBuffer,
@@ -39,8 +38,9 @@ current: u64,
 visible_length: u64,
 x: u64,
 y: u64,
+lang: Lang,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: u64) !Desktop {
+pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: u64, lang: Lang) !Desktop {
     return .{
         .allocator = allocator,
         .buffer = buffer,
@@ -49,12 +49,13 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: u64) !Des
         .visible_length = 0,
         .x = 0,
         .y = 0,
+        .lang = lang,
     };
 }
 
 pub fn deinit(self: Desktop) void {
-    for (self.environments.items) |environment| {
-        if (environment.has_entry_buffer) self.allocator.free(environment.entry_buffer);
+    for (self.environments.items) |*environment| {
+        if (environment.entry_ini) |*entry_ini| entry_ini.deinit();
     }
 
     self.environments.deinit();
@@ -68,15 +69,14 @@ pub fn position(self: *Desktop, x: u64, y: u64, visible_length: u64) void {
 
 pub fn addEnvironment(self: *Desktop, name: []const u8, cmd: []const u8, display_server: DisplayServer) !void {
     try self.environments.append(.{
-        .has_entry_buffer = false,
-        .entry_buffer = undefined,
+        .entry_ini = null,
         .name = name,
         .xdg_name = name, // TODO
         .cmd = cmd,
         .specifier = switch (display_server) {
-            .wayland => "wayland",
-            .x11 => "x11",
-            else => "other",
+            .wayland => self.lang.wayland,
+            .x11 => self.lang.x11,
+            else => self.lang.other,
         },
         .display_server = display_server,
     });
@@ -84,17 +84,16 @@ pub fn addEnvironment(self: *Desktop, name: []const u8, cmd: []const u8, display
     self.current = self.environments.items.len - 1;
 }
 
-pub fn addEnvironmentWithBuffer(self: *Desktop, entry_buffer: []u8, name: []const u8, cmd: []const u8, display_server: DisplayServer) !void {
+pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), name: []const u8, cmd: []const u8, display_server: DisplayServer) !void {
     try self.environments.append(.{
-        .has_entry_buffer = true,
-        .entry_buffer = entry_buffer,
+        .entry_ini = entry_ini,
         .name = name,
         .xdg_name = name, // TODO
         .cmd = cmd,
         .specifier = switch (display_server) {
-            .wayland => "wayland",
-            .x11 => "x11",
-            else => "other",
+            .wayland => self.lang.wayland,
+            .x11 => self.lang.x11,
+            else => self.lang.other,
         },
         .display_server = display_server,
     });
@@ -103,32 +102,38 @@ pub fn addEnvironmentWithBuffer(self: *Desktop, entry_buffer: []u8, name: []cons
 }
 
 pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !void {
-    var directory = std.fs.openDirAbsolute(path, .{}) catch return;
-    defer directory.close();
-
     var iterable_directory = try std.fs.openIterableDirAbsolute(path, .{});
     defer iterable_directory.close();
 
     var iterator = iterable_directory.iterate();
     while (try iterator.next()) |item| {
-        var file = try directory.openFile(item.name, .{});
-        defer file.close();
+        if (!std.mem.eql(u8, std.fs.path.extension(item.name), ".desktop")) continue;
 
-        const buffer = try file.readToEndAlloc(self.allocator, DESKTOP_ENTRY_MAX_SIZE);
-        const entry = try ini.readToStruct(Entry, buffer);
+        const entry_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ path, item.name });
+        defer self.allocator.free(entry_path);
+        var entry_ini = Ini(Entry).init(self.allocator);
+        var entry = try entry_ini.readToStruct(entry_path);
 
-        try self.addEnvironmentWithBuffer(buffer, entry.Desktop_Entry.Name, entry.Desktop_Entry.Exec, display_server);
+        try self.addEnvironmentWithIni(entry_ini, entry.Desktop_Entry.Name, entry.Desktop_Entry.Exec, display_server);
     }
 }
 
-pub fn handle(self: *Desktop, maybe_event: ?*termbox.tb_event) void {
+pub fn handle(self: *Desktop, maybe_event: ?*termbox.tb_event, insert_mode: bool) void {
     if (maybe_event) |event| blk: {
         if (event.type != termbox.TB_EVENT_KEY) break :blk;
 
         switch (event.key) {
             termbox.TB_KEY_ARROW_LEFT, termbox.TB_KEY_CTRL_H => self.goLeft(),
             termbox.TB_KEY_ARROW_RIGHT, termbox.TB_KEY_CTRL_L => self.goRight(),
-            else => {},
+            else => {
+                if (!insert_mode) {
+                    switch (event.ch) {
+                        'h' => self.goLeft(),
+                        'l' => self.goRight(),
+                        else => {},
+                    }
+                }
+            },
         }
     }
 

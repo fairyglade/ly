@@ -10,6 +10,14 @@ pub const pam = @cImport({
     @cInclude("security/pam_appl.h");
 });
 
+pub const utmp = @cImport({
+    @cInclude("utmp.h");
+});
+
+pub const xcb = @cImport({
+    @cInclude("xcb/xcb.h");
+});
+
 pub const c_size = u64;
 pub const c_uid = u32;
 pub const c_gid = u32;
@@ -35,6 +43,9 @@ pub const passwd = extern struct {
     pw_dir: [*:0]u8,
     pw_shell: [*:0]u8,
 };
+
+pub const SIGTERM: c_int = 15;
+pub const ESRCH: c_int = 3;
 
 pub const _POSIX_HOST_NAME_MAX: c_int = 0xFF;
 pub const _SC_HOST_NAME_MAX: c_int = 0xB4;
@@ -63,6 +74,7 @@ pub extern "c" fn strftime(str: [*:0]u8, maxsize: c_size, format: [*:0]const u8,
 pub extern "c" fn setenv(name: [*:0]const u8, value: [*:0]const u8, overwrite: c_int) c_int;
 pub extern "c" fn getenv(name: [*:0]const u8) [*:0]u8;
 pub extern "c" fn putenv(name: [*:0]u8) c_int;
+pub extern "c" fn clearenv() c_int;
 pub extern "c" fn getuid() c_uid;
 pub extern "c" fn getpwnam(name: [*:0]const u8) ?*passwd;
 pub extern "c" fn endpwent() void;
@@ -81,6 +93,7 @@ pub fn getHostName(allocator: Allocator) !struct {
     const hostname_max_length: u64 = if (hostname_sysconf < 0) @intCast(_POSIX_HOST_NAME_MAX) else @intCast(hostname_sysconf);
 
     const buffer = try allocator.alloc(u8, hostname_max_length);
+    errdefer allocator.free(buffer);
 
     const error_code = std.c.gethostname(buffer.ptr, hostname_max_length);
     if (error_code < 0) return error.CannotGetHostName;
@@ -99,27 +112,22 @@ pub fn getHostName(allocator: Allocator) !struct {
     };
 }
 
-pub fn timeAsString(allocator: Allocator, format: []const u8, max_length: u64) ![:0]u8 {
+pub fn timeAsString(allocator: Allocator, format: [:0]const u8, max_length: u64) ![:0]u8 {
     const timer = time(null);
     const tm_info = localtime(&timer);
     const buffer = try allocator.allocSentinel(u8, max_length, 0);
+    errdefer allocator.free(buffer);
 
-    const format_z = try allocator.dupeZ(u8, format);
-    defer allocator.free(format_z);
-
-    if (strftime(buffer, max_length, format_z, tm_info) < 0) return error.CannotGetFormattedTime;
+    if (strftime(buffer, max_length, format, tm_info) < 0) return error.CannotGetFormattedTime;
 
     return buffer;
 }
 
-pub fn getLockState(allocator: Allocator, console_dev: []const u8) !struct {
+pub fn getLockState(console_dev: [:0]const u8) !struct {
     numlock: bool,
     capslock: bool,
 } {
-    const console_dev_z = try allocator.dupeZ(u8, console_dev);
-    defer allocator.free(console_dev_z);
-
-    const fd = std.c.open(console_dev_z, O_RDONLY);
+    const fd = std.c.open(console_dev, O_RDONLY);
     if (fd < 0) return error.CannotOpenConsoleDev;
 
     var numlock = false;

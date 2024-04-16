@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const interop = @import("../interop.zig");
 const utils = @import("utils.zig");
+const Config = @import("../config/Config.zig");
 
 const Allocator = std.mem.Allocator;
 const Random = std.rand.Random;
@@ -16,6 +17,7 @@ height: u64,
 buffer: [*]termbox.tb_cell,
 fg: u8,
 bg: u8,
+border_fg: u8,
 box_chars: struct {
     left_up: u32,
     left_down: u32,
@@ -34,7 +36,7 @@ box_height: u64,
 margin_box_v: u8,
 margin_box_h: u8,
 
-pub fn init(margin_box_v: u8, margin_box_h: u8, input_length: u8, labels_max_length: u64, fg: u8, bg: u8) TerminalBuffer {
+pub fn init(config: Config, labels_max_length: u64) TerminalBuffer {
     var prng = std.rand.Isaac64.init(@intCast(std.time.timestamp()));
 
     return .{
@@ -42,8 +44,9 @@ pub fn init(margin_box_v: u8, margin_box_h: u8, input_length: u8, labels_max_len
         .width = @intCast(termbox.tb_width()),
         .height = @intCast(termbox.tb_height()),
         .buffer = termbox.tb_cell_buffer(),
-        .fg = fg,
-        .bg = bg,
+        .fg = config.fg,
+        .bg = config.bg,
+        .border_fg = config.border_fg,
         .box_chars = if (builtin.os.tag == .linux or builtin.os.tag.isBSD()) .{
             .left_up = 0x250C,
             .left_down = 0x2514,
@@ -66,10 +69,10 @@ pub fn init(margin_box_v: u8, margin_box_h: u8, input_length: u8, labels_max_len
         .labels_max_length = labels_max_length,
         .box_x = 0,
         .box_y = 0,
-        .box_width = (2 * margin_box_h) + input_length + 1 + labels_max_length,
-        .box_height = 7 + (2 * margin_box_v),
-        .margin_box_v = margin_box_v,
-        .margin_box_h = margin_box_h,
+        .box_width = (2 * config.margin_box_h) + config.input_len + 1 + labels_max_length,
+        .box_height = 7 + (2 * config.margin_box_v),
+        .margin_box_v = config.margin_box_v,
+        .margin_box_h = config.margin_box_h,
     };
 }
 
@@ -107,13 +110,13 @@ pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool)
     self.box_y = y1;
 
     if (show_borders) {
-        termbox.tb_change_cell(@intCast(x1 - 1), @intCast(y1 - 1), self.box_chars.left_up, self.fg, self.bg);
-        termbox.tb_change_cell(@intCast(x2), @intCast(y1 - 1), self.box_chars.right_up, self.fg, self.bg);
-        termbox.tb_change_cell(@intCast(x1 - 1), @intCast(y2), self.box_chars.left_down, self.fg, self.bg);
-        termbox.tb_change_cell(@intCast(x2), @intCast(y2), self.box_chars.right_down, self.fg, self.bg);
+        termbox.tb_change_cell(@intCast(x1 - 1), @intCast(y1 - 1), self.box_chars.left_up, self.border_fg, self.bg);
+        termbox.tb_change_cell(@intCast(x2), @intCast(y1 - 1), self.box_chars.right_up, self.border_fg, self.bg);
+        termbox.tb_change_cell(@intCast(x1 - 1), @intCast(y2), self.box_chars.left_down, self.border_fg, self.bg);
+        termbox.tb_change_cell(@intCast(x2), @intCast(y2), self.box_chars.right_down, self.border_fg, self.bg);
 
-        var c1 = utils.initCell(self.box_chars.top, self.fg, self.bg);
-        var c2 = utils.initCell(self.box_chars.bottom, self.fg, self.bg);
+        var c1 = utils.initCell(self.box_chars.top, self.border_fg, self.bg);
+        var c2 = utils.initCell(self.box_chars.bottom, self.border_fg, self.bg);
 
         for (0..self.box_width) |i| {
             termbox.tb_put_cell(@intCast(x1 + i), @intCast(y1 - 1), &c1);
@@ -158,7 +161,13 @@ pub fn calculateComponentCoordinates(self: TerminalBuffer) struct {
 
 pub fn drawLabel(self: TerminalBuffer, text: []const u8, x: u64, y: u64) void {
     const yc: c_int = @intCast(y);
-    for (0..text.len) |xx| termbox.tb_change_cell(@intCast(x + xx), yc, text[xx], self.fg, self.bg);
+    const utf8view = std.unicode.Utf8View.init(text) catch return;
+    var utf8 = utf8view.iterator();
+
+    var i = x;
+    while (utf8.nextCodepoint()) |codepoint| : (i += 1) {
+        termbox.tb_change_cell(@intCast(i), yc, codepoint, self.fg, self.bg);
+    }
 }
 
 pub fn drawCharMultiple(self: TerminalBuffer, char: u8, x: u64, y: u64, length: u64) void {

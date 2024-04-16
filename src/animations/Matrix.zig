@@ -66,10 +66,9 @@ pub fn realloc(self: *Matrix) !void {
     self.lines = lines;
 }
 
-// TODO: Fix!!
 pub fn draw(self: *Matrix) void {
-    var first_column = false;
-
+    const buf_height = self.terminal_buffer.height;
+    const buf_width = self.terminal_buffer.width;
     self.count += 1;
     if (self.count > FRAME_DELAY) {
         self.frame += 1;
@@ -78,81 +77,74 @@ pub fn draw(self: *Matrix) void {
 
         var x: u64 = 0;
         while (x < self.terminal_buffer.width) : (x += 2) {
-            var line = self.lines[x];
+            var tail: u64 = 0;
+            var line = &self.lines[x];
             if (self.frame <= line.update) continue;
 
-            var tail: u64 = 0;
             if (self.dots[x].value == -1 and self.dots[self.terminal_buffer.width + x].value == ' ') {
-                if (line.space <= 0) {
-                    const random = self.terminal_buffer.random.int(i16);
-                    const h: isize = @intCast(self.terminal_buffer.height);
-                    line.length = @mod(random, h - 3) + 3;
-                    line.space = @mod(random, h) + 1;
-                    self.dots[x].value = @mod(random, MAX_CODEPOINT) + MIN_CODEPOINT;
-                } else {
+                if (line.space > 0) {
                     line.space -= 1;
+                } else {
+                    const randint = self.terminal_buffer.random.int(i16);
+                    const h: isize = @intCast(self.terminal_buffer.height);
+                    line.length = @mod(randint, h - 3) + 3;
+                    self.dots[x].value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                    line.space = @mod(randint, h + 1);
+                }
+            }
+
+            var y: u64 = 0;
+            var first_col = true;
+            var seg_len: u64 = 0;
+            height_it: while (y <= buf_height) : (y += 1) {
+                var dot = &self.dots[buf_width * y + x];
+                // Skip over spaces
+                while (y <= buf_height and (dot.value == ' ' or dot.value == -1)) {
+                    y += 1;
+                    if (y > buf_height) break :height_it;
+                    dot = &self.dots[buf_width * y + x];
                 }
 
-                self.lines[x] = line;
-                first_column = true;
-
-                var y: u64 = 0;
-                var seg_length: u64 = 0;
-
-                while (y <= self.terminal_buffer.height) : (y += 1) {
-                    // TODO: Are all these y/height checks required?
-                    var dot = self.dots[y * self.terminal_buffer.width + x];
-
-                    // Skip over spaces
-                    while (dot.value == ' ' or dot.value == -1) {
-                        y += 1;
-                        if (y > self.terminal_buffer.height) break;
-
-                        dot = self.dots[y * self.terminal_buffer.width + x];
-                    }
-                    if (y > self.terminal_buffer.height) break;
-
-                    // Find the head of this column
-                    tail = y;
-                    seg_length = 0;
-                    while (y <= self.terminal_buffer.height and dot.value != ' ' and dot.value != -1) {
-                        dot.is_head = false;
-                        if (MID_SCROLL_CHANGE) {
-                            const random = self.terminal_buffer.random.int(i16);
-                            if (@mod(random, 8) == 0) dot.value = @mod(random, MAX_CODEPOINT) + MIN_CODEPOINT;
+                // Find the head of this column
+                tail = y;
+                seg_len = 0;
+                while (y <= buf_height and dot.value != ' ' and dot.value != -1) {
+                    dot.is_head = false;
+                    if (MID_SCROLL_CHANGE) {
+                        const randint = self.terminal_buffer.random.int(i16);
+                        if (@mod(randint, 8) == 0) {
+                            dot.value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
                         }
-                        self.dots[y * self.terminal_buffer.width + x] = dot;
-
-                        y += 1;
-                        seg_length += 1;
-                        dot = self.dots[y * self.terminal_buffer.width + x];
                     }
 
-                    // The head is down offscreen
-                    if (y > self.terminal_buffer.height) {
-                        self.dots[tail * self.terminal_buffer.width + x].value = ' ';
-                        continue; // TODO: Shouldn't this be break?
+                    y += 1;
+                    seg_len += 1;
+                    // Head's down offscreen
+                    if (y > buf_height) {
+                        self.dots[buf_width * tail + x].value = ' ';
+                        break :height_it;
                     }
-
-                    const random = self.terminal_buffer.random.int(i16);
-                    self.dots[y * self.terminal_buffer.width + x].value = @mod(random, MAX_CODEPOINT) + MIN_CODEPOINT;
-                    self.dots[y * self.terminal_buffer.width + x].is_head = true;
-
-                    if (seg_length > line.length or !first_column) {
-                        self.dots[tail * self.terminal_buffer.width + x].value = ' ';
-                        self.dots[x].value = -1;
-                    }
-                    first_column = false;
+                    dot = &self.dots[buf_width * y + x];
                 }
+
+                const randint = self.terminal_buffer.random.int(i16);
+                dot.value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                dot.is_head = true;
+
+                if (seg_len > line.length or !first_col) {
+                    self.dots[buf_width * tail + x].value = ' ';
+                    self.dots[x].value = -1;
+                }
+                first_col = false;
             }
         }
     }
 
     var x: u64 = 0;
-    while (x < self.terminal_buffer.width) : (x += 2) {
+    while (x < buf_width) : (x += 2) {
         var y: u64 = 1;
         while (y <= self.terminal_buffer.height) : (y += 1) {
-            const dot = self.dots[y * self.terminal_buffer.width + x];
+            const dot = self.dots[buf_width * y + x];
             var fg: u32 = @intCast(termbox.TB_GREEN);
 
             if (dot.value == -1 or dot.value == ' ') {
