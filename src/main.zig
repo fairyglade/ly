@@ -158,7 +158,7 @@ pub fn main() !void {
     defer password.deinit();
 
     var active_input = config.default_input;
-    var vi_mode: ViMode = if (config.vi_mode) .normal else .insert;
+    var insert_mode: bool = if (config.vi_mode) false else true;
 
     // Load last saved username and desktop selection, if any
     if (config.load) {
@@ -187,11 +187,11 @@ pub fn main() !void {
         password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
 
         switch (active_input) {
-            .session => desktop.handle(null, vi_mode),
-            .login => login.handle(null, vi_mode) catch {
+            .session => desktop.handle(null, insert_mode),
+            .login => login.handle(null, insert_mode) catch {
                 try info_line.setText(lang.err_alloc);
             },
-            .password => password.handle(null, vi_mode) catch {
+            .password => password.handle(null, insert_mode) catch {
                 try info_line.setText(lang.err_alloc);
             },
         }
@@ -291,11 +291,11 @@ pub fn main() !void {
             // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
             if (auth_fails < 10) {
                 switch (active_input) {
-                    .session => desktop.handle(null, vi_mode),
-                    .login => login.handle(null, vi_mode) catch {
+                    .session => desktop.handle(null, insert_mode),
+                    .login => login.handle(null, insert_mode) catch {
                         try info_line.setText(lang.err_alloc);
                     },
-                    .password => password.handle(null, vi_mode) catch {
+                    .password => password.handle(null, insert_mode) catch {
                         try info_line.setText(lang.err_alloc);
                     },
                 }
@@ -387,7 +387,7 @@ pub fn main() !void {
                 }
 
                 if (config.vi_mode) {
-                    const label_txt = if (vi_mode == .normal) lang.normal else lang.insert;
+                    const label_txt = if (!insert_mode) lang.normal else lang.insert;
                     buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y - 1);
                 }
 
@@ -459,8 +459,8 @@ pub fn main() !void {
 
         switch (event.key) {
             termbox.TB_KEY_ESC => {
-                if (config.vi_mode and vi_mode != .normal) {
-                    vi_mode = .normal;
+                if (config.vi_mode and insert_mode) {
+                    insert_mode = false;
                     update = true;
                 }
             },
@@ -564,7 +564,7 @@ pub fn main() !void {
                 }
             },
             else => {
-                if (vi_mode == .normal) {
+                if (!insert_mode) {
                     switch (event.ch) {
                         'k' => {
                             active_input = switch (active_input) {
@@ -583,7 +583,7 @@ pub fn main() !void {
                             continue;
                         },
                         'i' => {
-                            vi_mode = .insert;
+                            insert_mode = true;
                             update = true;
                             continue;
                         },
@@ -592,11 +592,11 @@ pub fn main() !void {
                 }
 
                 switch (active_input) {
-                    .session => desktop.handle(&event, vi_mode),
-                    .login => login.handle(&event, vi_mode) catch {
+                    .session => desktop.handle(&event, insert_mode),
+                    .login => login.handle(&event, insert_mode) catch {
                         try info_line.setText(lang.err_alloc);
                     },
-                    .password => password.handle(&event, vi_mode) catch {
+                    .password => password.handle(&event, insert_mode) catch {
                         try info_line.setText(lang.err_alloc);
                     },
                 }

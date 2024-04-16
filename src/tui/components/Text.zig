@@ -47,7 +47,7 @@ pub fn position(self: *Text, x: u64, y: u64, visible_length: u64) void {
     self.visible_length = visible_length;
 }
 
-pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, vi_mode: ViMode) !void {
+pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, insert_mode: bool) !void {
     if (maybe_event) |event| blk: {
         if (event.type != termbox.TB_EVENT_KEY) break :blk;
 
@@ -56,7 +56,7 @@ pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, vi_mode: ViMode) !vo
             termbox.TB_KEY_ARROW_RIGHT => self.goRight(),
             termbox.TB_KEY_DELETE => self.delete(),
             termbox.TB_KEY_BACKSPACE, termbox.TB_KEY_BACKSPACE2 => {
-                if (vi_mode == .insert) {
+                if (insert_mode) {
                     self.backspace();
                 } else {
                     self.goLeft();
@@ -65,7 +65,7 @@ pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, vi_mode: ViMode) !vo
             termbox.TB_KEY_SPACE => try self.write(' '),
             else => {
                 if (event.ch > 31 and event.ch < 127) {
-                    if (vi_mode == .insert) {
+                    if (insert_mode) {
                         try self.write(@intCast(event.ch));
                     } else {
                         switch (event.ch) {
