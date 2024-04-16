@@ -112,7 +112,9 @@ pub fn draw(self: *Matrix) void {
                     dot.is_head = false;
                     if (MID_SCROLL_CHANGE) {
                         const randint = self.terminal_buffer.random.int(i16);
-                        if (@mod(randint, 8) == 0) dot.value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                        if (@mod(randint, 8) == 0) {
+                            dot.value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                        }
                     }
 
                     y += 1;

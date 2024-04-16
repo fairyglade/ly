@@ -454,7 +454,9 @@ fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
 
     entry.ut_user = username_buf;
 
-    entry.ut_host = std.mem.zeroes([256]u8);
+    var host: [256]u8 = undefined;
+    host[0] = 0;
+    entry.ut_host = host;
 
     var tv: std.c.timeval = undefined;
     _ = std.c.gettimeofday(&tv, null);
