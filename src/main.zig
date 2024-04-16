@@ -2,6 +2,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 const builtin = @import("builtin");
 const clap = @import("clap");
+const ini = @import("zigini");
 const auth = @import("auth.zig");
 const bigclock = @import("bigclock.zig");
 const interop = @import("interop.zig");
@@ -12,9 +13,9 @@ const Desktop = @import("tui/components/Desktop.zig");
 const Text = @import("tui/components/Text.zig");
 const InfoLine = @import("tui/components/InfoLine.zig");
 const Config = @import("config/Config.zig");
-const ini = @import("zigini");
 const Lang = @import("config/Lang.zig");
 const Save = @import("config/Save.zig");
+const migrator = @import("config/migrator.zig");
 const ViMode = @import("enums.zig").ViMode;
 const SharedError = @import("SharedError.zig");
 const utils = @import("tui/utils.zig");
@@ -66,6 +67,7 @@ pub fn main() !void {
     // Load configuration file
     var config_ini = Ini(Config).init(allocator);
     defer config_ini.deinit();
+
     var lang_ini = Ini(Lang).init(allocator);
     defer lang_ini.deinit();
 
@@ -127,7 +129,7 @@ pub fn main() !void {
     _ = termbox.tb_select_output_mode(termbox.TB_OUTPUT_NORMAL);
     termbox.tb_clear();
 
-    // we need this to reset it after auth.
+    // Needed to reset termbox after auth
     const tb_termios = try std.os.tcgetattr(std.os.STDIN_FILENO);
 
     // Initialize terminal buffer
@@ -164,7 +166,10 @@ pub fn main() !void {
     if (config.load) {
         var save_ini = Ini(Save).init(allocator);
         defer save_ini.deinit();
-        const save = save_ini.readToStruct(config.save_file) catch Save{};
+
+        // If it fails, we try to migrate the potentially old save file. And if we can't do that, we just create
+        // a new save file
+        const save = save_ini.readToStruct(config.save_file) catch migrator.tryMigrateSaveFile(allocator, config.save_file);
 
         if (save.user) |user| {
             try login.text.appendSlice(user);

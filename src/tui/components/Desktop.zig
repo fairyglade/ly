@@ -71,7 +71,7 @@ pub fn addEnvironment(self: *Desktop, name: []const u8, cmd: []const u8, display
     try self.environments.append(.{
         .entry_ini = null,
         .name = name,
-        .xdg_name = name, // TODO
+        .xdg_name = getXdgName(name),
         .cmd = cmd,
         .specifier = switch (display_server) {
             .wayland => self.lang.wayland,
@@ -88,7 +88,7 @@ pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), name: []cons
     try self.environments.append(.{
         .entry_ini = entry_ini,
         .name = name,
-        .xdg_name = name, // TODO
+        .xdg_name = getXdgName(name),
         .cmd = cmd,
         .specifier = switch (display_server) {
             .wayland => self.lang.wayland,
@@ -102,7 +102,7 @@ pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), name: []cons
 }
 
 pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !void {
-    var iterable_directory = try std.fs.openIterableDirAbsolute(path, .{});
+    var iterable_directory = std.fs.openIterableDirAbsolute(path, .{}) catch return;
     defer iterable_directory.close();
 
     var iterator = iterable_directory.iterate();
@@ -172,4 +172,9 @@ fn goRight(self: *Desktop) void {
     }
 
     self.current += 1;
+}
+
+fn getXdgName(name: []const u8) []const u8 {
+    // TODO
+    return name;
 }

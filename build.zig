@@ -1,13 +1,13 @@
 const std = @import("std");
 
-const ly_version = std.SemanticVersion{ .major = 1, .minor = 0, .patch = 0 };
+const ly_version = std.SemanticVersion{ .major = 1, .minor = 0, .patch = 0, .build = "dev" };
 
 pub fn build(b: *std.Build) void {
     const data_directory = b.option([]const u8, "data_directory", "Specify a default data directory (default is /etc/ly)");
 
     const build_options = b.addOptions();
     build_options.addOption([]const u8, "data_directory", data_directory orelse "/etc/ly");
-    const version_str = b.fmt("{d}.{d}.{d}", .{ ly_version.major, ly_version.minor, ly_version.patch });
+    const version_str = b.fmt("{d}.{d}.{d}-{s}", .{ ly_version.major, ly_version.minor, ly_version.patch, ly_version.build.? });
 
     build_options.addOption([]const u8, "version", version_str);
 
