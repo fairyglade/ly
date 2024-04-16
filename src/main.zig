@@ -158,7 +158,7 @@ pub fn main() !void {
     defer password.deinit();
 
     var active_input = config.default_input;
-    var insert_mode: bool = if (config.vi_mode) false else true;
+    var insert_mode = !config.vi_mode;
 
     // Load last saved username and desktop selection, if any
     if (config.load) {
@@ -353,11 +353,9 @@ pub fn main() !void {
                 buffer.drawLabel(lang.login, label_x, label_y + 4);
                 buffer.drawLabel(lang.password, label_x, label_y + 6);
 
-                if (info_line.width > 0) {
-                    if (buffer.box_width > info_line.width) {
-                        const x = buffer.box_x + ((buffer.box_width - info_line.width) / 2);
-                        buffer.drawLabel(info_line.text, x, label_y);
-                    }
+                if (info_line.width > 0 and buffer.box_width > info_line.width) {
+                    const x = buffer.box_x + ((buffer.box_width - info_line.width) / 2);
+                    buffer.drawLabel(info_line.text, x, label_y);
                 }
 
                 if (!config.hide_key_hints) {
@@ -387,7 +385,7 @@ pub fn main() !void {
                 }
 
                 if (config.vi_mode) {
-                    const label_txt = if (!insert_mode) lang.normal else lang.insert;
+                    const label_txt = if (insert_mode) lang.insert else lang.normal;
                     buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y - 1);
                 }
 

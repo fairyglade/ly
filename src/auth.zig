@@ -297,7 +297,7 @@ fn getFreeDisplay() !u8 {
     return i;
 }
 
-fn getXPID(display_num: u8) !i32 {
+fn getXPid(display_num: u8) !i32 {
     var buf: [15]u8 = undefined;
     const file_name = try std.fmt.bufPrint(&buf, "/tmp/.X{d}-lock", .{display_num});
     const file = try std.fs.openFileAbsolute(file_name, .{});
@@ -411,7 +411,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
 
     // X Server detaches from the process.
     // PID can be fetched from /tmp/X{d}.lock
-    const x_pid = try getXPID(display_num);
+    const x_pid = try getXPid(display_num);
 
     const xorg_pid = try std.os.fork();
     if (xorg_pid == 0) {
