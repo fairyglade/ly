@@ -31,7 +31,7 @@ pub fn signalHandler(i: c_int) callconv(.C) void {
     if (session_pid > 0) {
         _ = std.c.kill(session_pid, i);
         var status: c_int = 0;
-        _ = std.c.waitpid(-1, &status, 0);
+        _ = std.c.waitpid(session_pid, &status, 0);
     }
 
     termbox.tb_shutdown();
