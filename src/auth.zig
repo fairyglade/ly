@@ -10,17 +10,14 @@ const utmp = interop.utmp;
 const Utmp = utmp.utmp;
 const SharedError = @import("SharedError.zig");
 
-var child_pid: std.os.pid_t = 0;
 var xorg_pid: std.os.pid_t = 0;
-
 pub fn xorgSignalHandler(i: c_int) callconv(.C) void {
-    if (xorg_pid > 0)
-        _ = std.c.kill(xorg_pid, i);
+    if (xorg_pid > 0) _ = std.c.kill(xorg_pid, i);
 }
 
+var child_pid: std.os.pid_t = 0;
 pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
-    if (child_pid > 0)
-        _ = std.c.kill(child_pid, i);
+    if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
 pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, login: Text, password: *Text) !void {
