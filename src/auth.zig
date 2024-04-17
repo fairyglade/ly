@@ -10,6 +10,19 @@ const utmp = interop.utmp;
 const Utmp = utmp.utmp;
 const SharedError = @import("SharedError.zig");
 
+var child_pid: std.os.pid_t = 0;
+var xorg_pid: std.os.pid_t = 0;
+
+pub fn xorgSignalHandler(i: c_int) callconv(.C) void {
+    if (xorg_pid > 0)
+        _ = std.c.kill(xorg_pid, i);
+}
+
+pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
+    if (child_pid > 0)
+        _ = std.c.kill(child_pid, i);
+}
+
 pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, login: Text, password: *Text) !void {
     var tty_buffer: [2]u8 = undefined;
     const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
@@ -86,8 +99,8 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
     var shared_err = try SharedError.init();
     defer shared_err.deinit();
 
-    const pid = try std.os.fork();
-    if (pid == 0) {
+    child_pid = try std.os.fork();
+    if (child_pid == 0) {
         // Set the user information
         status = interop.initgroups(pwd.pw_name, pwd.pw_gid);
         if (status != 0) {
@@ -159,10 +172,18 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
     }
 
     var entry: Utmp = std.mem.zeroes(Utmp);
-    addUtmpEntry(&entry, pwd.pw_name, pid) catch {};
+    addUtmpEntry(&entry, pwd.pw_name, child_pid) catch {};
+
+    // If we receive SIGTERM, forward it to child_pid
+    const act = std.os.Sigaction{
+        .handler = .{ .handler = &sessionSignalHandler },
+        .mask = std.os.empty_sigset,
+        .flags = 0,
+    };
+    try std.os.sigaction(std.os.SIG.TERM, &act, null);
 
     // Wait for the session to stop
-    _ = std.os.waitpid(pid, 0);
+    _ = std.os.waitpid(child_pid, 0);
 
     removeUtmpEntry(&entry);
 
@@ -400,20 +421,21 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
         std.os.exit(0);
     }
 
+    var status: c_int = 0;
     var ok: c_int = undefined;
     var xcb: ?*interop.xcb.xcb_connection_t = null;
     while (ok != 0) {
         xcb = interop.xcb.xcb_connect(null, null);
         ok = interop.xcb.xcb_connection_has_error(xcb);
-        _ = std.c.kill(pid, 0);
-        if (std.c._errno().* == interop.ESRCH and ok != 0) return;
+        status = std.c.kill(pid, 0);
+        if (std.os.errno(status) == .SRCH and ok != 0) return;
     }
 
     // X Server detaches from the process.
     // PID can be fetched from /tmp/X{d}.lock
     const x_pid = try getXPid(display_num);
 
-    const xorg_pid = try std.os.fork();
+    xorg_pid = try std.os.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd }) catch std.os.exit(1);
@@ -421,13 +443,20 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
         std.os.exit(0);
     }
 
-    var status: c_int = 0;
+    // If we receive SIGTERM, clean up by killing the xorg_pid process
+    const act = std.os.Sigaction{
+        .handler = .{ .handler = &xorgSignalHandler },
+        .mask = std.os.empty_sigset,
+        .flags = 0,
+    };
+    try std.os.sigaction(std.os.SIG.TERM, &act, null);
+
     _ = std.os.waitpid(xorg_pid, 0);
     interop.xcb.xcb_disconnect(xcb);
 
-    _ = std.c.kill(x_pid, 0);
-    if (std.c._errno().* != interop.ESRCH) {
-        _ = std.c.kill(x_pid, interop.SIGTERM);
+    status = std.c.kill(x_pid, 0);
+    if (std.os.errno(status) != .SRCH) {
+        _ = std.c.kill(x_pid, std.os.SIG.TERM);
         _ = std.c.waitpid(x_pid, &status, 0);
     }
 }

@@ -23,7 +23,17 @@ const utils = @import("tui/utils.zig");
 const Ini = ini.Ini;
 const termbox = interop.termbox;
 
+var session_pid: std.os.pid_t = -1;
 pub fn signalHandler(i: c_int) callconv(.C) void {
+    if (session_pid == 0) return;
+
+    // Forward signal to session to clean up
+    if (session_pid > 0) {
+        _ = std.c.kill(session_pid, i);
+        var status: c_int = 0;
+        _ = std.c.waitpid(-1, &status, 0);
+    }
+
     termbox.tb_shutdown();
     std.c.exit(i);
 }
@@ -532,7 +542,7 @@ pub fn main() !void {
                 var shared_err = try SharedError.init();
                 defer shared_err.deinit();
 
-                const session_pid = try std.os.fork();
+                session_pid = try std.os.fork();
                 if (session_pid == 0) {
                     auth.authenticate(allocator, config, desktop, login, &password) catch |err| {
                         shared_err.writeError(err);
@@ -542,6 +552,7 @@ pub fn main() !void {
                 }
 
                 _ = std.os.waitpid(session_pid, 0);
+                session_pid = -1;
 
                 var auth_err = shared_err.readError();
                 if (auth_err) |err| {

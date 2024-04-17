@@ -4,8 +4,6 @@ const enums = @import("../enums.zig");
 const Animation = enums.Animation;
 const Input = enums.Input;
 
-const Config = @This();
-
 animation: Animation = .none,
 asterisk: u8 = '*',
 bg: u8 = 0,
