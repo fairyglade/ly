@@ -27,7 +27,11 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
 
     // Set the XDG environment variables
     setXdgSessionEnv(current_environment.display_server);
-    try setXdgEnv(allocator, tty_str, current_environment.xdg_name);
+    if (current_environment.entry_ini) |entry| {
+        try setXdgEnv(allocator, tty_str, entry.DesktopNames);
+    } else {
+        try setXdgEnv(allocator, tty_str, "");
+    }
 
     // Open the PAM session
     const login_text_z = try allocator.dupeZ(u8, login.text.items);
@@ -227,18 +231,21 @@ fn setXdgSessionEnv(display_server: enums.DisplayServer) void {
 }
 
 fn setXdgEnv(allocator: Allocator, tty_str: [:0]u8, desktop_name: []const u8) !void {
-    const desktop_name_z = try allocator.dupeZ(u8, desktop_name);
-    defer allocator.free(desktop_name_z);
-
     const uid = interop.getuid();
     var uid_buffer: [10 + @sizeOf(u32) + 1]u8 = undefined;
     const uid_str = try std.fmt.bufPrintZ(&uid_buffer, "/run/user/{d}", .{uid});
 
-    _ = interop.setenv("XDG_CURRENT_DESKTOP", desktop_name_z.ptr, 0);
+    if (desktop_name.len > 0) {
+        const desktop_name_z = try allocator.dupeZ(u8, desktop_name);
+        defer allocator.free(desktop_name_z);
+
+        _ = interop.setenv("XDG_CURRENT_DESKTOP", desktop_name_z.ptr, 0);
+        _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name_z.ptr, 0);
+    }
+
     _ = interop.setenv("XDG_RUNTIME_DIR", uid_str.ptr, 0);
     _ = interop.setenv("XDG_SESSION_CLASS", "user", 0);
     _ = interop.setenv("XDG_SESSION_ID", "1", 0);
-    _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name_z.ptr, 0);
     _ = interop.setenv("XDG_SEAT", "seat0", 0);
     _ = interop.setenv("XDG_VTNR", tty_str.ptr, 0);
 }

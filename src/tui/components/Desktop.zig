@@ -18,7 +18,6 @@ const Desktop = @This();
 pub const Environment = struct {
     entry_ini: ?Ini(Entry) = null,
     name: []const u8 = "",
-    xdg_name: []const u8 = "",
     cmd: []const u8 = "",
     specifier: []const u8 = "",
     display_server: DisplayServer = .wayland,
@@ -27,6 +26,7 @@ pub const Environment = struct {
 const DesktopEntry = struct {
     Exec: []const u8 = "",
     Name: []const u8 = "",
+    DesktopNames: []const u8 = "",
 };
 
 pub const Entry = struct { Desktop_Entry: DesktopEntry = DesktopEntry{} };
@@ -71,7 +71,6 @@ pub fn addEnvironment(self: *Desktop, name: []const u8, cmd: []const u8, display
     try self.environments.append(.{
         .entry_ini = null,
         .name = name,
-        .xdg_name = getXdgName(name),
         .cmd = cmd,
         .specifier = switch (display_server) {
             .wayland => self.lang.wayland,
@@ -88,7 +87,6 @@ pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), name: []cons
     try self.environments.append(.{
         .entry_ini = entry_ini,
         .name = name,
-        .xdg_name = getXdgName(name),
         .cmd = cmd,
         .specifier = switch (display_server) {
             .wayland => self.lang.wayland,
@@ -172,9 +170,4 @@ fn goRight(self: *Desktop) void {
     }
 
     self.current += 1;
-}
-
-fn getXdgName(name: []const u8) []const u8 {
-    // TODO
-    return name;
 }
