@@ -42,4 +42,4 @@ session_index = 0
 + X Server PID is fetched from /tmp/X{d}.lock to be able to kill the process since it detaches.
 + Non .desktop files are now ignored in sessions directory.
 + PAM auth is now done in a child process. (Fixes some issues with logging out and back in).
-+ When ly receives SIGTERM, the terminal is now cleared.
++ When ly receives SIGTERM, the terminal is now cleared and existing child processes are cleaned up.

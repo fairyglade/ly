@@ -44,9 +44,6 @@ pub const passwd = extern struct {
     pw_shell: [*:0]u8,
 };
 
-pub const SIGTERM: c_int = 15;
-pub const ESRCH: c_int = 3;
-
 pub const _POSIX_HOST_NAME_MAX: c_int = 0xFF;
 pub const _SC_HOST_NAME_MAX: c_int = 0xB4;
 
