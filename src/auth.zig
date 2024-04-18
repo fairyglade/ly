@@ -20,38 +20,25 @@ pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, login: Text, password: *Text) !void {
+pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, password: [:0]const u8) !void {
     var tty_buffer: [2]u8 = undefined;
     const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
     const current_environment = desktop.environments.items[desktop.current];
 
     // Set the XDG environment variables
     setXdgSessionEnv(current_environment.display_server);
-    try setXdgEnv(allocator, tty_str, current_environment.xdg_name);
+    try setXdgEnv(tty_str, current_environment.name, current_environment.xdg_name);
 
     // Open the PAM session
-    const login_text_z = try allocator.dupeZ(u8, login.text.items);
-    defer allocator.free(login_text_z);
-
-    const password_text_z = try allocator.dupeZ(u8, password.text.items);
-    defer allocator.free(password_text_z);
-
-    var credentials = try allocator.allocSentinel([*c]const u8, 2, 0);
-    defer allocator.free(credentials);
-
-    credentials[0] = login_text_z.ptr;
-    credentials[1] = password_text_z.ptr;
+    var credentials = [2:null][*c]const u8{ login, password };
 
     const conv = interop.pam.pam_conv{
         .conv = loginConv,
-        .appdata_ptr = @ptrCast(credentials.ptr),
+        .appdata_ptr = @ptrCast(&credentials),
     };
     var handle: ?*interop.pam.pam_handle = undefined;
 
-    const service_name_z = try allocator.dupeZ(u8, config.service_name);
-    defer allocator.free(service_name_z);
-
-    var status = interop.pam.pam_start(service_name_z.ptr, null, &conv, &handle);
+    var status = interop.pam.pam_start(config.service_name.ptr, null, &conv, &handle);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     // Do the PAM routine
@@ -68,7 +55,7 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     // Get password structure from username
-    const maybe_pwd = interop.getpwnam(login_text_z.ptr);
+    const maybe_pwd = interop.getpwnam(login.ptr);
     interop.endpwent();
 
     if (maybe_pwd == null) return error.GetPasswordNameFailed;
@@ -118,7 +105,7 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
         }
 
         // Set up the environment
-        initEnv(allocator, pwd, config.path) catch |e| {
+        initEnv(pwd, config.path) catch |e| {
             shared_err.writeError(e);
             std.os.exit(1);
         };
@@ -141,7 +128,7 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
             std.os.exit(1);
         }
 
-        resetTerminal(allocator, pwd.pw_shell, config.term_reset_cmd) catch |e| {
+        resetTerminal(pwd.pw_shell, config.term_reset_cmd) catch |e| {
             shared_err.writeError(e);
             std.os.exit(1);
         };
@@ -184,7 +171,7 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
 
     removeUtmpEntry(&entry);
 
-    try resetTerminal(allocator, pwd.pw_shell, config.term_reset_cmd);
+    try resetTerminal(pwd.pw_shell, config.term_reset_cmd);
 
     // Close the PAM session
     status = interop.pam.pam_close_session(handle, 0);
@@ -199,7 +186,7 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
     if (shared_err.readError()) |err| return err;
 }
 
-fn initEnv(allocator: Allocator, pwd: *interop.passwd, path: ?[]const u8) !void {
+fn initEnv(pwd: *interop.passwd, path_env: ?[:0]const u8) !void {
     const term_env = std.os.getenv("TERM");
 
     if (term_env) |term| _ = interop.setenv("TERM", term, 1);
@@ -209,11 +196,8 @@ fn initEnv(allocator: Allocator, pwd: *interop.passwd, path: ?[]const u8) !void 
     _ = interop.setenv("USER", pwd.pw_name, 1);
     _ = interop.setenv("LOGNAME", pwd.pw_name, 1);
 
-    if (path != null) {
-        const path_z = try allocator.dupeZ(u8, path.?);
-        defer allocator.free(path_z);
-
-        const status = interop.setenv("PATH", path_z, 1);
+    if (path_env) |path| {
+        const status = interop.setenv("PATH", path, 1);
         if (status != 0) return error.SetPathFailed;
     }
 }
@@ -226,19 +210,16 @@ fn setXdgSessionEnv(display_server: enums.DisplayServer) void {
     }, 0);
 }
 
-fn setXdgEnv(allocator: Allocator, tty_str: [:0]u8, desktop_name: []const u8) !void {
-    const desktop_name_z = try allocator.dupeZ(u8, desktop_name);
-    defer allocator.free(desktop_name_z);
-
+fn setXdgEnv(tty_str: [:0]u8, desktop_name: [:0]const u8, desktop_names: [:0]const u8) !void {
     const uid = interop.getuid();
     var uid_buffer: [10 + @sizeOf(u32) + 1]u8 = undefined;
     const uid_str = try std.fmt.bufPrintZ(&uid_buffer, "/run/user/{d}", .{uid});
 
-    _ = interop.setenv("XDG_CURRENT_DESKTOP", desktop_name_z.ptr, 0);
+    _ = interop.setenv("XDG_CURRENT_DESKTOP", desktop_names.ptr, 0);
     _ = interop.setenv("XDG_RUNTIME_DIR", uid_str.ptr, 0);
     _ = interop.setenv("XDG_SESSION_CLASS", "user", 0);
     _ = interop.setenv("XDG_SESSION_ID", "1", 0);
-    _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name_z.ptr, 0);
+    _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name.ptr, 0);
     _ = interop.setenv("XDG_SEAT", "seat0", 0);
     _ = interop.setenv("XDG_VTNR", tty_str.ptr, 0);
 }
@@ -291,14 +272,11 @@ fn loginConv(
     return status;
 }
 
-fn resetTerminal(allocator: Allocator, shell: [*:0]const u8, term_reset_cmd: []const u8) !void {
-    const term_reset_cmd_z = try allocator.dupeZ(u8, term_reset_cmd);
-    defer allocator.free(term_reset_cmd_z);
-
+fn resetTerminal(shell: [*:0]const u8, term_reset_cmd: [:0]const u8) !void {
     const pid = try std.os.fork();
 
     if (pid == 0) {
-        _ = interop.execl(shell, shell, "-c", term_reset_cmd_z.ptr, @as([*c]const u8, 0));
+        _ = interop.execl(shell, shell, "-c", term_reset_cmd.ptr, @as([*c]const u8, 0));
         std.os.exit(0);
     }
 
@@ -380,7 +358,7 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
 
 fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xauth_cmd: []const u8, mcookie_cmd: []const u8) !void {
     var pwd_buf: [100]u8 = undefined;
-    var pwd: [:0]u8 = try std.fmt.bufPrintZ(&pwd_buf, "{s}", .{pw_dir});
+    var pwd = try std.fmt.bufPrintZ(&pwd_buf, "{s}", .{pw_dir});
 
     const xauthority = try createXauthFile(pwd);
     _ = interop.setenv("XAUTHORITY", xauthority, 1);

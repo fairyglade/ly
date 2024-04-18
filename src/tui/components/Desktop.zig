@@ -9,7 +9,6 @@ const Allocator = std.mem.Allocator;
 const EnvironmentList = std.ArrayList(Environment);
 
 const DisplayServer = enums.DisplayServer;
-const ViMode = enums.ViMode;
 
 const termbox = interop.termbox;
 
@@ -17,8 +16,8 @@ const Desktop = @This();
 
 pub const Environment = struct {
     entry_ini: ?Ini(Entry) = null,
-    name: []const u8 = "",
-    xdg_name: []const u8 = "",
+    name: [:0]const u8 = "",
+    xdg_name: [:0]const u8 = "",
     cmd: []const u8 = "",
     specifier: []const u8 = "",
     display_server: DisplayServer = .wayland,
@@ -26,7 +25,8 @@ pub const Environment = struct {
 
 const DesktopEntry = struct {
     Exec: []const u8 = "",
-    Name: []const u8 = "",
+    Name: [:0]const u8 = "",
+    DesktopNames: [:0]const u8 = "",
 };
 
 pub const Entry = struct { Desktop_Entry: DesktopEntry = DesktopEntry{} };
@@ -67,12 +67,12 @@ pub fn position(self: *Desktop, x: u64, y: u64, visible_length: u64) void {
     self.visible_length = visible_length;
 }
 
-pub fn addEnvironment(self: *Desktop, name: []const u8, cmd: []const u8, display_server: DisplayServer) !void {
+pub fn addEnvironment(self: *Desktop, entry: DesktopEntry, display_server: DisplayServer) !void {
     try self.environments.append(.{
         .entry_ini = null,
-        .name = name,
-        .xdg_name = getXdgName(name),
-        .cmd = cmd,
+        .name = entry.Name,
+        .xdg_name = entry.DesktopNames,
+        .cmd = entry.Exec,
         .specifier = switch (display_server) {
             .wayland => self.lang.wayland,
             .x11 => self.lang.x11,
@@ -84,12 +84,13 @@ pub fn addEnvironment(self: *Desktop, name: []const u8, cmd: []const u8, display
     self.current = self.environments.items.len - 1;
 }
 
-pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), name: []const u8, cmd: []const u8, display_server: DisplayServer) !void {
+pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), display_server: DisplayServer) !void {
+    const entry = entry_ini.data.Desktop_Entry;
     try self.environments.append(.{
         .entry_ini = entry_ini,
-        .name = name,
-        .xdg_name = getXdgName(name),
-        .cmd = cmd,
+        .name = entry.Name,
+        .xdg_name = entry.DesktopNames,
+        .cmd = entry.Exec,
         .specifier = switch (display_server) {
             .wayland => self.lang.wayland,
             .x11 => self.lang.x11,
@@ -112,9 +113,9 @@ pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !v
         const entry_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ path, item.name });
         defer self.allocator.free(entry_path);
         var entry_ini = Ini(Entry).init(self.allocator);
-        var entry = try entry_ini.readToStruct(entry_path);
+        _ = try entry_ini.readToStruct(entry_path);
 
-        try self.addEnvironmentWithIni(entry_ini, entry.Desktop_Entry.Name, entry.Desktop_Entry.Exec, display_server);
+        try self.addEnvironmentWithIni(entry_ini, display_server);
     }
 }
 
@@ -172,9 +173,4 @@ fn goRight(self: *Desktop) void {
     }
 
     self.current += 1;
-}
-
-fn getXdgName(name: []const u8) []const u8 {
-    // TODO
-    return name;
 }

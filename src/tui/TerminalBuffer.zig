@@ -4,7 +4,6 @@ const interop = @import("../interop.zig");
 const utils = @import("utils.zig");
 const Config = @import("../config/Config.zig");
 
-const Allocator = std.mem.Allocator;
 const Random = std.rand.Random;
 
 const termbox = interop.termbox;

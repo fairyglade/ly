@@ -16,7 +16,6 @@ const Config = @import("config/Config.zig");
 const Lang = @import("config/Lang.zig");
 const Save = @import("config/Save.zig");
 const migrator = @import("config/migrator.zig");
-const ViMode = @import("enums.zig").ViMode;
 const SharedError = @import("SharedError.zig");
 const utils = @import("tui/utils.zig");
 
@@ -61,6 +60,7 @@ pub fn main() !void {
 
     var config: Config = undefined;
     var lang: Lang = undefined;
+    var save: Save = undefined;
     var info_line = InfoLine{};
 
     if (res.args.help != 0) {
@@ -81,6 +81,15 @@ pub fn main() !void {
     var lang_ini = Ini(Lang).init(allocator);
     defer lang_ini.deinit();
 
+    var save_ini = Ini(Save).init(allocator);
+    defer save_ini.deinit();
+
+    var save_path: []const u8 = build_options.data_directory ++ "/save.ini";
+    var save_path_alloc = false;
+    defer {
+        if (save_path_alloc) allocator.free(save_path);
+    }
+
     if (res.args.config) |s| {
         const trailing_slash = if (s[s.len - 1] != '/') "/" else "";
 
@@ -93,6 +102,14 @@ pub fn main() !void {
         defer allocator.free(lang_path);
 
         lang = lang_ini.readToStruct(lang_path) catch Lang{};
+
+        if (config.load) {
+            save_path = try std.fmt.allocPrint(allocator, "{s}{s}save.ini", .{ s, trailing_slash });
+            save_path_alloc = true;
+
+            var user_buf: [32]u8 = undefined;
+            save = save_ini.readToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file, save_path);
+        }
     } else {
         config = config_ini.readToStruct(build_options.data_directory ++ "/config.ini") catch Config{};
 
@@ -100,6 +117,11 @@ pub fn main() !void {
         defer allocator.free(lang_path);
 
         lang = lang_ini.readToStruct(lang_path) catch Lang{};
+
+        if (config.load) {
+            var user_buf: [32]u8 = undefined;
+            save = save_ini.readToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file, save_path);
+        }
     }
 
     // Initialize information line with host name
@@ -151,11 +173,11 @@ pub fn main() !void {
     var desktop = try Desktop.init(allocator, &buffer, config.max_desktop_len, lang);
     defer desktop.deinit();
 
-    desktop.addEnvironment(lang.shell, "", .shell) catch {
+    desktop.addEnvironment(.{ .Name = lang.shell }, .shell) catch {
         try info_line.setText(lang.err_alloc);
     };
     if (config.xinitrc) |xinitrc| {
-        desktop.addEnvironment(lang.xinitrc, xinitrc, .xinitrc) catch {
+        desktop.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, .xinitrc) catch {
             try info_line.setText(lang.err_alloc);
         };
     }
@@ -174,16 +196,10 @@ pub fn main() !void {
 
     // Load last saved username and desktop selection, if any
     if (config.load) {
-        var save_ini = Ini(Save).init(allocator);
-        defer save_ini.deinit();
-
-        // If it fails, we try to migrate the potentially old save file. And if we can't do that, we just create
-        // a new save file
-        const save = save_ini.readToStruct(config.save_file) catch migrator.tryMigrateSaveFile(allocator, config.save_file);
-
         if (save.user) |user| {
             try login.text.appendSlice(user);
             login.end = user.len;
+            login.cursor = login.end;
             active_input = .password;
         }
 
@@ -487,11 +503,8 @@ pub fn main() !void {
                     run = false;
                 } else if (pressed_key == sleep_key) {
                     if (config.sleep_cmd) |sleep_cmd| {
-                        const pid = try std.os.fork();
-                        if (pid == 0) {
-                            std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", sleep_cmd }) catch std.os.exit(1);
-                            std.os.exit(0);
-                        }
+                        var sleep = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
+                        _ = sleep.spawnAndWait() catch .{};
                     }
                 }
             },
@@ -529,7 +542,7 @@ pub fn main() !void {
             },
             termbox.TB_KEY_ENTER => {
                 if (config.save) save_last_settings: {
-                    var file = std.fs.createFileAbsolute(config.save_file, .{}) catch break :save_last_settings;
+                    var file = std.fs.createFileAbsolute(save_path, .{}) catch break :save_last_settings;
                     defer file.close();
 
                     const save_data = Save{
@@ -542,17 +555,24 @@ pub fn main() !void {
                 var shared_err = try SharedError.init();
                 defer shared_err.deinit();
 
-                session_pid = try std.os.fork();
-                if (session_pid == 0) {
-                    auth.authenticate(allocator, config, desktop, login, &password) catch |err| {
-                        shared_err.writeError(err);
-                        std.os.exit(1);
-                    };
-                    std.os.exit(0);
-                }
+                {
+                    const login_text = try allocator.dupeZ(u8, login.text.items);
+                    defer allocator.free(login_text);
+                    const password_text = try allocator.dupeZ(u8, password.text.items);
+                    defer allocator.free(password_text);
 
-                _ = std.os.waitpid(session_pid, 0);
-                session_pid = -1;
+                    session_pid = try std.os.fork();
+                    if (session_pid == 0) {
+                        auth.authenticate(config, desktop, login_text, password_text) catch |err| {
+                            shared_err.writeError(err);
+                            std.os.exit(1);
+                        };
+                        std.os.exit(0);
+                    }
+
+                    _ = std.os.waitpid(session_pid, 0);
+                    session_pid = -1;
+                }
 
                 var auth_err = shared_err.readError();
                 if (auth_err) |err| {
@@ -571,11 +591,8 @@ pub fn main() !void {
 
                 update = true;
 
-                const pid = try std.os.fork();
-                if (pid == 0) {
-                    std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }) catch std.os.exit(1);
-                    std.os.exit(0);
-                }
+                var restore_cursor = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
+                _ = restore_cursor.spawnAndWait() catch .{};
             },
             else => {
                 if (!insert_mode) {
