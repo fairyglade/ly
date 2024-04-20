@@ -30,7 +30,7 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
     try setXdgEnv(tty_str, current_environment.name, current_environment.xdg_name);
 
     // Open the PAM session
-    var credentials = [2:null][*c]const u8{ login, password };
+    var credentials = [2:null]?[*:0]const u8{ login, password };
 
     const conv = interop.pam.pam_conv{
         .conv = loginConv,
@@ -275,7 +275,7 @@ fn loginConv(
 fn resetTerminal(shell: [*:0]const u8, term_reset_cmd: [:0]const u8) !void {
     const pid = try std.os.fork();
     if (pid == 0) {
-        _ = interop.execl(shell, shell, "-c", term_reset_cmd.ptr, @as([*c]const u8, 0));
+        _ = interop.execl(shell, shell, "-c", term_reset_cmd.ptr);
         std.os.exit(0);
     }
 
@@ -367,7 +367,7 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . $({s})", .{ xauth_cmd, display_name, mcookie_cmd }) catch std.os.exit(1);
-        _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
+        _ = interop.execl(shell, shell, "-c", cmd_str.ptr);
         std.os.exit(0);
     }
 
@@ -378,7 +378,7 @@ fn executeWaylandCmd(shell: [*:0]const u8, wayland_cmd: []const u8, desktop_cmd:
     var cmd_buffer: [1024]u8 = undefined;
 
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ wayland_cmd, desktop_cmd });
-    _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
+    _ = interop.execl(shell, shell, "-c", cmd_str.ptr);
 }
 
 fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, desktop_cmd: []const u8, vt: []const u8) !void {
@@ -391,7 +391,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt }) catch std.os.exit(1);
-        _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
+        _ = interop.execl(shell, shell, "-c", cmd_str.ptr);
         std.os.exit(0);
     }
 
@@ -413,7 +413,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd }) catch std.os.exit(1);
-        _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
+        _ = interop.execl(shell, shell, "-c", cmd_str.ptr);
         std.os.exit(0);
     }
 
@@ -436,7 +436,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
 }
 
 fn executeShellCmd(shell: [*:0]const u8) void {
-    _ = interop.execl(shell, shell, @as([*c]const u8, 0));
+    _ = interop.execl(shell, shell);
 }
 
 fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
