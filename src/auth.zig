@@ -274,7 +274,6 @@ fn loginConv(
 
 fn resetTerminal(shell: [*:0]const u8, term_reset_cmd: [:0]const u8) !void {
     const pid = try std.os.fork();
-
     if (pid == 0) {
         _ = interop.execl(shell, shell, "-c", term_reset_cmd.ptr, @as([*c]const u8, 0));
         std.os.exit(0);

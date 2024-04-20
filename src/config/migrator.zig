@@ -5,7 +5,7 @@ const Save = @import("Save.zig");
 pub fn tryMigrateSaveFile(user_buf: *[32]u8, old_path: []const u8, new_path: []const u8) Save {
     var save = Save{};
 
-    var file = std.fs.openFileAbsolute(old_path, .{ .mode = .read_only }) catch return save;
+    var file = std.fs.openFileAbsolute(old_path, .{}) catch return save;
     defer file.close();
 
     const reader = file.reader();
