@@ -90,37 +90,40 @@ pub fn main() !void {
         if (save_path_alloc) allocator.free(save_path);
     }
 
+    // Compatibility with v0.6.0
+    const mapped_config_fields = .{.{ "blank_password", "clear_password" }};
+
     if (res.args.config) |s| {
         const trailing_slash = if (s[s.len - 1] != '/') "/" else "";
 
         const config_path = try std.fmt.allocPrint(allocator, "{s}{s}config.ini", .{ s, trailing_slash });
         defer allocator.free(config_path);
 
-        config = config_ini.readToStruct(config_path) catch Config{};
+        config = config_ini.readFileToStructWithMap(config_path, mapped_config_fields) catch Config{};
 
         const lang_path = try std.fmt.allocPrint(allocator, "{s}{s}lang/{s}.ini", .{ s, trailing_slash, config.lang });
         defer allocator.free(lang_path);
 
-        lang = lang_ini.readToStruct(lang_path) catch Lang{};
+        lang = lang_ini.readFileToStruct(lang_path) catch Lang{};
 
         if (config.load) {
             save_path = try std.fmt.allocPrint(allocator, "{s}{s}save.ini", .{ s, trailing_slash });
             save_path_alloc = true;
 
             var user_buf: [32]u8 = undefined;
-            save = save_ini.readToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file, save_path);
+            save = save_ini.readFileToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file, save_path);
         }
     } else {
-        config = config_ini.readToStruct(build_options.data_directory ++ "/config.ini") catch Config{};
+        config = config_ini.readFileToStructWithMap(build_options.data_directory ++ "/config.ini", mapped_config_fields) catch Config{};
 
         const lang_path = try std.fmt.allocPrint(allocator, "{s}/lang/{s}.ini", .{ build_options.data_directory, config.lang });
         defer allocator.free(lang_path);
 
-        lang = lang_ini.readToStruct(lang_path) catch Lang{};
+        lang = lang_ini.readFileToStruct(lang_path) catch Lang{};
 
         if (config.load) {
             var user_buf: [32]u8 = undefined;
-            save = save_ini.readToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file, save_path);
+            save = save_ini.readFileToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file, save_path);
         }
     }
 
@@ -587,12 +590,13 @@ pub fn main() !void {
 
                 try std.os.tcsetattr(std.os.STDIN_FILENO, .FLUSH, tb_termios);
                 termbox.tb_clear();
-                termbox.tb_present();
 
                 update = true;
 
                 var restore_cursor = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
                 _ = restore_cursor.spawnAndWait() catch .{};
+
+                termbox.tb_present();
             },
             else => {
                 if (!insert_mode) {

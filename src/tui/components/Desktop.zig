@@ -29,7 +29,7 @@ const DesktopEntry = struct {
     DesktopNames: [:0]const u8 = "",
 };
 
-pub const Entry = struct { Desktop_Entry: DesktopEntry = DesktopEntry{} };
+pub const Entry = struct { @"Desktop Entry": DesktopEntry = DesktopEntry{} };
 
 allocator: Allocator,
 buffer: *TerminalBuffer,
@@ -85,7 +85,7 @@ pub fn addEnvironment(self: *Desktop, entry: DesktopEntry, display_server: Displ
 }
 
 pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), display_server: DisplayServer) !void {
-    const entry = entry_ini.data.Desktop_Entry;
+    const entry = entry_ini.data.@"Desktop Entry";
     try self.environments.append(.{
         .entry_ini = entry_ini,
         .name = entry.Name,
@@ -113,7 +113,7 @@ pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !v
         const entry_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ path, item.name });
         defer self.allocator.free(entry_path);
         var entry_ini = Ini(Entry).init(self.allocator);
-        _ = try entry_ini.readToStruct(entry_path);
+        _ = try entry_ini.readFileToStruct(entry_path);
 
         try self.addEnvironmentWithIni(entry_ini, display_server);
     }
