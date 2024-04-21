@@ -12,7 +12,7 @@ pub fn tryMigrateSaveFile(user_buf: *[32]u8, old_path: []const u8, new_path: []c
 
     var user_fbs = std.io.fixedBufferStream(user_buf);
     reader.streamUntilDelimiter(user_fbs.writer(), '\n', 32) catch return save;
-    var user = user_fbs.getWritten();
+    const user = user_fbs.getWritten();
     if (user.len > 0) save.user = user;
 
     var session_buf: [20]u8 = undefined;

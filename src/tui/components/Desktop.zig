@@ -103,7 +103,7 @@ pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), display_serv
 }
 
 pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !void {
-    var iterable_directory = std.fs.openIterableDirAbsolute(path, .{}) catch return;
+    var iterable_directory = std.fs.openDirAbsolute(path, .{ .iterate = true }) catch return;
     defer iterable_directory.close();
 
     var iterator = iterable_directory.iterate();

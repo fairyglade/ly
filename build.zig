@@ -35,12 +35,12 @@ pub fn build(b: *std.Build) void {
     });
 
     const zigini = b.dependency("zigini", .{ .target = target, .optimize = optimize });
-    exe.addModule("zigini", zigini.module("zigini"));
+    exe.root_module.addImport("zigini", zigini.module("zigini"));
 
-    exe.addOptions("build_options", build_options);
+    exe.root_module.addOptions("build_options", build_options);
 
     const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
-    exe.addModule("clap", clap.module("clap"));
+    exe.root_module.addImport("clap", clap.module("clap"));
 
     exe.linkSystemLibrary("pam");
     exe.linkSystemLibrary("xcb");

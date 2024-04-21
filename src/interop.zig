@@ -44,9 +44,6 @@ pub const passwd = extern struct {
     pw_shell: [*:0]u8,
 };
 
-pub const _POSIX_HOST_NAME_MAX: c_int = 0xFF;
-pub const _SC_HOST_NAME_MAX: c_int = 0xB4;
-
 pub const VT_ACTIVATE: c_int = 0x5606;
 pub const VT_WAITACTIVE: c_int = 0x5607;
 
@@ -59,19 +56,11 @@ pub const LED_CAP: c_int = 0x04;
 pub const K_NUMLOCK: c_int = 0x02;
 pub const K_CAPSLOCK: c_int = 0x04;
 
-pub const O_RDONLY: c_uint = 0x00;
-pub const O_WRONLY: c_uint = 0x01;
-pub const O_RDWR: c_uint = 0x02;
-
-pub extern "c" fn fileno(stream: *std.c.FILE) c_int;
-pub extern "c" fn sysconf(name: c_int) c_long;
 pub extern "c" fn time(second: ?*c_time) c_time;
 pub extern "c" fn localtime(timer: *const c_time) *tm;
 pub extern "c" fn strftime(str: [*:0]u8, maxsize: c_size, format: [*:0]const u8, timeptr: *const tm) c_size;
 pub extern "c" fn setenv(name: [*:0]const u8, value: [*:0]const u8, overwrite: c_int) c_int;
-pub extern "c" fn getenv(name: [*:0]const u8) [*:0]u8;
 pub extern "c" fn putenv(name: [*:0]u8) c_int;
-pub extern "c" fn clearenv() c_int;
 pub extern "c" fn getuid() c_uid;
 pub extern "c" fn getpwnam(name: [*:0]const u8) ?*passwd;
 pub extern "c" fn endpwent() void;
@@ -79,52 +68,23 @@ pub extern "c" fn setusershell() void;
 pub extern "c" fn getusershell() [*:0]u8;
 pub extern "c" fn endusershell() void;
 pub extern "c" fn initgroups(user: [*:0]const u8, group: c_gid) c_int;
-pub extern "c" fn chdir(path: [*:0]const u8) c_int;
 pub extern "c" fn execl(path: [*:0]const u8, arg: [*:0]const u8, ...) c_int;
 
-pub fn getHostName(allocator: Allocator) !struct {
-    buffer: []u8,
-    slice: []const u8,
-} {
-    const hostname_sysconf = sysconf(_SC_HOST_NAME_MAX);
-    const hostname_max_length: u64 = if (hostname_sysconf < 0) @intCast(_POSIX_HOST_NAME_MAX) else @intCast(hostname_sysconf);
-
-    const buffer = try allocator.alloc(u8, hostname_max_length);
-    errdefer allocator.free(buffer);
-
-    const error_code = std.c.gethostname(buffer.ptr, hostname_max_length);
-    if (error_code < 0) return error.CannotGetHostName;
-
-    var hostname_length: u64 = 0;
-    for (buffer, 0..) |char, i| {
-        if (char == 0) {
-            hostname_length = i + 1;
-            break;
-        }
-    }
-
-    return .{
-        .buffer = buffer,
-        .slice = buffer[0..hostname_length],
-    };
-}
-
-pub fn timeAsString(allocator: Allocator, format: [:0]const u8, max_length: u64) ![:0]u8 {
+pub fn timeAsString(buf: [:0]u8, format: [:0]const u8) ![]u8 {
     const timer = time(null);
     const tm_info = localtime(&timer);
-    const buffer = try allocator.allocSentinel(u8, max_length, 0);
-    errdefer allocator.free(buffer);
 
-    if (strftime(buffer, max_length, format, tm_info) < 0) return error.CannotGetFormattedTime;
+    const len = strftime(buf, buf.len, format, tm_info);
+    if (len < 0) return error.CannotGetFormattedTime;
 
-    return buffer;
+    return buf[0..len];
 }
 
 pub fn getLockState(console_dev: [:0]const u8) !struct {
     numlock: bool,
     capslock: bool,
 } {
-    const fd = std.c.open(console_dev, O_RDONLY);
+    const fd = std.c.open(console_dev, .{ .ACCMODE = .RDONLY });
     if (fd < 0) return error.CannotOpenConsoleDev;
 
     var numlock = false;
