@@ -179,12 +179,12 @@ fn setXdgSessionEnv(display_server: enums.DisplayServer) void {
     }, 0);
 }
 
-fn setXdgEnv(tty_str: [:0]u8, desktop_name: [:0]const u8, desktop_names: [:0]const u8) !void {
+fn setXdgEnv(tty_str: [:0]u8, desktop_name: [:0]const u8, xdg_desktop_names: [:0]const u8) !void {
     const uid = interop.getuid();
     var uid_buffer: [10 + @sizeOf(u32) + 1]u8 = undefined;
     const uid_str = try std.fmt.bufPrintZ(&uid_buffer, "/run/user/{d}", .{uid});
 
-    _ = interop.setenv("XDG_CURRENT_DESKTOP", desktop_names.ptr, 0);
+    _ = interop.setenv("XDG_CURRENT_DESKTOP", xdg_desktop_names.ptr, 0);
     _ = interop.setenv("XDG_RUNTIME_DIR", uid_str.ptr, 0);
     _ = interop.setenv("XDG_SESSION_CLASS", "user", 0);
     _ = interop.setenv("XDG_SESSION_ID", "1", 0);
@@ -407,7 +407,6 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     interop.xcb.xcb_disconnect(xcb);
 
     std.posix.kill(x_pid, 0) catch return;
-
     std.posix.kill(x_pid, std.posix.SIG.TERM) catch {};
 
     var status: c_int = 0;

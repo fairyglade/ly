@@ -111,7 +111,7 @@ pub fn main() !void {
             save_path_alloc = true;
 
             var user_buf: [32]u8 = undefined;
-            save = save_ini.readFileToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file, save_path);
+            save = save_ini.readFileToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
         }
     } else {
         config = config_ini.readFileToStructWithMap(build_options.data_directory ++ "/config.ini", mapped_config_fields) catch Config{};
@@ -123,7 +123,7 @@ pub fn main() !void {
 
         if (config.load) {
             var user_buf: [32]u8 = undefined;
-            save = save_ini.readFileToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file, save_path);
+            save = save_ini.readFileToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
         }
     }
 

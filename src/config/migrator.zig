@@ -2,10 +2,10 @@ const std = @import("std");
 const ini = @import("zigini");
 const Save = @import("Save.zig");
 
-pub fn tryMigrateSaveFile(user_buf: *[32]u8, old_path: []const u8, new_path: []const u8) Save {
+pub fn tryMigrateSaveFile(user_buf: *[32]u8, path: []const u8) Save {
     var save = Save{};
 
-    var file = std.fs.openFileAbsolute(old_path, .{}) catch return save;
+    var file = std.fs.openFileAbsolute(path, .{}) catch return save;
     defer file.close();
 
     const reader = file.reader();
@@ -25,12 +25,6 @@ pub fn tryMigrateSaveFile(user_buf: *[32]u8, old_path: []const u8, new_path: []c
         session_index = std.fmt.parseUnsigned(u64, session_index_str, 10) catch return save;
     }
     save.session_index = session_index;
-
-    const new_save_file = std.fs.cwd().createFile(new_path, .{}) catch return save;
-    ini.writeFromStruct(save, new_save_file.writer(), null) catch return save;
-
-    // Delete old save file
-    std.fs.deleteFileAbsolute(old_path) catch {};
 
     return save;
 }
