@@ -319,7 +319,7 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
 
     var buf: [256]u8 = undefined;
     const xauthority: [:0]u8 = try std.fmt.bufPrintZ(&buf, "{s}/{s}", .{ trimmed_xauth_dir, xauth_file });
-    const file = try std.fs.createFileAbsoluteZ(xauthority, .{}); // FileNotFound
+    const file = try std.fs.createFileAbsoluteZ(xauthority, .{});
     file.close();
 
     return xauthority;
