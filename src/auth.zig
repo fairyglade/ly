@@ -30,7 +30,7 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
     try setXdgEnv(tty_str, current_environment.name, current_environment.xdg_name);
 
     // Open the PAM session
-    var credentials = [2:null]?[*:0]const u8{ login, password };
+    var credentials = [_:null]?[*:0]const u8{ login, password };
 
     const conv = interop.pam.pam_conv{
         .conv = loginConv,
@@ -244,7 +244,7 @@ fn loginConv(
 fn resetTerminal(shell: [*:0]const u8, term_reset_cmd: [:0]const u8) !void {
     const pid = try std.posix.fork();
     if (pid == 0) {
-        const args = [3:null]?[*:0]const u8{ shell, "-c", term_reset_cmd };
+        const args = [_:null]?[*:0]const u8{ shell, "-c", term_reset_cmd };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
     }
@@ -337,7 +337,7 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . $({s})", .{ xauth_cmd, display_name, mcookie_cmd }) catch std.process.exit(1);
-        const args = [3:null]?[*:0]const u8{ shell, "-c", cmd_str.ptr };
+        const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
     }
@@ -346,14 +346,14 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
 }
 
 fn executeShellCmd(shell: [*:0]const u8) !void {
-    const args = [1:null]?[*:0]const u8{shell};
+    const args = [_:null]?[*:0]const u8{shell};
     return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
 fn executeWaylandCmd(shell: [*:0]const u8, wayland_cmd: []const u8, desktop_cmd: []const u8) !void {
     var cmd_buffer: [1024]u8 = undefined;
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ wayland_cmd, desktop_cmd });
-    const args = [3:null]?[*:0]const u8{ shell, "-c", cmd_str };
+    const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
     return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
@@ -367,7 +367,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt }) catch std.process.exit(1);
-        const args = [3:null]?[*:0]const u8{ shell, "-c", cmd_str };
+        const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
     }
@@ -390,7 +390,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd }) catch std.process.exit(1);
-        const args = [3:null]?[*:0]const u8{ shell, "-c", cmd_str };
+        const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
     }

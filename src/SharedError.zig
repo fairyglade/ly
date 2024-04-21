@@ -18,7 +18,7 @@ pub fn init() !SharedError {
 }
 
 pub fn deinit(self: *SharedError) void {
-    defer std.posix.munmap(self.data);
+    std.posix.munmap(self.data);
 }
 
 pub fn writeError(self: SharedError, err: anyerror) void {

@@ -56,7 +56,6 @@ pub const LED_CAP: c_int = 0x04;
 pub const K_NUMLOCK: c_int = 0x02;
 pub const K_CAPSLOCK: c_int = 0x04;
 
-pub extern "c" fn time(second: ?*c_time) c_time;
 pub extern "c" fn localtime(timer: *const c_time) *tm;
 pub extern "c" fn strftime(str: [*:0]u8, maxsize: c_size, format: [*:0]const u8, timeptr: *const tm) c_size;
 pub extern "c" fn setenv(name: [*:0]const u8, value: [*:0]const u8, overwrite: c_int) c_int;
@@ -70,7 +69,7 @@ pub extern "c" fn endusershell() void;
 pub extern "c" fn initgroups(user: [*:0]const u8, group: c_gid) c_int;
 
 pub fn timeAsString(buf: [:0]u8, format: [:0]const u8) ![]u8 {
-    const timer = time(null);
+    const timer = std.time.timestamp();
     const tm_info = localtime(&timer);
 
     const len = strftime(buf, buf.len, format, tm_info);
@@ -85,6 +84,7 @@ pub fn getLockState(console_dev: [:0]const u8) !struct {
 } {
     const fd = std.c.open(console_dev, .{ .ACCMODE = .RDONLY });
     if (fd < 0) return error.CannotOpenConsoleDev;
+    defer _ = std.c.close(fd);
 
     var numlock = false;
     var capslock = false;
@@ -100,8 +100,6 @@ pub fn getLockState(console_dev: [:0]const u8) !struct {
         numlock = (led & K_NUMLOCK) != 0;
         capslock = (led & K_CAPSLOCK) != 0;
     }
-
-    _ = std.c.close(fd);
 
     return .{
         .numlock = numlock,
