@@ -146,7 +146,7 @@ fn startSession(
 
     switch (current_environment.display_server) {
         .wayland => try executeWaylandCmd(pwd.pw_shell, config.wayland_cmd, current_environment.cmd),
-        .shell => executeShellCmd(pwd.pw_shell),
+        .shell => try executeShellCmd(pwd.pw_shell),
         .xinitrc, .x11 => {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{config.tty});
@@ -244,8 +244,9 @@ fn loginConv(
 fn resetTerminal(shell: [*:0]const u8, term_reset_cmd: [:0]const u8) !void {
     const pid = try std.posix.fork();
     if (pid == 0) {
-        _ = interop.execl(shell, shell, "-c", term_reset_cmd.ptr);
-        std.process.exit(0);
+        const args = [3:null]?[*:0]const u8{ shell, "-c", term_reset_cmd };
+        std.posix.execveZ(shell, &args, std.c.environ) catch {};
+        std.process.exit(1);
     }
 
     _ = std.posix.waitpid(pid, 0);
@@ -336,18 +337,24 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . $({s})", .{ xauth_cmd, display_name, mcookie_cmd }) catch std.process.exit(1);
-        _ = interop.execl(shell, shell, "-c", cmd_str.ptr);
-        std.process.exit(0);
+        const args = [3:null]?[*:0]const u8{ shell, "-c", cmd_str.ptr };
+        std.posix.execveZ(shell, &args, std.c.environ) catch {};
+        std.process.exit(1);
     }
 
     _ = std.posix.waitpid(pid, 0);
 }
 
+fn executeShellCmd(shell: [*:0]const u8) !void {
+    const args = [1:null]?[*:0]const u8{shell};
+    return std.posix.execveZ(shell, &args, std.c.environ);
+}
+
 fn executeWaylandCmd(shell: [*:0]const u8, wayland_cmd: []const u8, desktop_cmd: []const u8) !void {
     var cmd_buffer: [1024]u8 = undefined;
-
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ wayland_cmd, desktop_cmd });
-    _ = interop.execl(shell, shell, "-c", cmd_str.ptr);
+    const args = [3:null]?[*:0]const u8{ shell, "-c", cmd_str };
+    return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
 fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, desktop_cmd: []const u8, vt: []const u8) !void {
@@ -360,8 +367,9 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt }) catch std.process.exit(1);
-        _ = interop.execl(shell, shell, "-c", cmd_str.ptr);
-        std.process.exit(0);
+        const args = [3:null]?[*:0]const u8{ shell, "-c", cmd_str };
+        std.posix.execveZ(shell, &args, std.c.environ) catch {};
+        std.process.exit(1);
     }
 
     var ok: c_int = undefined;
@@ -382,8 +390,9 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd }) catch std.process.exit(1);
-        _ = interop.execl(shell, shell, "-c", cmd_str.ptr);
-        std.process.exit(0);
+        const args = [3:null]?[*:0]const u8{ shell, "-c", cmd_str };
+        std.posix.execveZ(shell, &args, std.c.environ) catch {};
+        std.process.exit(1);
     }
 
     // If we receive SIGTERM, clean up by killing the xorg_pid process
@@ -403,10 +412,6 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
 
     var status: c_int = 0;
     _ = std.c.waitpid(x_pid, &status, 0);
-}
-
-fn executeShellCmd(shell: [*:0]const u8) void {
-    _ = interop.execl(shell, shell);
 }
 
 fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {

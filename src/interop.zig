@@ -68,7 +68,6 @@ pub extern "c" fn setusershell() void;
 pub extern "c" fn getusershell() [*:0]u8;
 pub extern "c" fn endusershell() void;
 pub extern "c" fn initgroups(user: [*:0]const u8, group: c_gid) c_int;
-pub extern "c" fn execl(path: [*:0]const u8, arg: [*:0]const u8, ...) c_int;
 
 pub fn timeAsString(buf: [:0]u8, format: [:0]const u8) ![]u8 {
     const timer = time(null);
