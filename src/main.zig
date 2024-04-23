@@ -163,11 +163,11 @@ pub fn main() !void {
     var desktop = try Desktop.init(allocator, &buffer, config.max_desktop_len, lang);
     defer desktop.deinit();
 
-    desktop.addEnvironment(.{ .Name = lang.shell }, .shell) catch {
+    desktop.addEnvironment(.{ .Name = lang.shell }, "", .shell) catch {
         try info_line.setText(lang.err_alloc);
     };
     if (config.xinitrc) |xinitrc| {
-        desktop.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, .xinitrc) catch {
+        desktop.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, "", .xinitrc) catch {
             try info_line.setText(lang.err_alloc);
         };
     }
