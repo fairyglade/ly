@@ -85,6 +85,7 @@ pub fn addEnvironment(self: *Desktop, entry: DesktopEntry, xdg_session_desktop: 
     }
 
     const session_desktop = try self.allocator.dupeZ(u8, xdg_session_desktop);
+    errdefer self.allocator.free(session_desktop);
 
     try self.environments.append(.{
         .entry_ini = null,
@@ -119,6 +120,7 @@ pub fn addEnvironmentWithIni(self: *Desktop, entry_ini: Ini(Entry), xdg_session_
     }
 
     const session_desktop = try self.allocator.dupeZ(u8, xdg_session_desktop);
+    errdefer self.allocator.free(session_desktop);
 
     try self.environments.append(.{
         .entry_ini = entry_ini,
@@ -149,6 +151,7 @@ pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !v
         defer self.allocator.free(entry_path);
         var entry_ini = Ini(Entry).init(self.allocator);
         _ = try entry_ini.readFileToStruct(entry_path);
+        errdefer entry_ini.deinit();
 
         var xdg_session_desktop: []const u8 = undefined;
         const maybe_desktop_names = entry_ini.data.@"Desktop Entry".DesktopNames;
