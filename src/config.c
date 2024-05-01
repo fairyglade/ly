@@ -159,8 +159,8 @@ void config_load(const char *cfg_path)
 	{
 		{"animate", &config.animate, config_handle_bool},
 		{"animation", &config.animation, config_handle_u8},
-    {"animation_cmatrix_bg",&config.animation_cmatrix_bg, config_handle_u8},
-    {"animation_cmatrix_fg",&config.animation_cmatrix_fg, config_handle_u8},
+    	{"animation_cmatrix_bg",&config.animation_cmatrix_bg, config_handle_u8},
+    	{"animation_cmatrix_fg",&config.animation_cmatrix_fg, config_handle_u8},
 		{"asterisk", &config.asterisk, config_handle_char},
 		{"bg", &config.bg, config_handle_u8},
 		{"bigclock", &config.bigclock, config_handle_bool},
@@ -273,8 +273,8 @@ void config_defaults()
 {
 	config.animate = false;
 	config.animation = 0;
-  config.animation_cmatrix_bg = 0;
-  config.animation_cmatrix_fg = 3;
+  	config.animation_cmatrix_bg = 0;
+  	config.animation_cmatrix_fg = 3;
 	config.asterisk = '*';
 	config.bg = 0;
 	config.bigclock = false;
