@@ -16,14 +16,13 @@ const Config = @import("config/Config.zig");
 const Lang = @import("config/Lang.zig");
 const Save = @import("config/Save.zig");
 const migrator = @import("config/migrator.zig");
-const ViMode = @import("enums.zig").ViMode;
 const SharedError = @import("SharedError.zig");
 const utils = @import("tui/utils.zig");
 
 const Ini = ini.Ini;
 const termbox = interop.termbox;
 
-var session_pid: std.os.pid_t = -1;
+var session_pid: std.posix.pid_t = -1;
 pub fn signalHandler(i: c_int) callconv(.C) void {
     if (session_pid == 0) return;
 
@@ -53,7 +52,7 @@ pub fn main() !void {
     );
 
     var diag = clap.Diagnostic{};
-    var res = clap.parse(clap.Help, &params, clap.parsers.default, .{ .diagnostic = &diag }) catch |err| {
+    var res = clap.parse(clap.Help, &params, clap.parsers.default, .{ .diagnostic = &diag, .allocator = allocator }) catch |err| {
         diag.report(stderr, err) catch {};
         return err;
     };
@@ -61,17 +60,18 @@ pub fn main() !void {
 
     var config: Config = undefined;
     var lang: Lang = undefined;
+    var save: Save = undefined;
     var info_line = InfoLine{};
 
     if (res.args.help != 0) {
         try clap.help(stderr, clap.Help, &params, .{});
 
         _ = try stderr.write("Note: if you want to configure Ly, please check the config file, which is usually located at /etc/ly/config.ini.\n");
-        std.os.exit(0);
+        std.process.exit(0);
     }
     if (res.args.version != 0) {
         _ = try stderr.write("Ly version " ++ build_options.version ++ "\n");
-        std.os.exit(0);
+        std.process.exit(0);
     }
 
     // Load configuration file
@@ -81,66 +81,78 @@ pub fn main() !void {
     var lang_ini = Ini(Lang).init(allocator);
     defer lang_ini.deinit();
 
+    var save_ini = Ini(Save).init(allocator);
+    defer save_ini.deinit();
+
+    var save_path: []const u8 = build_options.data_directory ++ "/save.ini";
+    var save_path_alloc = false;
+    defer {
+        if (save_path_alloc) allocator.free(save_path);
+    }
+
+    // Compatibility with v0.6.0
+    const mapped_config_fields = .{.{ "blank_password", "clear_password" }};
+
     if (res.args.config) |s| {
         const trailing_slash = if (s[s.len - 1] != '/') "/" else "";
 
         const config_path = try std.fmt.allocPrint(allocator, "{s}{s}config.ini", .{ s, trailing_slash });
         defer allocator.free(config_path);
 
-        config = config_ini.readToStruct(config_path) catch Config{};
+        config = config_ini.readFileToStructWithMap(config_path, mapped_config_fields) catch Config{};
 
         const lang_path = try std.fmt.allocPrint(allocator, "{s}{s}lang/{s}.ini", .{ s, trailing_slash, config.lang });
         defer allocator.free(lang_path);
 
-        lang = lang_ini.readToStruct(lang_path) catch Lang{};
+        lang = lang_ini.readFileToStruct(lang_path) catch Lang{};
+
+        if (config.load) {
+            save_path = try std.fmt.allocPrint(allocator, "{s}{s}save.ini", .{ s, trailing_slash });
+            save_path_alloc = true;
+
+            var user_buf: [32]u8 = undefined;
+            save = save_ini.readFileToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
+        }
     } else {
-        config = config_ini.readToStruct(build_options.data_directory ++ "/config.ini") catch Config{};
+        config = config_ini.readFileToStructWithMap(build_options.data_directory ++ "/config.ini", mapped_config_fields) catch Config{};
 
         const lang_path = try std.fmt.allocPrint(allocator, "{s}/lang/{s}.ini", .{ build_options.data_directory, config.lang });
         defer allocator.free(lang_path);
 
-        lang = lang_ini.readToStruct(lang_path) catch Lang{};
+        lang = lang_ini.readFileToStruct(lang_path) catch Lang{};
+
+        if (config.load) {
+            var user_buf: [32]u8 = undefined;
+            save = save_ini.readFileToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
+        }
     }
 
     // Initialize information line with host name
-    var got_host_name = false;
-    var host_name_buffer: []u8 = undefined;
-
     get_host_name: {
-        const host_name_struct = interop.getHostName(allocator) catch |err| {
-            if (err == error.CannotGetHostName) {
-                try info_line.setText(lang.err_hostname);
-            } else {
-                try info_line.setText(lang.err_alloc);
-            }
+        var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
+        const hostname = std.posix.gethostname(&name_buf) catch {
+            try info_line.setText(lang.err_hostname);
             break :get_host_name;
         };
-
-        got_host_name = true;
-        host_name_buffer = host_name_struct.buffer;
-        try info_line.setText(host_name_struct.slice);
-    }
-
-    defer {
-        if (got_host_name) allocator.free(host_name_buffer);
+        try info_line.setText(hostname);
     }
 
     // Initialize termbox
     _ = termbox.tb_init();
     defer termbox.tb_shutdown();
 
-    const act = std.os.Sigaction{
+    const act = std.posix.Sigaction{
         .handler = .{ .handler = &signalHandler },
-        .mask = std.os.empty_sigset,
+        .mask = std.posix.empty_sigset,
         .flags = 0,
     };
-    try std.os.sigaction(std.os.SIG.TERM, &act, null);
+    try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     _ = termbox.tb_select_output_mode(termbox.TB_OUTPUT_NORMAL);
     termbox.tb_clear();
 
     // Needed to reset termbox after auth
-    const tb_termios = try std.os.tcgetattr(std.os.STDIN_FILENO);
+    const tb_termios = try std.posix.tcgetattr(std.posix.STDIN_FILENO);
 
     // Initialize terminal buffer
     const labels_max_length = @max(lang.login.len, lang.password.len);
@@ -151,11 +163,11 @@ pub fn main() !void {
     var desktop = try Desktop.init(allocator, &buffer, config.max_desktop_len, lang);
     defer desktop.deinit();
 
-    desktop.addEnvironment(lang.shell, "", .shell) catch {
+    desktop.addEnvironment(.{ .Name = lang.shell }, "", .shell) catch {
         try info_line.setText(lang.err_alloc);
     };
     if (config.xinitrc) |xinitrc| {
-        desktop.addEnvironment(lang.xinitrc, xinitrc, .xinitrc) catch {
+        desktop.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, "", .xinitrc) catch {
             try info_line.setText(lang.err_alloc);
         };
     }
@@ -174,16 +186,10 @@ pub fn main() !void {
 
     // Load last saved username and desktop selection, if any
     if (config.load) {
-        var save_ini = Ini(Save).init(allocator);
-        defer save_ini.deinit();
-
-        // If it fails, we try to migrate the potentially old save file. And if we can't do that, we just create
-        // a new save file
-        const save = save_ini.readToStruct(config.save_file) catch migrator.tryMigrateSaveFile(allocator, config.save_file);
-
         if (save.user) |user| {
             try login.text.appendSlice(user);
             login.end = user.len;
+            login.cursor = login.end;
             active_input = .password;
         }
 
@@ -246,13 +252,7 @@ pub fn main() !void {
 
     // Switch to selected TTY if possible
     open_console_dev: {
-        const console_dev_z = allocator.dupeZ(u8, config.console_dev) catch {
-            try info_line.setText(lang.err_alloc);
-            break :open_console_dev;
-        };
-        defer allocator.free(console_dev_z);
-
-        const fd = std.c.open(console_dev_z, interop.O_WRONLY);
+        const fd = std.c.open(config.console_dev, .{ .ACCMODE = .WRONLY });
         defer _ = std.c.close(fd);
 
         if (fd < 0) {
@@ -328,14 +328,13 @@ pub fn main() !void {
                     const xo = buffer.width / 2 - (format.len * (bigclock.WIDTH + 1)) / 2;
                     const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
 
-                    const clock_str = interop.timeAsString(allocator, format, format.len + 1) catch {
-                        try info_line.setText(lang.err_alloc);
+                    var clock_buf: [format.len + 1:0]u8 = undefined;
+                    const clock_str = interop.timeAsString(&clock_buf, format) catch {
                         break :draw_big_clock;
                     };
-                    defer allocator.free(clock_str);
 
-                    for (0..format.len) |i| {
-                        const clock_cell = bigclock.clockCell(animate, clock_str[i], buffer.fg, buffer.bg);
+                    for (clock_str, 0..) |c, i| {
+                        const clock_cell = bigclock.clockCell(animate, c, buffer.fg, buffer.bg);
                         bigclock.alphaBlit(buffer.buffer, xo + i * (bigclock.WIDTH + 1), yo, buffer.width, buffer.height, clock_cell);
                     }
                 }
@@ -343,23 +342,14 @@ pub fn main() !void {
                 buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
 
                 if (config.clock) |clock| draw_clock: {
-                    const clock_buffer = interop.timeAsString(allocator, clock, 32) catch {
-                        try info_line.setText(lang.err_alloc);
+                    var clock_buf: [32:0]u8 = undefined;
+                    const clock_str = interop.timeAsString(&clock_buf, clock) catch {
                         break :draw_clock;
                     };
-                    defer allocator.free(clock_buffer);
 
-                    var clock_str_length: u64 = 0;
-                    for (clock_buffer, 0..) |char, i| {
-                        if (char == 0) {
-                            clock_str_length = i;
-                            break;
-                        }
-                    }
+                    if (clock_str.len == 0) return error.FormattedTimeEmpty;
 
-                    if (clock_str_length == 0) return error.FormattedTimeEmpty;
-
-                    buffer.drawLabel(clock_buffer[0..clock_str_length], buffer.width - clock_str_length, 0);
+                    buffer.drawLabel(clock_str, buffer.width - clock_str.len, 0);
                 }
 
                 const label_x = buffer.box_x + buffer.margin_box_h;
@@ -405,12 +395,8 @@ pub fn main() !void {
                 }
 
                 draw_lock_state: {
-                    const lock_state = interop.getLockState(config.console_dev) catch |err| {
-                        if (err == error.CannotOpenConsoleDev) {
-                            try info_line.setText(lang.err_console_dev);
-                        } else {
-                            try info_line.setText(lang.err_alloc);
-                        }
+                    const lock_state = interop.getLockState(config.console_dev) catch {
+                        try info_line.setText(lang.err_console_dev);
                         break :draw_lock_state;
                     };
 
@@ -487,11 +473,8 @@ pub fn main() !void {
                     run = false;
                 } else if (pressed_key == sleep_key) {
                     if (config.sleep_cmd) |sleep_cmd| {
-                        const pid = try std.os.fork();
-                        if (pid == 0) {
-                            std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", sleep_cmd }) catch std.os.exit(1);
-                            std.os.exit(0);
-                        }
+                        var sleep = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
+                        _ = sleep.spawnAndWait() catch .{};
                     }
                 }
             },
@@ -529,7 +512,7 @@ pub fn main() !void {
             },
             termbox.TB_KEY_ENTER => {
                 if (config.save) save_last_settings: {
-                    var file = std.fs.createFileAbsolute(config.save_file, .{}) catch break :save_last_settings;
+                    var file = std.fs.createFileAbsolute(save_path, .{}) catch break :save_last_settings;
                     defer file.close();
 
                     const save_data = Save{
@@ -542,19 +525,26 @@ pub fn main() !void {
                 var shared_err = try SharedError.init();
                 defer shared_err.deinit();
 
-                session_pid = try std.os.fork();
-                if (session_pid == 0) {
-                    auth.authenticate(allocator, config, desktop, login, &password) catch |err| {
-                        shared_err.writeError(err);
-                        std.os.exit(1);
-                    };
-                    std.os.exit(0);
+                {
+                    const login_text = try allocator.dupeZ(u8, login.text.items);
+                    defer allocator.free(login_text);
+                    const password_text = try allocator.dupeZ(u8, password.text.items);
+                    defer allocator.free(password_text);
+
+                    session_pid = try std.posix.fork();
+                    if (session_pid == 0) {
+                        auth.authenticate(config, desktop, login_text, password_text) catch |err| {
+                            shared_err.writeError(err);
+                            std.process.exit(1);
+                        };
+                        std.process.exit(0);
+                    }
+
+                    _ = std.posix.waitpid(session_pid, 0);
+                    session_pid = -1;
                 }
 
-                _ = std.os.waitpid(session_pid, 0);
-                session_pid = -1;
-
-                var auth_err = shared_err.readError();
+                const auth_err = shared_err.readError();
                 if (auth_err) |err| {
                     auth_fails += 1;
                     active_input = .password;
@@ -565,17 +555,15 @@ pub fn main() !void {
                     try info_line.setText(lang.logout);
                 }
 
-                try std.os.tcsetattr(std.os.STDIN_FILENO, .FLUSH, tb_termios);
+                try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
                 termbox.tb_clear();
-                termbox.tb_present();
 
                 update = true;
 
-                const pid = try std.os.fork();
-                if (pid == 0) {
-                    std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }) catch std.os.exit(1);
-                    std.os.exit(0);
-                }
+                var restore_cursor = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
+                _ = restore_cursor.spawnAndWait() catch .{};
+
+                termbox.tb_present();
             },
             else => {
                 if (!insert_mode) {
@@ -649,6 +637,6 @@ fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
         error.PamSystemError => lang.err_pam_sys,
         error.PamUserUnknown => lang.err_pam_user_unknown,
         error.PamAbort => lang.err_pam_abort,
-        else => "An unknown error occurred",
+        else => lang.err_unknown,
     };
 }

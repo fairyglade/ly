@@ -2,7 +2,6 @@ const std = @import("std");
 const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const utils = @import("../utils.zig");
-const ViMode = @import("../../enums.zig").ViMode;
 
 const Allocator = std.mem.Allocator;
 const DynamicString = std.ArrayList(u8);

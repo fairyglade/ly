@@ -10,52 +10,35 @@ const utmp = interop.utmp;
 const Utmp = utmp.utmp;
 const SharedError = @import("SharedError.zig");
 
-var xorg_pid: std.os.pid_t = 0;
+var xorg_pid: std.posix.pid_t = 0;
 pub fn xorgSignalHandler(i: c_int) callconv(.C) void {
     if (xorg_pid > 0) _ = std.c.kill(xorg_pid, i);
 }
 
-var child_pid: std.os.pid_t = 0;
+var child_pid: std.posix.pid_t = 0;
 pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, login: Text, password: *Text) !void {
+pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, password: [:0]const u8) !void {
     var tty_buffer: [2]u8 = undefined;
     const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
     const current_environment = desktop.environments.items[desktop.current];
 
     // Set the XDG environment variables
     setXdgSessionEnv(current_environment.display_server);
-    if (current_environment.entry_ini) |entry| {
-        try setXdgEnv(allocator, tty_str, entry.DesktopNames);
-    } else {
-        try setXdgEnv(allocator, tty_str, "");
-    }
+    try setXdgEnv(tty_str, current_environment.xdg_session_desktop, current_environment.xdg_desktop_names orelse "");
 
     // Open the PAM session
-    const login_text_z = try allocator.dupeZ(u8, login.text.items);
-    defer allocator.free(login_text_z);
-
-    const password_text_z = try allocator.dupeZ(u8, password.text.items);
-    defer allocator.free(password_text_z);
-
-    var credentials = try allocator.allocSentinel([*c]const u8, 2, 0);
-    defer allocator.free(credentials);
-
-    credentials[0] = login_text_z.ptr;
-    credentials[1] = password_text_z.ptr;
+    var credentials = [_:null]?[*:0]const u8{ login, password };
 
     const conv = interop.pam.pam_conv{
         .conv = loginConv,
-        .appdata_ptr = @ptrCast(credentials.ptr),
+        .appdata_ptr = @ptrCast(&credentials),
     };
     var handle: ?*interop.pam.pam_handle = undefined;
 
-    const service_name_z = try allocator.dupeZ(u8, config.service_name);
-    defer allocator.free(service_name_z);
-
-    var status = interop.pam.pam_start(service_name_z.ptr, null, &conv, &handle);
+    var status = interop.pam.pam_start(config.service_name.ptr, null, &conv, &handle);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     // Do the PAM routine
@@ -71,124 +54,50 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
     status = interop.pam.pam_open_session(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
-    // Get password structure from username
-    const maybe_pwd = interop.getpwnam(login_text_z.ptr);
-    interop.endpwent();
+    var pwd: *interop.passwd = undefined;
+    {
+        defer interop.endpwent();
 
-    if (maybe_pwd == null) return error.GetPasswordNameFailed;
-    const pwd = maybe_pwd.?;
+        // Get password structure from username
+        pwd = interop.getpwnam(login.ptr) orelse return error.GetPasswordNameFailed;
+    }
 
     // Set user shell if it hasn't already been set
     if (pwd.pw_shell[0] == 0) {
         interop.setusershell();
-        defer interop.endusershell();
-
-        const shell = interop.getusershell();
-
-        if (shell[0] != 0) {
-            var index: usize = 0;
-
-            while (true) : (index += 1) {
-                const char = shell[index];
-                pwd.pw_shell[index] = char;
-
-                if (char == 0) break;
-            }
-        }
+        pwd.pw_shell = interop.getusershell();
+        interop.endusershell();
     }
 
     var shared_err = try SharedError.init();
     defer shared_err.deinit();
 
-    child_pid = try std.os.fork();
+    child_pid = try std.posix.fork();
     if (child_pid == 0) {
-        // Set the user information
-        status = interop.initgroups(pwd.pw_name, pwd.pw_gid);
-        if (status != 0) {
-            shared_err.writeError(error.GroupInitializationFailed);
-            std.os.exit(1);
-        }
-
-        status = std.c.setgid(pwd.pw_gid);
-        if (status != 0) {
-            shared_err.writeError(error.SetUserGidFailed);
-            std.os.exit(1);
-        }
-
-        status = std.c.setuid(pwd.pw_uid);
-        if (status != 0) {
-            shared_err.writeError(error.SetUserUidFailed);
-            std.os.exit(1);
-        }
-
-        // Set up the environment
-        initEnv(allocator, pwd, config.path) catch |e| {
+        startSession(config, pwd, handle, current_environment) catch |e| {
             shared_err.writeError(e);
-            std.os.exit(1);
+            std.process.exit(1);
         };
-
-        // Set the PAM variables
-        const pam_env_vars = interop.pam.pam_getenvlist(handle);
-        var index: usize = 0;
-
-        while (true) : (index += 1) {
-            const pam_env_var = pam_env_vars[index];
-            if (pam_env_var == null) break;
-
-            _ = interop.putenv(pam_env_var);
-        }
-
-        // Execute what the user requested
-        status = interop.chdir(pwd.pw_dir);
-        if (status != 0) {
-            shared_err.writeError(error.ChangeDirectoryFailed);
-            std.os.exit(1);
-        }
-
-        resetTerminal(allocator, pwd.pw_shell, config.term_reset_cmd) catch |e| {
-            shared_err.writeError(e);
-            std.os.exit(1);
-        };
-
-        switch (current_environment.display_server) {
-            .wayland => executeWaylandCmd(pwd.pw_shell, config.wayland_cmd, current_environment.cmd) catch |e| {
-                shared_err.writeError(e);
-                std.os.exit(1);
-            },
-            .shell => executeShellCmd(pwd.pw_shell),
-            .xinitrc, .x11 => {
-                var vt_buf: [5]u8 = undefined;
-                const vt = std.fmt.bufPrint(&vt_buf, "vt{d}", .{config.tty}) catch |e| {
-                    shared_err.writeError(e);
-                    std.os.exit(1);
-                };
-                executeX11Cmd(pwd.pw_shell, pwd.pw_dir, config, current_environment.cmd, vt) catch |e| {
-                    shared_err.writeError(e);
-                    std.os.exit(1);
-                };
-            },
-        }
-
-        std.os.exit(0);
+        std.process.exit(0);
     }
 
     var entry: Utmp = std.mem.zeroes(Utmp);
     addUtmpEntry(&entry, pwd.pw_name, child_pid) catch {};
 
     // If we receive SIGTERM, forward it to child_pid
-    const act = std.os.Sigaction{
+    const act = std.posix.Sigaction{
         .handler = .{ .handler = &sessionSignalHandler },
-        .mask = std.os.empty_sigset,
+        .mask = std.posix.empty_sigset,
         .flags = 0,
     };
-    try std.os.sigaction(std.os.SIG.TERM, &act, null);
+    try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     // Wait for the session to stop
-    _ = std.os.waitpid(child_pid, 0);
+    _ = std.posix.waitpid(child_pid, 0);
 
     removeUtmpEntry(&entry);
 
-    try resetTerminal(allocator, pwd.pw_shell, config.term_reset_cmd);
+    try resetTerminal(pwd.pw_shell, config.term_reset_cmd);
 
     // Close the PAM session
     status = interop.pam.pam_close_session(handle, 0);
@@ -203,8 +112,51 @@ pub fn authenticate(allocator: Allocator, config: Config, desktop: Desktop, logi
     if (shared_err.readError()) |err| return err;
 }
 
-fn initEnv(allocator: Allocator, pwd: *interop.passwd, path: ?[]const u8) !void {
-    const term_env = std.os.getenv("TERM");
+fn startSession(
+    config: Config,
+    pwd: *interop.passwd,
+    handle: ?*interop.pam.pam_handle,
+    current_environment: Desktop.Environment,
+) !void {
+    var status: c_int = 0;
+    status = interop.initgroups(pwd.pw_name, pwd.pw_gid);
+    if (status != 0) return error.GroupInitializationFailed;
+
+    std.posix.setgid(pwd.pw_gid) catch return error.SetUserGidFailed;
+    std.posix.setuid(pwd.pw_uid) catch return error.SetUserUidFailed;
+
+    // Set up the environment
+    try initEnv(pwd, config.path);
+
+    // Set the PAM variables
+    const pam_env_vars = interop.pam.pam_getenvlist(handle);
+
+    var index: usize = 0;
+    while (true) : (index += 1) {
+        const pam_env_var = pam_env_vars[index];
+        if (pam_env_var == null) break;
+
+        _ = interop.putenv(pam_env_var);
+    }
+
+    // Execute what the user requested
+    std.posix.chdirZ(pwd.pw_dir) catch return error.ChangeDirectoryFailed;
+
+    try resetTerminal(pwd.pw_shell, config.term_reset_cmd);
+
+    switch (current_environment.display_server) {
+        .wayland => try executeWaylandCmd(pwd.pw_shell, config.wayland_cmd, current_environment.cmd),
+        .shell => try executeShellCmd(pwd.pw_shell),
+        .xinitrc, .x11 => {
+            var vt_buf: [5]u8 = undefined;
+            const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{config.tty});
+            try executeX11Cmd(pwd.pw_shell, pwd.pw_dir, config, current_environment.cmd, vt);
+        },
+    }
+}
+
+fn initEnv(pwd: *interop.passwd, path_env: ?[:0]const u8) !void {
+    const term_env = std.posix.getenv("TERM");
 
     if (term_env) |term| _ = interop.setenv("TERM", term, 1);
     _ = interop.setenv("HOME", pwd.pw_dir, 1);
@@ -213,11 +165,8 @@ fn initEnv(allocator: Allocator, pwd: *interop.passwd, path: ?[]const u8) !void 
     _ = interop.setenv("USER", pwd.pw_name, 1);
     _ = interop.setenv("LOGNAME", pwd.pw_name, 1);
 
-    if (path != null) {
-        const path_z = try allocator.dupeZ(u8, path.?);
-        defer allocator.free(path_z);
-
-        const status = interop.setenv("PATH", path_z, 1);
+    if (path_env) |path| {
+        const status = interop.setenv("PATH", path, 1);
         if (status != 0) return error.SetPathFailed;
     }
 }
@@ -230,22 +179,16 @@ fn setXdgSessionEnv(display_server: enums.DisplayServer) void {
     }, 0);
 }
 
-fn setXdgEnv(allocator: Allocator, tty_str: [:0]u8, desktop_name: []const u8) !void {
+fn setXdgEnv(tty_str: [:0]u8, desktop_name: [:0]const u8, xdg_desktop_names: [:0]const u8) !void {
     const uid = interop.getuid();
     var uid_buffer: [10 + @sizeOf(u32) + 1]u8 = undefined;
     const uid_str = try std.fmt.bufPrintZ(&uid_buffer, "/run/user/{d}", .{uid});
 
-    if (desktop_name.len > 0) {
-        const desktop_name_z = try allocator.dupeZ(u8, desktop_name);
-        defer allocator.free(desktop_name_z);
-
-        _ = interop.setenv("XDG_CURRENT_DESKTOP", desktop_name_z.ptr, 0);
-        _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name_z.ptr, 0);
-    }
-
+    _ = interop.setenv("XDG_CURRENT_DESKTOP", xdg_desktop_names.ptr, 0);
     _ = interop.setenv("XDG_RUNTIME_DIR", uid_str.ptr, 0);
     _ = interop.setenv("XDG_SESSION_CLASS", "user", 0);
     _ = interop.setenv("XDG_SESSION_ID", "1", 0);
+    _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name.ptr, 0);
     _ = interop.setenv("XDG_SEAT", "seat0", 0);
     _ = interop.setenv("XDG_VTNR", tty_str.ptr, 0);
 }
@@ -298,18 +241,15 @@ fn loginConv(
     return status;
 }
 
-fn resetTerminal(allocator: Allocator, shell: [*:0]const u8, term_reset_cmd: []const u8) !void {
-    const term_reset_cmd_z = try allocator.dupeZ(u8, term_reset_cmd);
-    defer allocator.free(term_reset_cmd_z);
-
-    const pid = try std.os.fork();
-
+fn resetTerminal(shell: [*:0]const u8, term_reset_cmd: [:0]const u8) !void {
+    const pid = try std.posix.fork();
     if (pid == 0) {
-        _ = interop.execl(shell, shell, "-c", term_reset_cmd_z.ptr, @as([*c]const u8, 0));
-        std.os.exit(0);
+        const args = [_:null]?[*:0]const u8{ shell, "-c", term_reset_cmd };
+        std.posix.execveZ(shell, &args, std.c.environ) catch {};
+        std.process.exit(1);
     }
 
-    _ = std.os.waitpid(pid, 0);
+    _ = std.posix.waitpid(pid, 0);
 }
 
 fn getFreeDisplay() !u8 {
@@ -317,7 +257,7 @@ fn getFreeDisplay() !u8 {
     var i: u8 = 0;
     while (i < 200) : (i += 1) {
         const xlock = try std.fmt.bufPrint(&buf, "/tmp/.X{d}-lock", .{i});
-        std.os.access(xlock, std.os.F_OK) catch break;
+        std.posix.access(xlock, std.posix.F_OK) catch break;
     }
     return i;
 }
@@ -340,17 +280,17 @@ fn getXPid(display_num: u8) !i32 {
 fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
     var xauth_buf: [100]u8 = undefined;
     var xauth_dir: [:0]const u8 = undefined;
-    var xdg_rt_dir = std.os.getenv("XDG_RUNTIME_DIR");
+    const xdg_rt_dir = std.posix.getenv("XDG_RUNTIME_DIR");
     var xauth_file: []const u8 = "lyxauth";
 
     if (xdg_rt_dir == null) {
-        const xdg_cfg_home = std.os.getenv("XDG_CONFIG_HOME");
+        const xdg_cfg_home = std.posix.getenv("XDG_CONFIG_HOME");
         var sb: std.c.Stat = undefined;
         if (xdg_cfg_home == null) {
             xauth_dir = try std.fmt.bufPrintZ(&xauth_buf, "{s}/.config", .{pwd});
             _ = std.c.stat(xauth_dir, &sb);
-            const mode = sb.mode & std.os.S.IFMT;
-            if (mode == std.os.S.IFDIR) {
+            const mode = sb.mode & std.posix.S.IFMT;
+            if (mode == std.posix.S.IFDIR) {
                 xauth_dir = try std.fmt.bufPrintZ(&xauth_buf, "{s}/ly", .{xauth_dir});
             } else {
                 xauth_dir = pwd;
@@ -361,9 +301,9 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
         }
 
         _ = std.c.stat(xauth_dir, &sb);
-        const mode = sb.mode & std.os.S.IFMT;
-        if (mode != std.os.S.IFDIR) {
-            std.os.mkdir(xauth_dir, 777) catch {
+        const mode = sb.mode & std.posix.S.IFMT;
+        if (mode != std.posix.S.IFDIR) {
+            std.posix.mkdir(xauth_dir, 777) catch {
                 xauth_dir = pwd;
                 xauth_file = ".lyxauth";
             };
@@ -379,7 +319,7 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
 
     var buf: [256]u8 = undefined;
     const xauthority: [:0]u8 = try std.fmt.bufPrintZ(&buf, "{s}/{s}", .{ trimmed_xauth_dir, xauth_file });
-    const file = try std.fs.createFileAbsolute(xauthority, .{});
+    const file = try std.fs.createFileAbsoluteZ(xauthority, .{});
     file.close();
 
     return xauthority;
@@ -387,86 +327,90 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
 
 fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xauth_cmd: []const u8, mcookie_cmd: []const u8) !void {
     var pwd_buf: [100]u8 = undefined;
-    var pwd: [:0]u8 = try std.fmt.bufPrintZ(&pwd_buf, "{s}", .{pw_dir});
+    const pwd = try std.fmt.bufPrintZ(&pwd_buf, "{s}", .{pw_dir});
 
     const xauthority = try createXauthFile(pwd);
     _ = interop.setenv("XAUTHORITY", xauthority, 1);
     _ = interop.setenv("DISPLAY", display_name, 1);
 
-    const pid = try std.os.fork();
+    const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . $({s})", .{ xauth_cmd, display_name, mcookie_cmd }) catch std.os.exit(1);
-        _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
-        std.os.exit(0);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . $({s})", .{ xauth_cmd, display_name, mcookie_cmd }) catch std.process.exit(1);
+        const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
+        std.posix.execveZ(shell, &args, std.c.environ) catch {};
+        std.process.exit(1);
     }
 
-    _ = std.os.waitpid(pid, 0);
+    _ = std.posix.waitpid(pid, 0);
+}
+
+fn executeShellCmd(shell: [*:0]const u8) !void {
+    const args = [_:null]?[*:0]const u8{shell};
+    return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
 fn executeWaylandCmd(shell: [*:0]const u8, wayland_cmd: []const u8, desktop_cmd: []const u8) !void {
     var cmd_buffer: [1024]u8 = undefined;
-
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ wayland_cmd, desktop_cmd });
-    _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
+    const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
+    return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
 fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, desktop_cmd: []const u8, vt: []const u8) !void {
     const display_num = try getFreeDisplay();
     var buf: [5]u8 = undefined;
-    var display_name = try std.fmt.bufPrintZ(&buf, ":{d}", .{display_num});
+    const display_name = try std.fmt.bufPrintZ(&buf, ":{d}", .{display_num});
     try xauth(display_name, shell, pw_dir, config.xauth_cmd, config.mcookie_cmd);
 
-    const pid = try std.os.fork();
+    const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt }) catch std.os.exit(1);
-        _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
-        std.os.exit(0);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt }) catch std.process.exit(1);
+        const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
+        std.posix.execveZ(shell, &args, std.c.environ) catch {};
+        std.process.exit(1);
     }
 
-    var status: c_int = 0;
     var ok: c_int = undefined;
     var xcb: ?*interop.xcb.xcb_connection_t = null;
     while (ok != 0) {
         xcb = interop.xcb.xcb_connect(null, null);
         ok = interop.xcb.xcb_connection_has_error(xcb);
-        status = std.c.kill(pid, 0);
-        if (std.os.errno(status) == .SRCH and ok != 0) return;
+        std.posix.kill(pid, 0) catch |e| {
+            if (e == error.ProcessNotFound and ok != 0) return;
+        };
     }
 
     // X Server detaches from the process.
     // PID can be fetched from /tmp/X{d}.lock
     const x_pid = try getXPid(display_num);
 
-    xorg_pid = try std.os.fork();
+    xorg_pid = try std.posix.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd }) catch std.os.exit(1);
-        _ = interop.execl(shell, shell, "-c", cmd_str.ptr, @as([*c]const u8, 0));
-        std.os.exit(0);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd }) catch std.process.exit(1);
+        const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
+        std.posix.execveZ(shell, &args, std.c.environ) catch {};
+        std.process.exit(1);
     }
 
     // If we receive SIGTERM, clean up by killing the xorg_pid process
-    const act = std.os.Sigaction{
+    const act = std.posix.Sigaction{
         .handler = .{ .handler = &xorgSignalHandler },
-        .mask = std.os.empty_sigset,
+        .mask = std.posix.empty_sigset,
         .flags = 0,
     };
-    try std.os.sigaction(std.os.SIG.TERM, &act, null);
+    try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
-    _ = std.os.waitpid(xorg_pid, 0);
+    _ = std.posix.waitpid(xorg_pid, 0);
     interop.xcb.xcb_disconnect(xcb);
 
-    status = std.c.kill(x_pid, 0);
-    if (std.os.errno(status) != .SRCH) {
-        _ = std.c.kill(x_pid, std.os.SIG.TERM);
-        _ = std.c.waitpid(x_pid, &status, 0);
-    }
-}
+    std.posix.kill(x_pid, 0) catch return;
+    std.posix.kill(x_pid, std.posix.SIG.TERM) catch {};
 
-fn executeShellCmd(shell: [*:0]const u8) void {
-    _ = interop.execl(shell, shell, @as([*c]const u8, 0));
+    var status: c_int = 0;
+    _ = std.c.waitpid(x_pid, &status, 0);
 }
 
 fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {

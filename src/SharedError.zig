@@ -12,13 +12,13 @@ const SharedError = @This();
 data: []align(std.mem.page_size) u8,
 
 pub fn init() !SharedError {
-    const data = try std.os.mmap(null, @sizeOf(ErrorHandler), std.os.PROT.READ | std.os.PROT.WRITE, std.os.MAP.SHARED | std.os.MAP.ANONYMOUS, -1, 0);
+    const data = try std.posix.mmap(null, @sizeOf(ErrorHandler), std.posix.PROT.READ | std.posix.PROT.WRITE, .{ .TYPE = .SHARED, .ANONYMOUS = true }, -1, 0);
 
     return .{ .data = data };
 }
 
 pub fn deinit(self: *SharedError) void {
-    defer std.os.munmap(self.data);
+    std.posix.munmap(self.data);
 }
 
 pub fn writeError(self: SharedError, err: anyerror) void {

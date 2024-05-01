@@ -111,7 +111,7 @@ pub fn clockCell(animate: bool, char: u8, fg: u8, bg: u8) [SIZE]termbox.tb_cell 
     return cells;
 }
 
-pub fn alphaBlit(buffer: [*c]termbox.tb_cell, x: u64, y: u64, tb_width: u64, tb_height: u64, cells: [SIZE]termbox.tb_cell) void {
+pub fn alphaBlit(buffer: [*]termbox.tb_cell, x: u64, y: u64, tb_width: u64, tb_height: u64, cells: [SIZE]termbox.tb_cell) void {
     if (x + WIDTH >= tb_width or y + HEIGHT >= tb_height) return;
 
     for (0..HEIGHT) |yy| {

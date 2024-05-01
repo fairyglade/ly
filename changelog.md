@@ -17,6 +17,7 @@ Note: `sleep_cmd` is unset by default, meaning it's hidden and has no effect.
 
 + xinitrc can be set to null to hide it.
 + `blank_password` has been renamed to `clear_password`.
++ `save_file` has been deprecated and will be removed in a future version.
 
 ### Removals
 
@@ -24,7 +25,8 @@ Note: `sleep_cmd` is unset by default, meaning it's hidden and has no effect.
 
 ## Save File
 
-The save file is now in .ini format.
+The save file is now in .ini format and stored in the same directory as the config.
+Older save files will be migrated to the new format.
 
 Example:
 

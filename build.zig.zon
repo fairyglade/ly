@@ -3,12 +3,13 @@
     .version = "1.0.0",
     .dependencies = .{
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/f49b94700e0761b7514abdca0e4f0e7f3f938a93.tar.gz",
-            .hash = "1220f48518ce22882e102255ed3bcdb7aeeb4891f50b2cdd3bd74b5b2e24d3149ba2",
+            .url = "https://github.com/Hejsil/zig-clap/archive/8c98e6404b22aafc0184e999d8f068b81cc22fa1.tar.gz",
+            .hash = "122014e73fd712190e109950837b97f6143f02d7e2b6986e1db70b6f4aadb5ba6a0d",
         },
         .zigini = .{
-            .url = "https://github.com/Kawaii-Ash/zigini/archive/91f47e46591982fc559afa3248749c1d29a0fa2a.tar.gz",
-            .hash = "12209908f2773f730fbca024c80dc7f48dce15a6527b2387f3768968f5bae0d3931e",
+            .url = "https://github.com/Kawaii-Ash/zigini/archive/a5b5caf43f0a0246a242df4aebd00a0649deebad.tar.gz",
+            .hash = "12202e097a54cbb7c002a2a5b3a3435939fa3902cd14308b7b66ab710e3d88d76e94",
         },
     },
+    .paths = .{""},
 }
