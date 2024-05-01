@@ -63,6 +63,8 @@ struct config
 {
 	bool animate;
 	uint8_t animation;
+	uint8_t animation_cmatrix_bg;
+	uint8_t animation_cmatrix_fg;
 	char asterisk;
 	uint8_t bg;
 	bool bigclock;

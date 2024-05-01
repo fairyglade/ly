@@ -922,8 +922,8 @@ static void matrix(struct term_buf* buf)
 		for (int i = 1; i <= buf->height; ++i)
 		{
 			uint32_t c;
-			int fg = TB_GREEN;
-			int bg = TB_DEFAULT;
+			int fg = config.animation_cmatrix_fg;
+			int bg = config.animation_cmatrix_bg;
 
 			if (s->grid[i][j].val == -1 || s->grid[i][j].val == ' ')
 			{
