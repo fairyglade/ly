@@ -118,6 +118,8 @@ fn goRight(self: *Text) void {
 }
 
 fn delete(self: *Text) void {
+    if (self.cursor >= self.end) return;
+
     _ = self.text.orderedRemove(self.cursor);
 
     self.end -= 1;
