@@ -95,6 +95,8 @@ disable getty on Ly's tty to prevent "login" from spawning on top of it
 
 ### OpenRC
 
+**NOTE**: On Gentoo, Ly will disable the `display-manager-init` service in order to run.
+
 Clone, compile and test.
 
 Install Ly and the provided OpenRC service
