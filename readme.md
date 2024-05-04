@@ -5,7 +5,7 @@
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 ## Dependencies
- - zig
+ - zig 0.12.0
  - a C standard library
  - pam
  - xcb
@@ -15,14 +15,21 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
  - tput
  - shutdown
 
-On Debian-based distros running `apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you. 
-For Fedora try running `dnf install kernel-devel pam-devel libxcb-devel`
+### Debian
+```
+# apt install build-essential libpam0g-dev libxcb-xkb-dev
+```
 
-You can download Zig [here](https://ziglang.org/download/).
+### Fedora
+**Warning**: You may encounter issues with SELinux on Fedora.
+It is recommended to add a rule for Ly as it currently does not ship one.
+
+```
+# dnf install kernel-devel pam-devel libxcb-devel
+```
 
 ## Support
-The following desktop environments were tested with success
-
+The following desktop environments were tested with success:
  - awesome
  - bspwm
  - budgie
@@ -111,7 +118,8 @@ Enable the service
 
 You can edit which tty Ly will start on by editing the `tty` option in the configuration file.
 
-If you choose a tty that already has a login/getty running (has a basic login prompt), then you have to disable the getty so it doesn't respawn on top of ly
+If you choose a tty that already has a login/getty running (has a basic login prompt),
+then you have to disable getty, so it doesn't respawn on top of ly
 ```
 # rc-update del agetty.tty2
 ```
@@ -131,7 +139,9 @@ You should as well disable your existing display manager service if needed, e.g.
 # rm /var/service/lxdm
 ```
 
-The agetty service for the tty console where you are running ly should be disabled. For instance, if you are running ly on tty2 (that's the default, check your `/etc/ly/config.ini`) you should disable the agetty-tty2 service like this:
+The agetty service for the tty console where you are running ly should be disabled.
+For instance, if you are running ly on tty2 (that's the default, check your `/etc/ly/config.ini`)
+you should disable the agetty-tty2 service like this:
 
 ```
 # rm /var/service/agetty-tty2
