@@ -48,7 +48,7 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
     status = interop.pam.pam_acct_mgmt(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
-    status = interop.pam.pam_setcred(handle, 0);
+    status = interop.pam.pam_setcred(handle, interop.pam.PAM_ESTABLISH_CRED);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     status = interop.pam.pam_open_session(handle, 0);
@@ -103,7 +103,7 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
     status = interop.pam.pam_close_session(handle, 0);
     if (status != 0) return pamDiagnose(status);
 
-    status = interop.pam.pam_setcred(handle, 0);
+    status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
     if (status != 0) return pamDiagnose(status);
 
     status = interop.pam.pam_end(handle, status);
@@ -205,6 +205,12 @@ fn loginConv(
     const allocator = std.heap.c_allocator;
     const response = allocator.alloc(interop.pam.pam_response, message_count) catch return interop.pam.PAM_BUF_ERR;
 
+    // Initialise allocated memory to 0
+    // This ensures memory can be freed by pam on success
+    for (response) |*r| {
+        r.* = std.mem.zeroes(interop.pam.pam_response);
+    }
+
     var username: ?[:0]u8 = null;
     var password: ?[:0]u8 = null;
     var status: c_int = interop.pam.PAM_SUCCESS;
@@ -213,12 +219,18 @@ fn loginConv(
         switch (messages[i].?.msg_style) {
             interop.pam.PAM_PROMPT_ECHO_ON => {
                 const data: [*][*:0]u8 = @ptrCast(@alignCast(appdata_ptr));
-                username = allocator.dupeZ(u8, std.mem.span(data[0])) catch return interop.pam.PAM_BUF_ERR;
+                username = allocator.dupeZ(u8, std.mem.span(data[0])) catch {
+                    status = interop.pam.PAM_BUF_ERR;
+                    break :set_credentials;
+                };
                 response[i].resp = username.?.ptr;
             },
             interop.pam.PAM_PROMPT_ECHO_OFF => {
                 const data: [*][*:0]u8 = @ptrCast(@alignCast(appdata_ptr));
-                password = allocator.dupeZ(u8, std.mem.span(data[1])) catch return interop.pam.PAM_BUF_ERR;
+                password = allocator.dupeZ(u8, std.mem.span(data[1])) catch {
+                    status = interop.pam.PAM_BUF_ERR;
+                    break :set_credentials;
+                };
                 response[i].resp = password.?.ptr;
             },
             interop.pam.PAM_ERROR_MSG => {
