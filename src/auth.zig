@@ -207,9 +207,7 @@ fn loginConv(
 
     // Initialise allocated memory to 0
     // This ensures memory can be freed by pam on success
-    for (response) |*r| {
-        r.* = std.mem.zeroes(interop.pam.pam_response);
-    }
+    for (response) |*r| r.* = std.mem.zeroes(interop.pam.pam_response);
 
     var username: ?[:0]u8 = null;
     var password: ?[:0]u8 = null;
