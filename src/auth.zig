@@ -20,10 +20,9 @@ pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, password: [:0]const u8) !void {
+pub fn authenticate(config: Config, current_environment: Desktop.Environment, login: [:0]const u8, password: [:0]const u8) !void {
     var tty_buffer: [2]u8 = undefined;
     const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
-    const current_environment = desktop.environments.items[desktop.current];
 
     // Set the XDG environment variables
     setXdgSessionEnv(current_environment.display_server);
@@ -40,6 +39,7 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
 
     var status = interop.pam.pam_start(config.service_name.ptr, null, &conv, &handle);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+    defer _ = interop.pam.pam_end(handle, status);
 
     // Do the PAM routine
     status = interop.pam.pam_authenticate(handle, 0);
@@ -50,9 +50,11 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
 
     status = interop.pam.pam_setcred(handle, interop.pam.PAM_ESTABLISH_CRED);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+    defer status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
 
     status = interop.pam.pam_open_session(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+    defer status = interop.pam.pam_close_session(handle, 0);
 
     var pwd: *interop.passwd = undefined;
     {
@@ -83,6 +85,7 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
 
     var entry: Utmp = std.mem.zeroes(Utmp);
     addUtmpEntry(&entry, pwd.pw_name, child_pid) catch {};
+    defer removeUtmpEntry(&entry);
 
     // If we receive SIGTERM, forward it to child_pid
     const act = std.posix.Sigaction{
@@ -95,19 +98,7 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
     // Wait for the session to stop
     _ = std.posix.waitpid(child_pid, 0);
 
-    removeUtmpEntry(&entry);
-
     try resetTerminal(pwd.pw_shell, config.term_reset_cmd);
-
-    // Close the PAM session
-    status = interop.pam.pam_close_session(handle, 0);
-    if (status != 0) return pamDiagnose(status);
-
-    status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
-    if (status != 0) return pamDiagnose(status);
-
-    status = interop.pam.pam_end(handle, status);
-    if (status != 0) return pamDiagnose(status);
 
     if (shared_err.readError()) |err| return err;
 }
@@ -118,8 +109,7 @@ fn startSession(
     handle: ?*interop.pam.pam_handle,
     current_environment: Desktop.Environment,
 ) !void {
-    var status: c_int = 0;
-    status = interop.initgroups(pwd.pw_name, pwd.pw_gid);
+    const status = interop.initgroups(pwd.pw_name, pwd.pw_gid);
     if (status != 0) return error.GroupInitializationFailed;
 
     std.posix.setgid(pwd.pw_gid) catch return error.SetUserGidFailed;
@@ -352,7 +342,8 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
         std.process.exit(1);
     }
 
-    _ = std.posix.waitpid(pid, 0);
+    const status = std.posix.waitpid(pid, 0);
+    if (status.status != 0) return error.XauthFailed;
 }
 
 fn executeShellCmd(shell: [*:0]const u8) !void {
@@ -388,7 +379,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
         xcb = interop.xcb.xcb_connect(null, null);
         ok = interop.xcb.xcb_connection_has_error(xcb);
         std.posix.kill(pid, 0) catch |e| {
-            if (e == error.ProcessNotFound and ok != 0) return;
+            if (e == error.ProcessNotFound and ok != 0) return error.XcbConnectionFailed;
         };
     }
 

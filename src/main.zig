@@ -305,16 +305,6 @@ pub fn main() !void {
         if (update) {
             // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
             if (auth_fails < 10) {
-                switch (active_input) {
-                    .session => desktop.handle(null, insert_mode),
-                    .login => login.handle(null, insert_mode) catch {
-                        try info_line.setText(lang.err_alloc);
-                    },
-                    .password => password.handle(null, insert_mode) catch {
-                        try info_line.setText(lang.err_alloc);
-                    },
-                }
-
                 termbox.tb_clear();
 
                 switch (config.animation) {
@@ -325,7 +315,7 @@ pub fn main() !void {
 
                 if (config.bigclock and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) draw_big_clock: {
                     const format = "%H:%M";
-                    const xo = buffer.width / 2 - (format.len * (bigclock.WIDTH + 1)) / 2;
+                    const xo = buffer.width / 2 - @min(buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
                     const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
 
                     var clock_buf: [format.len + 1:0]u8 = undefined;
@@ -341,6 +331,25 @@ pub fn main() !void {
 
                 buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
 
+                if (resolution_changed) {
+                    const coordinates = buffer.calculateComponentCoordinates();
+                    desktop.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
+                    login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
+                    password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
+
+                    resolution_changed = false;
+                }
+
+                switch (active_input) {
+                    .session => desktop.handle(null, insert_mode),
+                    .login => login.handle(null, insert_mode) catch {
+                        try info_line.setText(lang.err_alloc);
+                    },
+                    .password => password.handle(null, insert_mode) catch {
+                        try info_line.setText(lang.err_alloc);
+                    },
+                }
+
                 if (config.clock) |clock| draw_clock: {
                     var clock_buf: [32:0]u8 = undefined;
                     const clock_str = interop.timeAsString(&clock_buf, clock) catch {
@@ -349,7 +358,7 @@ pub fn main() !void {
 
                     if (clock_str.len == 0) return error.FormattedTimeEmpty;
 
-                    buffer.drawLabel(clock_str, buffer.width - clock_str.len, 0);
+                    buffer.drawLabel(clock_str, buffer.width - @min(buffer.width, clock_str.len), 0);
                 }
 
                 const label_x = buffer.box_x + buffer.margin_box_h;
@@ -406,15 +415,6 @@ pub fn main() !void {
                     if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
                     lock_state_x -= lang.capslock.len + 1;
                     if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
-                }
-
-                if (resolution_changed) {
-                    const coordinates = buffer.calculateComponentCoordinates();
-                    desktop.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
-                    login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
-                    password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
-
-                    resolution_changed = false;
                 }
 
                 desktop.draw();
@@ -533,7 +533,8 @@ pub fn main() !void {
 
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
-                        auth.authenticate(config, desktop, login_text, password_text) catch |err| {
+                        const current_environment = desktop.environments.items[desktop.current];
+                        auth.authenticate(config, current_environment, login_text, password_text) catch |err| {
                             shared_err.writeError(err);
                             std.process.exit(1);
                         };

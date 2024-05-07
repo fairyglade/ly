@@ -100,10 +100,11 @@ pub fn cascade(self: TerminalBuffer) bool {
 }
 
 pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool) void {
-    const x1 = (self.width - self.box_width) / 2;
-    const y1 = (self.height - self.box_height) / 2;
-    const x2 = (self.width + self.box_width) / 2;
-    const y2 = (self.height + self.box_height) / 2;
+    if (self.width < 2 or self.height < 2) return;
+    const x1 = (self.width - @min(self.width - 2, self.box_width)) / 2;
+    const y1 = (self.height - @min(self.height - 2, self.box_height)) / 2;
+    const x2 = (self.width + @min(self.width, self.box_width)) / 2;
+    const y2 = (self.height + @min(self.height, self.box_height)) / 2;
 
     self.box_x = x1;
     self.box_y = y1;
