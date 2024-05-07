@@ -119,15 +119,11 @@ fn startSession(
     try initEnv(pwd, config.path);
 
     // Set the PAM variables
-    const pam_env_vars = interop.pam.pam_getenvlist(handle);
+    const pam_env_vars: ?[*:null]?[*:0]u8 = interop.pam.pam_getenvlist(handle);
+    if (pam_env_vars == null) return error.GetEnvListFailed;
 
-    var index: usize = 0;
-    while (true) : (index += 1) {
-        const pam_env_var = pam_env_vars[index];
-        if (pam_env_var == null) break;
-
-        _ = interop.putenv(pam_env_var);
-    }
+    const env_list = std.mem.span(pam_env_vars.?);
+    for (env_list) |env_var| _ = interop.putenv(env_var.?);
 
     // Execute what the user requested
     std.posix.chdirZ(pwd.pw_dir) catch return error.ChangeDirectoryFailed;
@@ -146,9 +142,6 @@ fn startSession(
 }
 
 fn initEnv(pwd: *interop.passwd, path_env: ?[:0]const u8) !void {
-    const term_env = std.posix.getenv("TERM");
-
-    if (term_env) |term| _ = interop.setenv("TERM", term, 1);
     _ = interop.setenv("HOME", pwd.pw_dir, 1);
     _ = interop.setenv("PWD", pwd.pw_dir, 1);
     _ = interop.setenv("SHELL", pwd.pw_shell, 1);
