@@ -37,7 +37,8 @@ The following desktop environments were tested with success:
  - budgie
  - cinnamon
  - deepin
- - dwm 
+ - dwl
+ - dwm
  - enlightenment
  - gnome
  - i3
@@ -46,12 +47,12 @@ The following desktop environments were tested with success:
  - lxde
  - lxqt
  - mate
- - maxx 
+ - maxx
  - pantheon
  - qtile
  - spectrwm
  - sway
- - windowmaker 
+ - windowmaker
  - xfce
  - xmonad
 
@@ -126,7 +127,6 @@ then you have to disable getty, so it doesn't respawn on top of ly
 ```
 
 ### runit
-
 ```
 # zig build installrunit
 # ln -s /etc/sv/ly /var/service/
@@ -146,6 +146,20 @@ you should disable the agetty-tty2 service like this:
 
 ```
 # rm /var/service/agetty-tty2
+```
+
+### Updating
+You can also install Ly without copying the system service and the configuration file. That's
+called *updating*. To update, simply run:
+
+```
+# zig build installnoconf
+```
+
+If you want to also copy the default config file (but still not the system service), run:
+
+```
+# zig build installexe
 ```
 
 ## Arch Linux Installation
