@@ -5,9 +5,8 @@
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 ## Dependencies
- - a C99 compiler (tested with tcc and gcc)
+ - zig 0.12.0
  - a C standard library
- - GNU make
  - pam
  - xcb
  - xorg
@@ -16,18 +15,27 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
  - tput
  - shutdown
 
-On Debian-based distros running `apt install build-essential libpam0g-dev libxcb-xkb-dev` as root should install all the dependencies for you.
-For Fedora try running `dnf install make automake gcc gcc-c++ kernel-devel pam-devel libxcb-devel`
+### Debian
+```
+# apt install build-essential libpam0g-dev libxcb-xkb-dev
+```
+
+### Fedora
+**Warning**: You may encounter issues with SELinux on Fedora.
+It is recommended to add a rule for Ly as it currently does not ship one.
+
+```
+# dnf install kernel-devel pam-devel libxcb-devel
+```
 
 ## Support
-The following desktop environments were tested with success
-
+The following desktop environments were tested with success:
  - awesome
  - bspwm
  - budgie
  - cinnamon
  - deepin
- - dwm
+ - dwm 
  - enlightenment
  - gnome
  - i3
@@ -36,12 +44,12 @@ The following desktop environments were tested with success
  - lxde
  - lxqt
  - mate
- - maxx
+ - maxx 
  - pantheon
  - qtile
  - spectrwm
  - sway
- - windowmaker
+ - windowmaker 
  - xfce
  - xmonad
 
@@ -57,7 +65,7 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-$ git clone --recurse-submodules https://github.com/fairyglade/ly
+$ git clone https://github.com/fairyglade/ly
 ```
 
 Change the directory to ly
@@ -67,18 +75,18 @@ $ cd ly
 
 Compile
 ```
-$ make
+$ zig build
 ```
 
 Test in the configured tty (tty2 by default)
 or a terminal emulator (but desktop environments won't start)
 ```
-# make run
+# zig build run
 ```
 
 Install Ly and the provided systemd service file
 ```
-# make install installsystemd
+# zig build installsystemd
 ```
 
 Enable the service
@@ -94,11 +102,13 @@ disable getty on Ly's tty to prevent "login" from spawning on top of it
 
 ### OpenRC
 
+**NOTE**: On Gentoo, Ly will disable the `display-manager-init` service in order to run.
+
 Clone, compile and test.
 
 Install Ly and the provided OpenRC service
 ```
-# make install installopenrc
+# zig build installopenrc
 ```
 
 Enable the service
@@ -108,7 +118,8 @@ Enable the service
 
 You can edit which tty Ly will start on by editing the `tty` option in the configuration file.
 
-If you choose a tty that already has a login/getty running (has a basic login prompt), then you have to disable the getty so it doesn't respawn on top of ly
+If you choose a tty that already has a login/getty running (has a basic login prompt),
+then you have to disable getty, so it doesn't respawn on top of ly
 ```
 # rc-update del agetty.tty2
 ```
@@ -116,12 +127,11 @@ If you choose a tty that already has a login/getty running (has a basic login pr
 ### runit
 
 ```
-$ make
-# make install installrunit
+# zig build installrunit
 # ln -s /etc/sv/ly /var/service/
 ```
 
-By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini`
+By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini` 
 
 You should as well disable your existing display manager service if needed, e.g.:
 
@@ -129,7 +139,9 @@ You should as well disable your existing display manager service if needed, e.g.
 # rm /var/service/lxdm
 ```
 
-The agetty service for the tty console where you are running ly should be disabled. For instance, if you are running ly on tty2 (that's the default, check your `/etc/ly/config.ini`) you should disable the agetty-tty2 service like this:
+The agetty service for the tty console where you are running ly should be disabled.
+For instance, if you are running ly on tty2 (that's the default, check your `/etc/ly/config.ini`)
+you should disable the agetty-tty2 service like this:
 
 ```
 # rm /var/service/agetty-tty2
