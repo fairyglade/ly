@@ -5,15 +5,17 @@
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 ## Dependencies
- - zig 0.12.0
- - a C standard library
- - pam
- - xcb
- - xorg
- - xorg-xauth
- - mcookie
- - tput
- - shutdown
+- Compile-time:
+  - zig 0.12.0
+  - a C standard library
+  - pam
+  - xcb
+- Runtime (with default config):
+  - xorg
+  - xorg-xauth
+  - mcookie
+  - tput
+  - shutdown
 
 ### Debian
 ```
@@ -101,7 +103,6 @@ disable getty on Ly's tty to prevent "login" from spawning on top of it
 ```
 
 ### OpenRC
-
 **NOTE**: On Gentoo, Ly will disable the `display-manager-init` service in order to run.
 
 Clone, compile and test.
