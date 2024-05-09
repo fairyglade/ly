@@ -267,7 +267,7 @@ pub fn main() !void {
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
         if (!update or config.animation != .none) {
-            if (!update) std.time.sleep(100_000_000);
+            if (!update) std.time.sleep(std.time.ns_per_ms * 100);
 
             termbox.tb_present(); // Required to update tb_width(), tb_height() and tb_cell_buffer()
 
@@ -367,10 +367,7 @@ pub fn main() !void {
                 buffer.drawLabel(lang.login, label_x, label_y + 4);
                 buffer.drawLabel(lang.password, label_x, label_y + 6);
 
-                if (info_line.width > 0 and buffer.box_width > info_line.width) {
-                    const x = buffer.box_x + ((buffer.box_width - info_line.width) / 2);
-                    buffer.drawLabel(info_line.text, x, label_y);
-                }
+                info_line.draw(buffer);
 
                 if (!config.hide_key_hints) {
                     var length: u64 = 0;
@@ -423,11 +420,11 @@ pub fn main() !void {
 
                 update = animate;
             } else {
-                std.time.sleep(10_000_000);
+                std.time.sleep(std.time.ns_per_ms * 10);
                 update = buffer.cascade();
 
                 if (!update) {
-                    std.time.sleep(7_000_000_000);
+                    std.time.sleep(std.time.ns_per_s * 7);
                     auth_fails = 0;
                 }
             }
@@ -531,6 +528,11 @@ pub fn main() !void {
                     const password_text = try allocator.dupeZ(u8, password.text.items);
                     defer allocator.free(password_text);
 
+                    try info_line.setText(lang.authenticating);
+                    InfoLine.clearRendered(allocator, buffer) catch {};
+                    info_line.draw(buffer);
+                    _ = termbox.tb_present();
+
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
                         const current_environment = desktop.environments.items[desktop.current];
@@ -557,14 +559,15 @@ pub fn main() !void {
                 }
 
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
-                termbox.tb_clear();
+                if (auth_fails < 10) {
+                    termbox.tb_clear();
+                    termbox.tb_present();
+                }
 
                 update = true;
 
                 var restore_cursor = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
                 _ = restore_cursor.spawnAndWait() catch .{};
-
-                termbox.tb_present();
             },
             else => {
                 if (!insert_mode) {

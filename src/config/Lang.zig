@@ -1,3 +1,4 @@
+authenticating: []const u8 = "authenticating...",
 capslock: []const u8 = "capslock",
 err_alloc: []const u8 = "failed memory allocation",
 err_bounds: []const u8 = "out-of-bounds index",

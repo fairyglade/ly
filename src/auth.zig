@@ -83,20 +83,29 @@ pub fn authenticate(config: Config, current_environment: Desktop.Environment, lo
         std.process.exit(0);
     }
 
-    var entry: Utmp = std.mem.zeroes(Utmp);
-    addUtmpEntry(&entry, pwd.pw_name, child_pid) catch {};
-    defer removeUtmpEntry(&entry);
+    var entry = std.mem.zeroes(Utmp);
 
-    // If we receive SIGTERM, forward it to child_pid
-    const act = std.posix.Sigaction{
-        .handler = .{ .handler = &sessionSignalHandler },
-        .mask = std.posix.empty_sigset,
-        .flags = 0,
-    };
-    try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
+    {
+        // If an error occurs here, we can send SIGTERM to the session
+        errdefer cleanup: {
+            _ = std.posix.kill(child_pid, std.posix.SIG.TERM) catch break :cleanup;
+            _ = std.posix.waitpid(child_pid, 0);
+        }
 
+        // If we receive SIGTERM, forward it to child_pid
+        const act = std.posix.Sigaction{
+            .handler = .{ .handler = &sessionSignalHandler },
+            .mask = std.posix.empty_sigset,
+            .flags = 0,
+        };
+        try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
+
+        try addUtmpEntry(&entry, pwd.pw_name, child_pid);
+    }
     // Wait for the session to stop
     _ = std.posix.waitpid(child_pid, 0);
+
+    removeUtmpEntry(&entry);
 
     try resetTerminal(pwd.pw_shell, config.term_reset_cmd);
 
@@ -190,7 +199,7 @@ fn loginConv(
 
     // Initialise allocated memory to 0
     // This ensures memory can be freed by pam on success
-    for (response) |*r| r.* = std.mem.zeroes(interop.pam.pam_response);
+    @memset(response, std.mem.zeroes(interop.pam.pam_response));
 
     var username: ?[:0]u8 = null;
     var password: ?[:0]u8 = null;
@@ -412,7 +421,7 @@ fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
     entry.ut_pid = pid;
 
     var buf: [4096]u8 = undefined;
-    const ttyname = try std.os.getFdPath(0, &buf);
+    const ttyname = try std.os.getFdPath(std.posix.STDIN_FILENO, &buf);
 
     var ttyname_buf: [32]u8 = undefined;
     _ = try std.fmt.bufPrintZ(&ttyname_buf, "{s}", .{ttyname["/dev/".len..]});
