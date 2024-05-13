@@ -3,7 +3,8 @@ const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 pub const termbox = @cImport({
-    @cInclude("termbox.h");
+    @cDefine("TB_IMPL", {});
+    @cInclude("termbox2.h");
 });
 
 pub const pam = @cImport({

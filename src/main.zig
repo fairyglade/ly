@@ -33,7 +33,7 @@ pub fn signalHandler(i: c_int) callconv(.C) void {
         _ = std.c.waitpid(session_pid, &status, 0);
     }
 
-    termbox.tb_shutdown();
+    _ = termbox.tb_shutdown();
     std.c.exit(i);
 }
 
@@ -143,7 +143,7 @@ pub fn main() !void {
 
     // Initialize termbox
     _ = termbox.tb_init();
-    defer termbox.tb_shutdown();
+    defer _ = termbox.tb_shutdown();
 
     const act = std.posix.Sigaction{
         .handler = .{ .handler = &signalHandler },
@@ -152,8 +152,8 @@ pub fn main() !void {
     };
     try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
-    _ = termbox.tb_select_output_mode(termbox.TB_OUTPUT_NORMAL);
-    termbox.tb_clear();
+    _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_NORMAL);
+    _ = termbox.tb_clear();
 
     // Needed to reset termbox after auth
     const tb_termios = try std.posix.tcgetattr(std.posix.STDIN_FILENO);
@@ -271,7 +271,7 @@ pub fn main() !void {
         if (!update or config.animation != .none) {
             if (!update) std.time.sleep(std.time.ns_per_ms * 100);
 
-            termbox.tb_present(); // Required to update tb_width(), tb_height() and tb_cell_buffer()
+            _ = termbox.tb_present(); // Required to update tb_width(), tb_height() and tb_cell_buffer()
 
             const width: u64 = @intCast(termbox.tb_width());
             const height: u64 = @intCast(termbox.tb_height());
@@ -307,7 +307,7 @@ pub fn main() !void {
         if (update) {
             // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
             if (auth_fails < 10) {
-                termbox.tb_clear();
+                _ = termbox.tb_clear();
 
                 switch (config.animation) {
                     .none => {},
@@ -435,7 +435,7 @@ pub fn main() !void {
                 }
             }
 
-            termbox.tb_present();
+            _ = termbox.tb_present();
         }
 
         var timeout: i32 = -1;
@@ -513,6 +513,15 @@ pub fn main() !void {
                 };
                 update = true;
             },
+            termbox.TB_KEY_BACK_TAB => {
+                active_input = switch (active_input) {
+                    .session => .password,
+                    .login => .session,
+                    .password => .login,
+                };
+
+                update = true;
+            },
             termbox.TB_KEY_ENTER => {
                 if (config.save) save_last_settings: {
                     var file = std.fs.cwd().createFile(save_path, .{}) catch break :save_last_settings;
@@ -566,8 +575,8 @@ pub fn main() !void {
 
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
                 if (auth_fails < 10) {
-                    termbox.tb_clear();
-                    termbox.tb_present();
+                    _ = termbox.tb_clear();
+                    _ = termbox.tb_present();
                 }
 
                 update = true;

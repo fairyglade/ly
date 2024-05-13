@@ -17,19 +17,6 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const c_args = [_][]const u8{
-        "-std=c99",
-        "-pedantic",
-        "-g",
-        "-Wall",
-        "-Wextra",
-        "-Werror=vla",
-        "-Wno-unused-parameter",
-        "-D_DEFAULT_SOURCE",
-        "-D_POSIX_C_SOURCE=200809L",
-        "-D_XOPEN_SOURCE",
-    };
-
     const exe = b.addExecutable(.{
         .name = "ly",
         .root_source_file = .{ .path = "src/main.zig" },
@@ -45,18 +32,10 @@ pub fn build(b: *std.Build) void {
     const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("clap", clap.module("clap"));
 
+    exe.addIncludePath(.{ .path = "include" });
     exe.linkSystemLibrary("pam");
     exe.linkSystemLibrary("xcb");
     exe.linkLibC();
-
-    exe.addIncludePath(.{ .path = "dep/termbox_next/src" });
-
-    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/input.c" }, .flags = &c_args });
-    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/memstream.c" }, .flags = &c_args });
-    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/ringbuffer.c" }, .flags = &c_args });
-    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/term.c" }, .flags = &c_args });
-    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/termbox.c" }, .flags = &c_args });
-    exe.addCSourceFile(.{ .file = .{ .path = "dep/termbox_next/src/utf8.c" }, .flags = &c_args });
 
     b.installArtifact(exe);
 

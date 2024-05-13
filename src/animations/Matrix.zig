@@ -145,15 +145,15 @@ pub fn draw(self: *Matrix) void {
         var y: u64 = 1;
         while (y <= self.terminal_buffer.height) : (y += 1) {
             const dot = self.dots[buf_width * y + x];
-            var fg: u32 = @intCast(termbox.TB_GREEN);
+            var fg: u16 = @intCast(termbox.TB_GREEN);
 
             if (dot.value == -1 or dot.value == ' ') {
-                termbox.tb_change_cell(@intCast(x), @intCast(y - 1), ' ', fg, termbox.TB_DEFAULT);
+                _ = termbox.tb_set_cell(@intCast(x), @intCast(y - 1), ' ', fg, termbox.TB_DEFAULT);
                 continue;
             }
 
             if (dot.is_head) fg = @intCast(termbox.TB_WHITE | termbox.TB_BOLD);
-            termbox.tb_change_cell(@intCast(x), @intCast(y - 1), @intCast(dot.value), fg, termbox.TB_DEFAULT);
+            _ = termbox.tb_set_cell(@intCast(x), @intCast(y - 1), @intCast(dot.value), fg, termbox.TB_DEFAULT);
         }
     }
 }
