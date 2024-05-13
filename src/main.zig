@@ -127,7 +127,7 @@ pub fn main() !void {
         }
     }
 
-    interop.setNumlock(config.console_dev, config.numlock) catch {};
+    interop.setNumlock(config.numlock) catch {};
 
     // Initialize information line with host name
     get_host_name: {
@@ -252,6 +252,7 @@ pub fn main() !void {
     var restart = false;
     var auth_fails: u64 = 0;
 
+    // Switch to selected TTY if possible
     open_console_dev: {
         const fd = std.posix.open(config.console_dev, .{ .ACCMODE = .WRONLY }, 0) catch {
             try info_line.setText(lang.err_console_dev);
@@ -259,7 +260,6 @@ pub fn main() !void {
         };
         defer std.posix.close(fd);
 
-        // Switch to selected TTY if possible
         _ = std.c.ioctl(fd, interop.VT_ACTIVATE, config.tty);
         _ = std.c.ioctl(fd, interop.VT_WAITACTIVE, config.tty);
     }
@@ -509,7 +509,7 @@ pub fn main() !void {
             },
             termbox.TB_KEY_ENTER => {
                 if (config.save) save_last_settings: {
-                    var file = std.fs.createFileAbsolute(save_path, .{}) catch break :save_last_settings;
+                    var file = std.fs.cwd().createFile(save_path, .{}) catch break :save_last_settings;
                     defer file.close();
 
                     const save_data = Save{

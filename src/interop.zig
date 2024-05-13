@@ -108,16 +108,13 @@ pub fn getLockState(console_dev: [:0]const u8) !struct {
     };
 }
 
-pub fn setNumlock(console_dev: [:0]const u8, val: bool) !void {
-    const fd = try std.posix.open(console_dev, .{ .ACCMODE = .RDONLY }, 0);
-    defer std.posix.close(fd);
-
+pub fn setNumlock(val: bool) !void {
     var led: c_char = undefined;
-    _ = std.c.ioctl(fd, KDGKBLED, &led);
+    _ = std.c.ioctl(0, KDGKBLED, &led);
 
     const numlock = (led & K_NUMLOCK) != 0;
     if (numlock != val) {
-        const status = std.c.ioctl(fd, KDSKBLED, led ^ K_NUMLOCK);
+        const status = std.c.ioctl(std.posix.STDIN_FILENO, KDSKBLED, led ^ K_NUMLOCK);
         if (status != 0) return error.FailedToSetNumlock;
     }
 }
