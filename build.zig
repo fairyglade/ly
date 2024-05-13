@@ -101,7 +101,7 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                     var service_dir = std.fs.openDirAbsolute(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
-                    try std.fs.cwd().copyFile("res/ly-openrc", service_dir, "ly", .{ .override_mode = 755 });
+                    try std.fs.cwd().copyFile("res/ly-openrc", service_dir, exe_name, .{ .override_mode = 755 });
                 },
                 .Runit => {
                     const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/sv/ly" });
