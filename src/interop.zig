@@ -48,7 +48,9 @@ pub const VT_ACTIVATE: c_int = 0x5606;
 pub const VT_WAITACTIVE: c_int = 0x5607;
 
 pub const KDGETLED: c_int = 0x4B31;
+pub const KDSETLED: c_int = 0x4B32;
 pub const KDGKBLED: c_int = 0x4B64;
+pub const KDSKBLED: c_int = 0x4B65;
 
 pub const LED_NUM: c_int = 0x02;
 pub const LED_CAP: c_int = 0x04;
@@ -82,9 +84,8 @@ pub fn getLockState(console_dev: [:0]const u8) !struct {
     numlock: bool,
     capslock: bool,
 } {
-    const fd = std.c.open(console_dev, .{ .ACCMODE = .RDONLY });
-    if (fd < 0) return error.CannotOpenConsoleDev;
-    defer _ = std.c.close(fd);
+    const fd = try std.posix.open(console_dev, .{ .ACCMODE = .RDONLY }, 0);
+    defer std.posix.close(fd);
 
     var numlock = false;
     var capslock = false;
@@ -105,4 +106,18 @@ pub fn getLockState(console_dev: [:0]const u8) !struct {
         .numlock = numlock,
         .capslock = capslock,
     };
+}
+
+pub fn setNumlock(console_dev: [:0]const u8, val: bool) !void {
+    const fd = try std.posix.open(console_dev, .{ .ACCMODE = .RDONLY }, 0);
+    defer std.posix.close(fd);
+
+    var led: c_char = undefined;
+    _ = std.c.ioctl(fd, KDGKBLED, &led);
+
+    const numlock = (led & K_NUMLOCK) != 0;
+    if (numlock != val) {
+        const status = std.c.ioctl(fd, KDSKBLED, led ^ K_NUMLOCK);
+        if (status != 0) return error.FailedToSetNumlock;
+    }
 }

@@ -127,6 +127,8 @@ pub fn main() !void {
         }
     }
 
+    interop.setNumlock(config.console_dev, config.numlock) catch {};
+
     // Initialize information line with host name
     get_host_name: {
         var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
@@ -250,16 +252,14 @@ pub fn main() !void {
     var restart = false;
     var auth_fails: u64 = 0;
 
-    // Switch to selected TTY if possible
     open_console_dev: {
-        const fd = std.c.open(config.console_dev, .{ .ACCMODE = .WRONLY });
-        defer _ = std.c.close(fd);
-
-        if (fd < 0) {
+        const fd = std.posix.open(config.console_dev, .{ .ACCMODE = .WRONLY }, 0) catch {
             try info_line.setText(lang.err_console_dev);
             break :open_console_dev;
-        }
+        };
+        defer std.posix.close(fd);
 
+        // Switch to selected TTY if possible
         _ = std.c.ioctl(fd, interop.VT_ACTIVATE, config.tty);
         _ = std.c.ioctl(fd, interop.VT_WAITACTIVE, config.tty);
     }
