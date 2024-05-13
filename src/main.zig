@@ -129,8 +129,10 @@ pub fn main() !void {
 
     interop.setNumlock(config.numlock) catch {};
 
-    // Initialize information line with host name
-    get_host_name: {
+    if (config.initial_info_text) |text| {
+        try info_line.setText(text);
+    } else get_host_name: {
+        // Initialize information line with host name
         var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
         const hostname = std.posix.gethostname(&name_buf) catch {
             try info_line.setText(lang.err_hostname);
@@ -395,9 +397,13 @@ pub fn main() !void {
                     }
                 }
 
+                if (config.box_title) |title| {
+                    buffer.drawConfinedLabel(title, buffer.box_x, buffer.box_y - 1, buffer.box_width);
+                }
+
                 if (config.vi_mode) {
                     const label_txt = if (insert_mode) lang.insert else lang.normal;
-                    buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y - 1);
+                    buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
                 }
 
                 draw_lock_state: {

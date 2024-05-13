@@ -170,6 +170,20 @@ pub fn drawLabel(self: TerminalBuffer, text: []const u8, x: u64, y: u64) void {
     }
 }
 
+pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: u64, y: u64, max_length: u64) void {
+    var confined_text = text;
+    if (text.len > max_length) confined_text = text[0..max_length];
+
+    const yc: c_int = @intCast(y);
+    const utf8view = std.unicode.Utf8View.init(confined_text) catch return;
+    var utf8 = utf8view.iterator();
+
+    var i = x;
+    while (utf8.nextCodepoint()) |codepoint| : (i += 1) {
+        termbox.tb_change_cell(@intCast(i), yc, codepoint, self.fg, self.bg);
+    }
+}
+
 pub fn drawCharMultiple(self: TerminalBuffer, char: u8, x: u64, y: u64, length: u64) void {
     const yc: c_int = @intCast(y);
     const cell = utils.initCell(char, self.fg, self.bg);
