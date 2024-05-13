@@ -412,12 +412,15 @@ pub fn main() !void {
                         break :draw_lock_state;
                     };
 
-                    var lock_state_x = buffer.width - lang.numlock.len;
+                    var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
                     const lock_state_y: u64 = if (config.clock != null) 1 else 0;
 
                     if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
-                    lock_state_x -= lang.capslock.len + 1;
-                    if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
+
+                    if (lock_state_x >= lang.capslock.len + 1) {
+                        lock_state_x -= lang.capslock.len + 1;
+                        if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
+                    }
                 }
 
                 desktop.draw();
