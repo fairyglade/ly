@@ -40,6 +40,16 @@ pub fn build(b: *std.Build) !void {
     exe.linkSystemLibrary("xcb");
     exe.linkLibC();
 
+    // Only fails with ReleaseSafe, so we'll override it.
+    const translate_c = b.addTranslateC(.{
+        .root_source_file = .{ .path = "include/termbox2.h" },
+        .target = target,
+        .optimize = if (optimize == .ReleaseSafe) .ReleaseFast else optimize,
+    });
+    translate_c.defineCMacroRaw("TB_IMPL");
+    const termbox2 = translate_c.addModule("termbox2");
+    exe.root_module.addImport("termbox2", termbox2);
+
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);

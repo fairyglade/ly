@@ -327,7 +327,36 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
     return xauthority;
 }
 
-fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xauth_cmd: []const u8, mcookie_cmd: []const u8) !void {
+pub fn mcookie(cmd: [:0]const u8) ![32]u8 {
+    const pipe = try std.posix.pipe();
+    defer std.posix.close(pipe[1]);
+
+    const output = std.fs.File{ .handle = pipe[0] };
+    defer output.close();
+
+    const pid = try std.posix.fork();
+    if (pid == 0) {
+        std.posix.close(pipe[0]);
+
+        std.posix.dup2(pipe[1], std.posix.STDOUT_FILENO) catch std.process.exit(1);
+        std.posix.close(pipe[1]);
+
+        const args = [_:null]?[*:0]u8{};
+        std.posix.execveZ(cmd.ptr, &args, std.c.environ) catch {};
+        std.process.exit(1);
+    }
+
+    const result = std.posix.waitpid(pid, 0);
+
+    if (result.status != 0) return error.CommandFailed;
+
+    var buf: [32]u8 = undefined;
+    const len = try output.read(&buf);
+    if (len != 32) return error.UnexpectedLength;
+    return buf;
+}
+
+fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xauth_cmd: []const u8, mcookie_cmd: [:0]const u8) !void {
     var pwd_buf: [100]u8 = undefined;
     const pwd = try std.fmt.bufPrintZ(&pwd_buf, "{s}", .{pw_dir});
 
@@ -335,10 +364,12 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     _ = interop.setenv("XAUTHORITY", xauthority, 1);
     _ = interop.setenv("DISPLAY", display_name, 1);
 
+    const mcookie_output = try mcookie(mcookie_cmd);
+
     const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . $({s})", .{ xauth_cmd, display_name, mcookie_cmd }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . {s}", .{ xauth_cmd, display_name, mcookie_output }) catch std.process.exit(1);
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);

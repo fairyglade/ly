@@ -2,10 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
-pub const termbox = @cImport({
-    @cDefine("TB_IMPL", {});
-    @cInclude("termbox2.h");
-});
+pub const termbox = @import("termbox2");
 
 pub const pam = @cImport({
     @cInclude("security/pam_appl.h");
