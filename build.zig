@@ -1,9 +1,9 @@
 const std = @import("std");
 
+const ly_version = std.SemanticVersion{ .major = 1, .minor = 0, .patch = 0 };
 var dest_directory: []const u8 = undefined;
 var data_directory: []const u8 = undefined;
 var exe_name: []const u8 = undefined;
-const ly_version = std.SemanticVersion{ .major = 1, .minor = 0, .patch = 0, .build = "dev" };
 
 pub fn build(b: *std.Build) !void {
     dest_directory = b.option([]const u8, "dest_directory", "Specify a dest directory for installation") orelse "";
@@ -13,7 +13,8 @@ pub fn build(b: *std.Build) !void {
 
     const build_options = b.addOptions();
     build_options.addOption([]const u8, "data_directory", data_directory);
-    const version_str = b.fmt("{d}.{d}.{d}-{s}", .{ ly_version.major, ly_version.minor, ly_version.patch, ly_version.build.? });
+
+    const version_str = try getVersionStr(b, "ly", ly_version);
 
     build_options.addOption([]const u8, "version", version_str);
 
@@ -227,4 +228,59 @@ pub fn uninstallall(step: *std.Build.Step, progress: *std.Progress.Node) !void {
     std.fs.deleteTreeAbsolute(runit_service_path) catch {
         std.debug.print("warn: runit service not found.\n", .{});
     };
+}
+
+fn getVersionStr(b: *std.Build, name: []const u8, version: std.SemanticVersion) ![]const u8 {
+    const version_str = b.fmt("{d}.{d}.{d}", .{ version.major, version.minor, version.patch });
+
+    var status: u8 = undefined;
+    const git_describe_raw = b.runAllowFail(&[_][]const u8{
+        "git",
+        "-C",
+        b.build_root.path orelse ".",
+        "describe",
+        "--match",
+        "*.*.*",
+        "--tags",
+    }, &status, .Ignore) catch {
+        return version_str;
+    };
+    var git_describe = std.mem.trim(u8, git_describe_raw, " \n\r");
+    git_describe = std.mem.trimLeft(u8, git_describe, "v");
+
+    switch (std.mem.count(u8, git_describe, "-")) {
+        0 => {
+            if (!std.mem.eql(u8, version_str, git_describe)) {
+                std.debug.print("{s} version '{s}' does not match git tag: '{s}'\n", .{ name, version_str, git_describe });
+                std.process.exit(1);
+            }
+            return version_str;
+        },
+        2 => {
+            // Untagged development build (e.g. 0.10.0-dev.2025+ecf0050a9).
+            var it = std.mem.splitScalar(u8, git_describe, '-');
+            const tagged_ancestor = std.mem.trimLeft(u8, it.first(), "v");
+            const commit_height = it.next().?;
+            const commit_id = it.next().?;
+
+            const ancestor_ver = try std.SemanticVersion.parse(tagged_ancestor);
+            if (version.order(ancestor_ver) != .gt) {
+                std.debug.print("{s} version '{}' must be greater than tagged ancestor '{}'\n", .{ name, version, ancestor_ver });
+                std.process.exit(1);
+            }
+
+            // Check that the commit hash is prefixed with a 'g' (a Git convention).
+            if (commit_id.len < 1 or commit_id[0] != 'g') {
+                std.debug.print("Unexpected `git describe` output: {s}\n", .{git_describe});
+                return version_str;
+            }
+
+            // The version is reformatted in accordance with the https://semver.org specification.
+            return b.fmt("{s}-dev.{s}+{s}", .{ version_str, commit_height, commit_id[1..] });
+        },
+        else => {
+            std.debug.print("Unexpected `git describe` output: {s}\n", .{git_describe});
+            return version_str;
+        },
+    }
 }
