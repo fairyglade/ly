@@ -1,5 +1,7 @@
 #%PAM-1.0
 
+auth       sufficient   pam_unix-so try_first_pass likeauth nullok # empty-password will not pass this, but will not fail causing the next line to get executed
+-auth      sufficient   pam_fprintd.so # We do not want to get errors when pam_fprintd.so is not present
 auth       include      login
 -auth      optional     pam_gnome_keyring.so
 -auth      optional     pam_kwallet5.so

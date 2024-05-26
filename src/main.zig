@@ -602,8 +602,8 @@ pub fn main() !void {
 
             asyncPamHandle = null;
             try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
-            termbox.tb_clear();
-            termbox.tb_present();
+            _ = termbox.tb_clear();
+            _ = termbox.tb_present();
             std.time.sleep(1000000000);
         }
 
