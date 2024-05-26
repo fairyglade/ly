@@ -39,6 +39,33 @@ pub fn signalHandler(i: c_int) callconv(.C) void {
     std.c.exit(i);
 }
 
+// When setting the currentLogin you must deallocate the previous currentLogin first
+var currentLogin: ?[:0]const u8 = null;
+var asyncPamHandle: ?*interop.pam.pam_handle = null;
+
+fn fingerprintLogin(config: Config, login: [:0]const u8) !void {
+    // TODO: loop if there was an error
+    const pamHandle = try auth.fingerprintAuth(config, login);
+    if (currentLogin != null and !std.mem.eql(u8, std.mem.span(@as([*:0]const u8, currentLogin.?)), login)) {
+        return;
+    }
+    asyncPamHandle = pamHandle;
+}
+
+fn startFingerPrintLogin(allocator: std.mem.Allocator, config: Config, login: Text) !void {
+    if (currentLogin) |clogin| {
+        allocator.free(clogin);
+        currentLogin = null;
+    }
+    const login_text = try allocator.dupeZ(u8, login.text.items);
+    currentLogin = login_text;
+    var handle = try std.Thread.spawn(.{}, fingerprintLogin, .{
+        config,
+        login_text,
+    });
+    handle.detach();
+}
+
 pub fn main() !void {
     var shutdown = false;
     var restart = false;
@@ -277,6 +304,9 @@ pub fn main() !void {
             if (session_index < session.label.list.items.len) session.label.current = session_index;
         }
     }
+
+    try startFingerPrintLogin(allocator, config, login);
+    defer allocator.free(currentLogin.?);
 
     // Place components on the screen
     {
@@ -526,9 +556,9 @@ pub fn main() !void {
             _ = termbox.tb_present();
         }
 
-        var timeout: i32 = -1;
+        var timeout: i32 = 100;
 
-        // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for the event indefinitely instead
+        // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for 100ms instead
         if (animate and !animation_timed_out) {
             timeout = config.min_refresh_delta;
 
@@ -556,9 +586,26 @@ pub fn main() !void {
             timeout = @intCast(1000 - @divTrunc(tv.tv_usec, 1000) + 1);
         }
 
+        timeout = @min(timeout, 100);
+
         const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
 
         update = timeout != -1;
+        if (asyncPamHandle) |handle| {
+            if (auth.postFingerprintAuth(config, session, handle, currentLogin.?)) |_| {
+                try info_line.setText(lang.logout);
+            } else |err| {
+                active_input = .password;
+                try info_line.setText(getAuthErrorMsg(err, lang));
+                try startFingerPrintLogin(allocator, config, login);
+            }
+
+            asyncPamHandle = null;
+            try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
+            termbox.tb_clear();
+            termbox.tb_present();
+            std.time.sleep(1000000000);
+        }
 
         if (event_error < 0 or event.type != termbox.TB_EVENT_KEY) continue;
 
@@ -745,8 +792,20 @@ pub fn main() !void {
                 switch (active_input) {
                     .info_line => info_line.label.handle(&event, insert_mode),
                     .session => session.label.handle(&event, insert_mode),
-                    .login => login.handle(&event, insert_mode) catch {
-                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                    .login => {
+                        const shouldFingerprint = switch (event.key) {
+                            termbox.TB_KEY_DELETE => true,
+                            termbox.TB_KEY_BACKSPACE, termbox.TB_KEY_BACKSPACE2 => true,
+                            else => event.ch > 31 and event.ch < 127,
+                        };
+
+                        if (shouldFingerprint) {
+                            try startFingerPrintLogin(allocator, config, login);
+                        }
+
+                        login.handle(&event, insert_mode) catch {
+                            try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                        };
                     },
                     .password => password.handle(&event, insert_mode) catch {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);

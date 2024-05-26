@@ -120,6 +120,102 @@ pub fn authenticate(config: Config, current_environment: Session.Environment, lo
     if (shared_err.readError()) |err| return err;
 }
 
+pub fn fingerprintAuth(config: Config, login: [:0]const u8) !*interop.pam.pam_handle {
+    // Open the PAM session
+    var credentials = [_:null]?[*:0]const u8{ login, "" };
+
+    const conv = interop.pam.pam_conv{
+        .conv = loginConv,
+        .appdata_ptr = @ptrCast(&credentials),
+    };
+    var handle: ?*interop.pam.pam_handle = undefined;
+
+    var status = interop.pam.pam_start(config.service_name.ptr, null, &conv, &handle);
+    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+
+    // Do the PAM routine
+    status = interop.pam.pam_authenticate(handle, 0);
+    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+
+    status = interop.pam.pam_acct_mgmt(handle, 0);
+    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+
+    status = interop.pam.pam_setcred(handle, interop.pam.PAM_ESTABLISH_CRED);
+    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+
+    status = interop.pam.pam_open_session(handle, 0);
+    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+
+    return handle.?;
+}
+
+pub fn postFingerprintAuth(config: Config, desktop: Desktop, handle: *interop.pam.pam_handle, login: [:0]const u8) !void {
+    var tty_buffer: [2]u8 = undefined;
+    const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
+    const current_environment = desktop.environments.items[desktop.current];
+
+    // Set the XDG environment variables
+    setXdgSessionEnv(current_environment.display_server);
+    try setXdgEnv(tty_str, current_environment.xdg_session_desktop, current_environment.xdg_desktop_names orelse "");
+
+    var pwd: *interop.passwd = undefined;
+    {
+        defer interop.endpwent();
+
+        // Get password structure from username
+        pwd = interop.getpwnam(login.ptr) orelse return error.GetPasswordNameFailed;
+    }
+
+    // Set user shell if it hasn't already been set
+    if (pwd.pw_shell[0] == 0) {
+        interop.setusershell();
+        pwd.pw_shell = interop.getusershell();
+        interop.endusershell();
+    }
+
+    var shared_err = try SharedError.init();
+    defer shared_err.deinit();
+
+    child_pid = try std.posix.fork();
+    if (child_pid == 0) {
+        startSession(config, pwd, handle, current_environment) catch |e| {
+            shared_err.writeError(e);
+            std.process.exit(1);
+        };
+        std.process.exit(0);
+    }
+
+    var entry: Utmp = std.mem.zeroes(Utmp);
+    addUtmpEntry(&entry, pwd.pw_name, child_pid) catch {};
+
+    // If we receive SIGTERM, forward it to child_pid
+    const act = std.posix.Sigaction{
+        .handler = .{ .handler = &sessionSignalHandler },
+        .mask = std.posix.empty_sigset,
+        .flags = 0,
+    };
+    try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
+
+    // Wait for the session to stop
+    _ = std.posix.waitpid(child_pid, 0);
+
+    removeUtmpEntry(&entry);
+
+    try resetTerminal(pwd.pw_shell, config.term_reset_cmd);
+
+    // Close the PAM session
+    var status = interop.pam.pam_close_session(handle, 0);
+    if (status != 0) return pamDiagnose(status);
+
+    status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
+    if (status != 0) return pamDiagnose(status);
+
+    status = interop.pam.pam_end(handle, status);
+    if (status != 0) return pamDiagnose(status);
+
+    if (shared_err.readError()) |err| return err;
+}
+
 fn startSession(
     config: Config,
     pwd: *interop.pwd.passwd,
