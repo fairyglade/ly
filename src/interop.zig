@@ -82,8 +82,9 @@ pub fn getLockState(console_dev: [:0]const u8) !struct {
     numlock: bool,
     capslock: bool,
 } {
-    const fd = try std.posix.open(console_dev, .{ .ACCMODE = .RDONLY }, 0);
-    defer std.posix.close(fd);
+    const fd = std.c.open(console_dev, .{ .ACCMODE = .RDONLY });
+    if (fd < 0) return error.CannotOpenConsoleDev;
+    defer _ = std.c.close(fd);
 
     var numlock = false;
     var capslock = false;
