@@ -7,6 +7,7 @@ Conflicts=getty@tty2.service
 [Service]
 Type=idle
 ExecStart=/usr/bin/ly
+StandardError=journal
 StandardInput=tty
 TTYPath=/dev/tty2
 TTYReset=yes
