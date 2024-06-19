@@ -6,6 +6,10 @@ pub const termbox = @cImport({
     @cInclude("termbox.h");
 });
 
+pub const vt = @cImport({
+    @cInclude("linux/vt.h");
+});
+
 pub const pam = @cImport({
     @cInclude("security/pam_appl.h");
 });
@@ -44,6 +48,7 @@ pub const passwd = extern struct {
     pw_shell: [*:0]u8,
 };
 
+pub const VT_GETSTATE: c_int = 0x5603;
 pub const VT_ACTIVATE: c_int = 0x5606;
 pub const VT_WAITACTIVE: c_int = 0x5607;
 

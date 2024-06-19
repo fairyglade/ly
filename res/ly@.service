@@ -1,17 +1,18 @@
 [Unit]
-Description=TUI display manager
+Description=TUI display manager (on %I)
 After=systemd-user-sessions.service plymouth-quit-wait.service
-After=getty@tty2.service
-Conflicts=getty@tty2.service
+After=getty@%I.service
+Conflicts=getty@%I.service
 
 [Service]
 Type=idle
 ExecStart=/usr/bin/ly
 StandardError=journal
 StandardInput=tty
-TTYPath=/dev/tty2
+TTYPath=/dev/%I
 TTYReset=yes
 TTYVHangup=yes
 
 [Install]
-Alias=display-manager.service
+WantedBy=multi-user.target
+# Alias=display-manager.service

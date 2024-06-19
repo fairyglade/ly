@@ -526,6 +526,11 @@ pub fn main() !void {
                 defer shared_err.deinit();
 
                 {
+                    // This will set the current active VT as our TTY.
+                    var vtstat: interop.vt.vt_stat = undefined;
+                    _ = std.c.ioctl(std.c.STDIN_FILENO, interop.VT_GETSTATE, &vtstat);
+                    config.tty = @intCast(vtstat.v_active);
+
                     const login_text = try allocator.dupeZ(u8, login.text.items);
                     defer allocator.free(login_text);
                     const password_text = try allocator.dupeZ(u8, password.text.items);
