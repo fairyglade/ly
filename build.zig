@@ -111,7 +111,7 @@ fn installsystemd(self: *std.Build.Step, progress: *std.Progress.Node) !void {
     var service_dir = std.fs.openDirAbsolute("/usr/lib/systemd/system", .{}) catch unreachable;
     defer service_dir.close();
 
-    try std.fs.cwd().copyFile("res/ly.service", service_dir, "ly.service", .{ .override_mode = 644 });
+    try std.fs.cwd().copyFile("res/ly@.service", service_dir, "ly@.service", .{ .override_mode = 644 });
 }
 
 fn installopenrc(self: *std.Build.Step, progress: *std.Progress.Node) !void {

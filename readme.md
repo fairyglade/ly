@@ -92,9 +92,10 @@ Install Ly and the provided systemd service file
 # zig build installsystemd
 ```
 
-Enable the service
+Enable the service (this will spawn on tty2 and tty9)
 ```
-# systemctl enable ly.service
+# systemctl enable ly@tty2.service
+# systemctl enable ly@tty9.service
 ```
 
 If you need to switch between ttys after Ly's start you also have to
@@ -102,6 +103,8 @@ disable getty on Ly's tty to prevent "login" from spawning on top of it
 ```
 # systemctl disable getty@tty2.service
 ```
+
+If you have multiple ttys setup with systemd, the tty option will be used as your default tty.
 
 ### OpenRC
 **NOTE**: On Gentoo, Ly will disable the `display-manager-init` service in order to run.
