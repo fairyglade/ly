@@ -348,11 +348,11 @@ pub fn mcookie(cmd: [:0]const u8) ![32]u8 {
 
     const result = std.posix.waitpid(pid, 0);
 
-    if (result.status != 0) return error.CommandFailed;
+    if (result.status != 0) return error.McookieFailed;
 
     var buf: [32]u8 = undefined;
     const len = try output.read(&buf);
-    if (len != 32) return error.UnexpectedLength;
+    if (len != 32) return error.McookieFailed;
     return buf;
 }
 

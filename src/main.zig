@@ -639,6 +639,10 @@ pub fn main() !void {
 fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
     return switch (err) {
         error.GetPasswordNameFailed => lang.err_pwnam,
+        error.GetEnvListFailed => lang.err_envlist,
+        error.XauthFailed => lang.err_xauth,
+        error.McookieFailed => lang.err_mcookie,
+        error.XcbConnectionFailed => lang.err_xcb_conn,
         error.GroupInitializationFailed => lang.err_user_init,
         error.SetUserGidFailed => lang.err_user_gid,
         error.SetUserUidFailed => lang.err_user_uid,

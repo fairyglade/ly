@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) !void {
     exe.linkSystemLibrary("xcb");
     exe.linkLibC();
 
-    // Only fails with ReleaseSafe, so we'll override it.
+    // HACK: Only fails with ReleaseSafe, so we'll override it.
     const translate_c = b.addTranslateC(.{
         .root_source_file = .{ .path = "include/termbox2.h" },
         .target = target,
@@ -151,7 +151,11 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
 
     {
         const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/bin" });
-        std.fs.cwd().makePath(exe_path) catch {};
+        if (!std.mem.eql(u8, dest_directory, "")) {
+            std.fs.cwd().makePath(exe_path) catch {
+                std.debug.print("warn: {s} already exists as a directory.\n", .{exe_path});
+            };
+        }
 
         var executable_dir = std.fs.openDirAbsolute(exe_path, .{}) catch unreachable;
         defer executable_dir.close();
@@ -194,7 +198,11 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
 
     {
         const pam_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/pam.d" });
-        std.fs.cwd().makePath(pam_path) catch {};
+        if (!std.mem.eql(u8, dest_directory, "")) {
+            std.fs.cwd().makePath(pam_path) catch {
+                std.debug.print("warn: {s} already exists as a directory.\n", .{pam_path});
+            };
+        }
 
         var pam_dir = std.fs.openDirAbsolute(pam_path, .{}) catch unreachable;
         defer pam_dir.close();
