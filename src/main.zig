@@ -18,6 +18,9 @@ const Save = @import("config/Save.zig");
 const migrator = @import("config/migrator.zig");
 const SharedError = @import("SharedError.zig");
 const utils = @import("tui/utils.zig");
+const c_import = @cImport({
+    @cInclude("unistd.h");
+});
 
 const Ini = ini.Ini;
 const termbox = interop.termbox;
@@ -475,6 +478,16 @@ pub fn main() !void {
                     if (config.sleep_cmd) |sleep_cmd| {
                         var sleep = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
                         _ = sleep.spawnAndWait() catch .{};
+                    }
+                } else if (pressed_key == 5) {
+                    if (c_import.access("/usr/bin/brightnessctl", c_import.X_OK) == 0) {
+                        var brightness = std.ChildProcess.init(&[_][]const u8{ "/usr/bin/brightnessctl", "-q", "s", "5%-" }, allocator);
+                        _ = brightness.spawnAndWait()catch.{};
+                    }
+                } else if (pressed_key == 6) {
+                    if (c_import.access("/usr/bin/brightnessctl", c_import.X_OK) == 0) {
+                        var brightness = std.ChildProcess.init(&[_][]const u8{ "/usr/bin/brightnessctl", "-q", "s", "+5%" }, allocator);
+                        _ = brightness.spawnAndWait()catch.{};
                     }
                 }
             },
