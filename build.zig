@@ -51,6 +51,10 @@ pub fn build(b: *std.Build) !void {
     const termbox2 = translate_c.addModule("termbox2");
     exe.root_module.addImport("termbox2", termbox2);
 
+    if (optimize == .ReleaseSafe) {
+        std.debug.print("warn: termbox2 module is being built in ReleaseFast due to a bug.\n", .{});
+    }
+
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
