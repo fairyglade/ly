@@ -18,7 +18,7 @@ const Save = @import("config/Save.zig");
 const migrator = @import("config/migrator.zig");
 const SharedError = @import("SharedError.zig");
 const utils = @import("tui/utils.zig");
-const c_import = @cImport({
+const unistd = @cImport({
     @cInclude("unistd.h");
 });
 
