@@ -1,7 +1,0 @@
-bin
-obj
-src/demo/*.o
-src/demo/keyboard
-src/demo/output
-src/demo/paint
-src/demo/truecolor

@@ -100,34 +100,35 @@ pub fn cascade(self: TerminalBuffer) bool {
 }
 
 pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool) void {
-    const x1 = (self.width - self.box_width) / 2;
-    const y1 = (self.height - self.box_height) / 2;
-    const x2 = (self.width + self.box_width) / 2;
-    const y2 = (self.height + self.box_height) / 2;
+    if (self.width < 2 or self.height < 2) return;
+    const x1 = (self.width - @min(self.width - 2, self.box_width)) / 2;
+    const y1 = (self.height - @min(self.height - 2, self.box_height)) / 2;
+    const x2 = (self.width + @min(self.width, self.box_width)) / 2;
+    const y2 = (self.height + @min(self.height, self.box_height)) / 2;
 
     self.box_x = x1;
     self.box_y = y1;
 
     if (show_borders) {
-        termbox.tb_change_cell(@intCast(x1 - 1), @intCast(y1 - 1), self.box_chars.left_up, self.border_fg, self.bg);
-        termbox.tb_change_cell(@intCast(x2), @intCast(y1 - 1), self.box_chars.right_up, self.border_fg, self.bg);
-        termbox.tb_change_cell(@intCast(x1 - 1), @intCast(y2), self.box_chars.left_down, self.border_fg, self.bg);
-        termbox.tb_change_cell(@intCast(x2), @intCast(y2), self.box_chars.right_down, self.border_fg, self.bg);
+        _ = termbox.tb_set_cell(@intCast(x1 - 1), @intCast(y1 - 1), self.box_chars.left_up, self.border_fg, self.bg);
+        _ = termbox.tb_set_cell(@intCast(x2), @intCast(y1 - 1), self.box_chars.right_up, self.border_fg, self.bg);
+        _ = termbox.tb_set_cell(@intCast(x1 - 1), @intCast(y2), self.box_chars.left_down, self.border_fg, self.bg);
+        _ = termbox.tb_set_cell(@intCast(x2), @intCast(y2), self.box_chars.right_down, self.border_fg, self.bg);
 
         var c1 = utils.initCell(self.box_chars.top, self.border_fg, self.bg);
         var c2 = utils.initCell(self.box_chars.bottom, self.border_fg, self.bg);
 
         for (0..self.box_width) |i| {
-            termbox.tb_put_cell(@intCast(x1 + i), @intCast(y1 - 1), &c1);
-            termbox.tb_put_cell(@intCast(x1 + i), @intCast(y2), &c2);
+            _ = utils.putCell(@intCast(x1 + i), @intCast(y1 - 1), &c1);
+            _ = utils.putCell(@intCast(x1 + i), @intCast(y2), &c2);
         }
 
         c1.ch = self.box_chars.left;
         c2.ch = self.box_chars.right;
 
         for (0..self.box_height) |i| {
-            termbox.tb_put_cell(@intCast(x1 - 1), @intCast(y1 + i), &c1);
-            termbox.tb_put_cell(@intCast(x2), @intCast(y1 + i), &c2);
+            _ = utils.putCell(@intCast(x1 - 1), @intCast(y1 + i), &c1);
+            _ = utils.putCell(@intCast(x2), @intCast(y1 + i), &c2);
         }
     }
 
@@ -136,7 +137,7 @@ pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool)
 
         for (0..self.box_height) |y| {
             for (0..self.box_width) |x| {
-                termbox.tb_put_cell(@intCast(x1 + x), @intCast(y1 + y), &blank);
+                _ = utils.putCell(@intCast(x1 + x), @intCast(y1 + y), &blank);
             }
         }
     }
@@ -165,7 +166,19 @@ pub fn drawLabel(self: TerminalBuffer, text: []const u8, x: u64, y: u64) void {
 
     var i = x;
     while (utf8.nextCodepoint()) |codepoint| : (i += 1) {
-        termbox.tb_change_cell(@intCast(i), yc, codepoint, self.fg, self.bg);
+        _ = termbox.tb_set_cell(@intCast(i), yc, codepoint, self.fg, self.bg);
+    }
+}
+
+pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: u64, y: u64, max_length: u64) void {
+    const yc: c_int = @intCast(y);
+    const utf8view = std.unicode.Utf8View.init(text) catch return;
+    var utf8 = utf8view.iterator();
+
+    var i: usize = 0;
+    while (utf8.nextCodepoint()) |codepoint| : (i += 1) {
+        if (i >= max_length) break;
+        _ = termbox.tb_set_cell(@intCast(i + x), yc, codepoint, self.fg, self.bg);
     }
 }
 
@@ -173,5 +186,5 @@ pub fn drawCharMultiple(self: TerminalBuffer, char: u8, x: u64, y: u64, length: 
     const yc: c_int = @intCast(y);
     const cell = utils.initCell(char, self.fg, self.bg);
 
-    for (0..length) |xx| termbox.tb_put_cell(@intCast(x + xx), yc, &cell);
+    for (0..length) |xx| _ = utils.putCell(@intCast(x + xx), yc, &cell);
 }
