@@ -479,7 +479,7 @@ pub fn main() !void {
                     run = false;
                 } else if (pressed_key == sleep_key) {
                     if (config.sleep_cmd) |sleep_cmd| {
-                        var sleep = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
+                        var sleep = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
                         _ = sleep.spawnAndWait() catch .{};
                     }
                 }
@@ -584,7 +584,7 @@ pub fn main() !void {
 
                 update = true;
 
-                var restore_cursor = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
+                var restore_cursor = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
                 _ = restore_cursor.spawnAndWait() catch .{};
             },
             else => {

@@ -4,12 +4,12 @@
     .minimum_zig_version = "0.12.0",
     .dependencies = .{
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/8c98e6404b22aafc0184e999d8f068b81cc22fa1.tar.gz",
-            .hash = "122014e73fd712190e109950837b97f6143f02d7e2b6986e1db70b6f4aadb5ba6a0d",
+            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.9.0.tar.gz",
+            .hash = "12207ee987ce045596cb992cfb15b0d6d9456e50d4721c3061c69dabc2962053644d",
         },
         .zigini = .{
-            .url = "https://github.com/Kawaii-Ash/zigini/archive/ce1f322482099db058f5d9fdd05fbfa255d79723.tar.gz",
-            .hash = "1220e7a99793a0430e0a7c0b938cb3c98321035bc297e21cd0e2413cf740b4923b9f",
+            .url = "https://github.com/Kawaii-Ash/zigini/archive/0f8967515464730a0031497718ebeecbeae32a07.tar.gz",
+            .hash = "1220b7f2e51153392255d2ab9418c55000a86ecab9f48c291385e784645948179c59",
         },
     },
     .paths = .{""},
