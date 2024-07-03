@@ -20,10 +20,9 @@ pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, password: [:0]const u8) !void {
+pub fn authenticate(config: Config, current_environment: Desktop.Environment, login: [:0]const u8, password: [:0]const u8) !void {
     var tty_buffer: [2]u8 = undefined;
     const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
-    const current_environment = desktop.environments.items[desktop.current];
 
     // Set the XDG environment variables
     setXdgSessionEnv(current_environment.display_server);
@@ -40,6 +39,7 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
 
     var status = interop.pam.pam_start(config.service_name.ptr, null, &conv, &handle);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+    defer _ = interop.pam.pam_end(handle, status);
 
     // Do the PAM routine
     status = interop.pam.pam_authenticate(handle, 0);
@@ -50,9 +50,11 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
 
     status = interop.pam.pam_setcred(handle, interop.pam.PAM_ESTABLISH_CRED);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+    defer status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
 
     status = interop.pam.pam_open_session(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+    defer status = interop.pam.pam_close_session(handle, 0);
 
     var pwd: *interop.passwd = undefined;
     {
@@ -81,33 +83,31 @@ pub fn authenticate(config: Config, desktop: Desktop, login: [:0]const u8, passw
         std.process.exit(0);
     }
 
-    var entry: Utmp = std.mem.zeroes(Utmp);
-    addUtmpEntry(&entry, pwd.pw_name, child_pid) catch {};
+    var entry = std.mem.zeroes(Utmp);
 
-    // If we receive SIGTERM, forward it to child_pid
-    const act = std.posix.Sigaction{
-        .handler = .{ .handler = &sessionSignalHandler },
-        .mask = std.posix.empty_sigset,
-        .flags = 0,
-    };
-    try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
+    {
+        // If an error occurs here, we can send SIGTERM to the session
+        errdefer cleanup: {
+            _ = std.posix.kill(child_pid, std.posix.SIG.TERM) catch break :cleanup;
+            _ = std.posix.waitpid(child_pid, 0);
+        }
 
+        // If we receive SIGTERM, forward it to child_pid
+        const act = std.posix.Sigaction{
+            .handler = .{ .handler = &sessionSignalHandler },
+            .mask = std.posix.empty_sigset,
+            .flags = 0,
+        };
+        try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
+
+        try addUtmpEntry(&entry, pwd.pw_name, child_pid);
+    }
     // Wait for the session to stop
     _ = std.posix.waitpid(child_pid, 0);
 
     removeUtmpEntry(&entry);
 
     try resetTerminal(pwd.pw_shell, config.term_reset_cmd);
-
-    // Close the PAM session
-    status = interop.pam.pam_close_session(handle, 0);
-    if (status != 0) return pamDiagnose(status);
-
-    status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
-    if (status != 0) return pamDiagnose(status);
-
-    status = interop.pam.pam_end(handle, status);
-    if (status != 0) return pamDiagnose(status);
 
     if (shared_err.readError()) |err| return err;
 }
@@ -118,8 +118,7 @@ fn startSession(
     handle: ?*interop.pam.pam_handle,
     current_environment: Desktop.Environment,
 ) !void {
-    var status: c_int = 0;
-    status = interop.initgroups(pwd.pw_name, pwd.pw_gid);
+    const status = interop.initgroups(pwd.pw_name, pwd.pw_gid);
     if (status != 0) return error.GroupInitializationFailed;
 
     std.posix.setgid(pwd.pw_gid) catch return error.SetUserGidFailed;
@@ -129,15 +128,11 @@ fn startSession(
     try initEnv(pwd, config.path);
 
     // Set the PAM variables
-    const pam_env_vars = interop.pam.pam_getenvlist(handle);
+    const pam_env_vars: ?[*:null]?[*:0]u8 = interop.pam.pam_getenvlist(handle);
+    if (pam_env_vars == null) return error.GetEnvListFailed;
 
-    var index: usize = 0;
-    while (true) : (index += 1) {
-        const pam_env_var = pam_env_vars[index];
-        if (pam_env_var == null) break;
-
-        _ = interop.putenv(pam_env_var);
-    }
+    const env_list = std.mem.span(pam_env_vars.?);
+    for (env_list) |env_var| _ = interop.putenv(env_var.?);
 
     // Execute what the user requested
     std.posix.chdirZ(pwd.pw_dir) catch return error.ChangeDirectoryFailed;
@@ -156,9 +151,6 @@ fn startSession(
 }
 
 fn initEnv(pwd: *interop.passwd, path_env: ?[:0]const u8) !void {
-    const term_env = std.posix.getenv("TERM");
-
-    if (term_env) |term| _ = interop.setenv("TERM", term, 1);
     _ = interop.setenv("HOME", pwd.pw_dir, 1);
     _ = interop.setenv("PWD", pwd.pw_dir, 1);
     _ = interop.setenv("SHELL", pwd.pw_shell, 1);
@@ -207,7 +199,7 @@ fn loginConv(
 
     // Initialise allocated memory to 0
     // This ensures memory can be freed by pam on success
-    for (response) |*r| r.* = std.mem.zeroes(interop.pam.pam_response);
+    @memset(response, std.mem.zeroes(interop.pam.pam_response));
 
     var username: ?[:0]u8 = null;
     var password: ?[:0]u8 = null;
@@ -335,7 +327,36 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
     return xauthority;
 }
 
-fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xauth_cmd: []const u8, mcookie_cmd: []const u8) !void {
+pub fn mcookie(cmd: [:0]const u8) ![32]u8 {
+    const pipe = try std.posix.pipe();
+    defer std.posix.close(pipe[1]);
+
+    const output = std.fs.File{ .handle = pipe[0] };
+    defer output.close();
+
+    const pid = try std.posix.fork();
+    if (pid == 0) {
+        std.posix.close(pipe[0]);
+
+        std.posix.dup2(pipe[1], std.posix.STDOUT_FILENO) catch std.process.exit(1);
+        std.posix.close(pipe[1]);
+
+        const args = [_:null]?[*:0]u8{};
+        std.posix.execveZ(cmd.ptr, &args, std.c.environ) catch {};
+        std.process.exit(1);
+    }
+
+    const result = std.posix.waitpid(pid, 0);
+
+    if (result.status != 0) return error.McookieFailed;
+
+    var buf: [32]u8 = undefined;
+    const len = try output.read(&buf);
+    if (len != 32) return error.McookieFailed;
+    return buf;
+}
+
+fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xauth_cmd: []const u8, mcookie_cmd: [:0]const u8) !void {
     var pwd_buf: [100]u8 = undefined;
     const pwd = try std.fmt.bufPrintZ(&pwd_buf, "{s}", .{pw_dir});
 
@@ -343,16 +364,19 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     _ = interop.setenv("XAUTHORITY", xauthority, 1);
     _ = interop.setenv("DISPLAY", display_name, 1);
 
+    const mcookie_output = try mcookie(mcookie_cmd);
+
     const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . $({s})", .{ xauth_cmd, display_name, mcookie_cmd }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . {s}", .{ xauth_cmd, display_name, mcookie_output }) catch std.process.exit(1);
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
     }
 
-    _ = std.posix.waitpid(pid, 0);
+    const status = std.posix.waitpid(pid, 0);
+    if (status.status != 0) return error.XauthFailed;
 }
 
 fn executeShellCmd(shell: [*:0]const u8) !void {
@@ -388,7 +412,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
         xcb = interop.xcb.xcb_connect(null, null);
         ok = interop.xcb.xcb_connection_has_error(xcb);
         std.posix.kill(pid, 0) catch |e| {
-            if (e == error.ProcessNotFound and ok != 0) return;
+            if (e == error.ProcessNotFound and ok != 0) return error.XcbConnectionFailed;
         };
     }
 
@@ -428,7 +452,7 @@ fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
     entry.ut_pid = pid;
 
     var buf: [4096]u8 = undefined;
-    const ttyname = try std.os.getFdPath(0, &buf);
+    const ttyname = try std.os.getFdPath(std.posix.STDIN_FILENO, &buf);
 
     var ttyname_buf: [32]u8 = undefined;
     _ = try std.fmt.bufPrintZ(&ttyname_buf, "{s}", .{ttyname["/dev/".len..]});

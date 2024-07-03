@@ -78,14 +78,21 @@ pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, insert_mode: bool) !
         }
     }
 
-    termbox.tb_set_cursor(@intCast(self.x + (self.cursor - self.visible_start)), @intCast(self.y));
+    _ = termbox.tb_set_cursor(@intCast(self.x + (self.cursor - self.visible_start)), @intCast(self.y));
 }
 
 pub fn draw(self: Text) void {
     const length = @min(self.text.items.len, self.visible_length);
     if (length == 0) return;
 
-    const visible_slice = if (self.text.items.len > self.visible_length and self.cursor < self.text.items.len) self.text.items[self.visible_start..(self.visible_length + self.visible_start)] else self.text.items[self.visible_start..];
+    const visible_slice = vs: {
+        if (self.text.items.len > self.visible_length and self.cursor < self.text.items.len) {
+            break :vs self.text.items[self.visible_start..(self.visible_length + self.visible_start)];
+        } else {
+            break :vs self.text.items[self.visible_start..];
+        }
+    };
+
     self.buffer.drawLabel(visible_slice, self.x, self.y);
 }
 

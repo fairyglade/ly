@@ -185,7 +185,7 @@ pub fn handle(self: *Desktop, maybe_event: ?*termbox.tb_event, insert_mode: bool
         }
     }
 
-    termbox.tb_set_cursor(@intCast(self.x + 2), @intCast(self.y));
+    _ = termbox.tb_set_cursor(@intCast(self.x + 2), @intCast(self.y));
 }
 
 pub fn draw(self: Desktop) void {
@@ -198,8 +198,8 @@ pub fn draw(self: Desktop) void {
     const y = self.buffer.box_y + self.buffer.margin_box_v + 2;
     self.buffer.drawLabel(environment.specifier, x, y);
 
-    termbox.tb_change_cell(@intCast(self.x), @intCast(self.y), '<', self.buffer.fg, self.buffer.bg);
-    termbox.tb_change_cell(@intCast(self.x + self.visible_length - 1), @intCast(self.y), '>', self.buffer.fg, self.buffer.bg);
+    _ = termbox.tb_set_cell(@intCast(self.x), @intCast(self.y), '<', self.buffer.fg, self.buffer.bg);
+    _ = termbox.tb_set_cell(@intCast(self.x + self.visible_length - 1), @intCast(self.y), '>', self.buffer.fg, self.buffer.bg);
 
     self.buffer.drawLabel(environment.name, self.x + 2, self.y);
 }

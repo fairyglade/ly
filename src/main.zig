@@ -36,7 +36,7 @@ pub fn signalHandler(i: c_int) callconv(.C) void {
         _ = std.c.waitpid(session_pid, &status, 0);
     }
 
-    termbox.tb_shutdown();
+    _ = termbox.tb_shutdown();
     std.c.exit(i);
 }
 
@@ -130,8 +130,12 @@ pub fn main() !void {
         }
     }
 
-    // Initialize information line with host name
-    get_host_name: {
+    interop.setNumlock(config.numlock) catch {};
+
+    if (config.initial_info_text) |text| {
+        try info_line.setText(text);
+    } else get_host_name: {
+        // Initialize information line with host name
         var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
         const hostname = std.posix.gethostname(&name_buf) catch {
             try info_line.setText(lang.err_hostname);
@@ -142,7 +146,7 @@ pub fn main() !void {
 
     // Initialize termbox
     _ = termbox.tb_init();
-    defer termbox.tb_shutdown();
+    defer _ = termbox.tb_shutdown();
 
     const act = std.posix.Sigaction{
         .handler = .{ .handler = &signalHandler },
@@ -151,8 +155,8 @@ pub fn main() !void {
     };
     try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
-    _ = termbox.tb_select_output_mode(termbox.TB_OUTPUT_NORMAL);
-    termbox.tb_clear();
+    _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_NORMAL);
+    _ = termbox.tb_clear();
 
     // Needed to reset termbox after auth
     const tb_termios = try std.posix.tcgetattr(std.posix.STDIN_FILENO);
@@ -255,13 +259,11 @@ pub fn main() !void {
 
     // Switch to selected TTY if possible
     open_console_dev: {
-        const fd = std.c.open(config.console_dev, .{ .ACCMODE = .WRONLY });
-        defer _ = std.c.close(fd);
-
-        if (fd < 0) {
+        const fd = std.posix.open(config.console_dev, .{ .ACCMODE = .WRONLY }, 0) catch {
             try info_line.setText(lang.err_console_dev);
             break :open_console_dev;
-        }
+        };
+        defer std.posix.close(fd);
 
         _ = std.c.ioctl(fd, interop.VT_ACTIVATE, config.tty);
         _ = std.c.ioctl(fd, interop.VT_WAITACTIVE, config.tty);
@@ -270,9 +272,9 @@ pub fn main() !void {
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
         if (!update or config.animation != .none) {
-            if (!update) std.time.sleep(100_000_000);
+            if (!update) std.time.sleep(std.time.ns_per_ms * 100);
 
-            termbox.tb_present(); // Required to update tb_width(), tb_height() and tb_cell_buffer()
+            _ = termbox.tb_present(); // Required to update tb_width(), tb_height() and tb_cell_buffer()
 
             const width: u64 = @intCast(termbox.tb_width());
             const height: u64 = @intCast(termbox.tb_height());
@@ -308,17 +310,7 @@ pub fn main() !void {
         if (update) {
             // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
             if (auth_fails < 10) {
-                switch (active_input) {
-                    .session => desktop.handle(null, insert_mode),
-                    .login => login.handle(null, insert_mode) catch {
-                        try info_line.setText(lang.err_alloc);
-                    },
-                    .password => password.handle(null, insert_mode) catch {
-                        try info_line.setText(lang.err_alloc);
-                    },
-                }
-
-                termbox.tb_clear();
+                _ = termbox.tb_clear();
 
                 switch (config.animation) {
                     .none => {},
@@ -328,7 +320,7 @@ pub fn main() !void {
 
                 if (config.bigclock and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) draw_big_clock: {
                     const format = "%H:%M";
-                    const xo = buffer.width / 2 - (format.len * (bigclock.WIDTH + 1)) / 2;
+                    const xo = buffer.width / 2 - @min(buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
                     const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
 
                     var clock_buf: [format.len + 1:0]u8 = undefined;
@@ -344,6 +336,25 @@ pub fn main() !void {
 
                 buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
 
+                if (resolution_changed) {
+                    const coordinates = buffer.calculateComponentCoordinates();
+                    desktop.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
+                    login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
+                    password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
+
+                    resolution_changed = false;
+                }
+
+                switch (active_input) {
+                    .session => desktop.handle(null, insert_mode),
+                    .login => login.handle(null, insert_mode) catch {
+                        try info_line.setText(lang.err_alloc);
+                    },
+                    .password => password.handle(null, insert_mode) catch {
+                        try info_line.setText(lang.err_alloc);
+                    },
+                }
+
                 if (config.clock) |clock| draw_clock: {
                     var clock_buf: [32:0]u8 = undefined;
                     const clock_str = interop.timeAsString(&clock_buf, clock) catch {
@@ -352,7 +363,7 @@ pub fn main() !void {
 
                     if (clock_str.len == 0) return error.FormattedTimeEmpty;
 
-                    buffer.drawLabel(clock_str, buffer.width - clock_str.len, 0);
+                    buffer.drawLabel(clock_str, buffer.width - @min(buffer.width, clock_str.len), 0);
                 }
 
                 const label_x = buffer.box_x + buffer.margin_box_h;
@@ -361,10 +372,7 @@ pub fn main() !void {
                 buffer.drawLabel(lang.login, label_x, label_y + 4);
                 buffer.drawLabel(lang.password, label_x, label_y + 6);
 
-                if (info_line.width > 0 and buffer.box_width > info_line.width) {
-                    const x = buffer.box_x + ((buffer.box_width - info_line.width) / 2);
-                    buffer.drawLabel(info_line.text, x, label_y);
-                }
+                info_line.draw(buffer);
 
                 if (!config.hide_key_hints) {
                     var length: u64 = 0;
@@ -392,9 +400,13 @@ pub fn main() !void {
                     }
                 }
 
+                if (config.box_title) |title| {
+                    buffer.drawConfinedLabel(title, buffer.box_x, buffer.box_y - 1, buffer.box_width);
+                }
+
                 if (config.vi_mode) {
                     const label_txt = if (insert_mode) lang.insert else lang.normal;
-                    buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y - 1);
+                    buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
                 }
 
                 draw_lock_state: {
@@ -403,21 +415,15 @@ pub fn main() !void {
                         break :draw_lock_state;
                     };
 
-                    var lock_state_x = buffer.width - lang.numlock.len;
+                    var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
                     const lock_state_y: u64 = if (config.clock != null) 1 else 0;
 
                     if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
-                    lock_state_x -= lang.capslock.len + 1;
-                    if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
-                }
 
-                if (resolution_changed) {
-                    const coordinates = buffer.calculateComponentCoordinates();
-                    desktop.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
-                    login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
-                    password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
-
-                    resolution_changed = false;
+                    if (lock_state_x >= lang.capslock.len + 1) {
+                        lock_state_x -= lang.capslock.len + 1;
+                        if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
+                    }
                 }
 
                 desktop.draw();
@@ -426,16 +432,16 @@ pub fn main() !void {
 
                 update = animate;
             } else {
-                std.time.sleep(10_000_000);
+                std.time.sleep(std.time.ns_per_ms * 10);
                 update = buffer.cascade();
 
                 if (!update) {
-                    std.time.sleep(7_000_000_000);
+                    std.time.sleep(std.time.ns_per_s * 7);
                     auth_fails = 0;
                 }
             }
 
-            termbox.tb_present();
+            _ = termbox.tb_present();
         }
 
         var timeout: i32 = -1;
@@ -523,9 +529,18 @@ pub fn main() !void {
                 };
                 update = true;
             },
+            termbox.TB_KEY_BACK_TAB => {
+                active_input = switch (active_input) {
+                    .session => .password,
+                    .login => .session,
+                    .password => .login,
+                };
+
+                update = true;
+            },
             termbox.TB_KEY_ENTER => {
                 if (config.save) save_last_settings: {
-                    var file = std.fs.createFileAbsolute(save_path, .{}) catch break :save_last_settings;
+                    var file = std.fs.cwd().createFile(save_path, .{}) catch break :save_last_settings;
                     defer file.close();
 
                     const save_data = Save{
@@ -544,9 +559,15 @@ pub fn main() !void {
                     const password_text = try allocator.dupeZ(u8, password.text.items);
                     defer allocator.free(password_text);
 
+                    try info_line.setText(lang.authenticating);
+                    InfoLine.clearRendered(allocator, buffer) catch {};
+                    info_line.draw(buffer);
+                    _ = termbox.tb_present();
+
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
-                        auth.authenticate(config, desktop, login_text, password_text) catch |err| {
+                        const current_environment = desktop.environments.items[desktop.current];
+                        auth.authenticate(config, current_environment, login_text, password_text) catch |err| {
                             shared_err.writeError(err);
                             std.process.exit(1);
                         };
@@ -569,14 +590,15 @@ pub fn main() !void {
                 }
 
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
-                termbox.tb_clear();
+                if (auth_fails < 10) {
+                    _ = termbox.tb_clear();
+                    _ = termbox.tb_present();
+                }
 
                 update = true;
 
                 var restore_cursor = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
                 _ = restore_cursor.spawnAndWait() catch .{};
-
-                termbox.tb_present();
             },
             else => {
                 if (!insert_mode) {
@@ -630,6 +652,10 @@ pub fn main() !void {
 fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
     return switch (err) {
         error.GetPasswordNameFailed => lang.err_pwnam,
+        error.GetEnvListFailed => lang.err_envlist,
+        error.XauthFailed => lang.err_xauth,
+        error.McookieFailed => lang.err_mcookie,
+        error.XcbConnectionFailed => lang.err_xcb_conn,
         error.GroupInitializationFailed => lang.err_user_init,
         error.SetUserGidFailed => lang.err_user_gid,
         error.SetUserUidFailed => lang.err_user_uid,

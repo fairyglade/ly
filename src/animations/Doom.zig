@@ -56,7 +56,7 @@ pub fn draw(self: Doom) void {
             const source = y * self.terminal_buffer.width + x;
             const random = (self.terminal_buffer.random.int(u16) % 7) & 3;
 
-            var dest = source - random + 1;
+            var dest = (source - @min(source, random)) + 1;
             if (self.terminal_buffer.width > dest) dest = 0 else dest -= self.terminal_buffer.width;
 
             const buffer_source = self.buffer[source];

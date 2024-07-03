@@ -10,6 +10,9 @@ res/config.ini contains all of the available config options and their default va
 + `term_restore_cursor_cmd` should restore the cursor to it's usual state.
 + `vi_mode` to enable vi keybindings.
 + `sleep_key` and `sleep_cmd`.
++ `numlock` to set numlock on startup.
++ `initial_info_text` allows changing the initial text on the info line.
++ `box_title` to display a title at the top of the main box
 
 Note: `sleep_cmd` is unset by default, meaning it's hidden and has no effect. 
 
@@ -45,3 +48,5 @@ session_index = 0
 + Non .desktop files are now ignored in sessions directory.
 + PAM auth is now done in a child process. (Fixes some issues with logging out and back in).
 + When ly receives SIGTERM, the terminal is now cleared and existing child processes are cleaned up.
++ Shift+Tab now focuses previous input.
++ Display text in the info line when authenticating.

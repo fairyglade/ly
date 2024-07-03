@@ -8,89 +8,89 @@ const termbox = interop.termbox;
 const X: u32 = if (builtin.os.tag == .linux or builtin.os.tag.isBSD()) 0x2593 else '#';
 const O: u32 = 0;
 
-pub const WIDTH: u64 = 5;
-pub const HEIGHT: u64 = 5;
+pub const WIDTH = 5;
+pub const HEIGHT = 5;
 pub const SIZE = WIDTH * HEIGHT;
 
 // zig fmt: off
-const ZERO = [_]u32{
+const ZERO = [_]u21{
     X,X,X,X,X,
     X,X,O,X,X,
     X,X,O,X,X,
     X,X,O,X,X,
     X,X,X,X,X,
 };
-const ONE = [_]u32{
+const ONE = [_]u21{
     O,O,O,X,X,
     O,O,O,X,X,
     O,O,O,X,X,
     O,O,O,X,X,
     O,O,O,X,X,
 };
-const TWO = [_]u32{
+const TWO = [_]u21{
     X,X,X,X,X,
     O,O,O,X,X,
     X,X,X,X,X,
     X,X,O,O,O,
     X,X,X,X,X,
 };
-const THREE = [_]u32{
+const THREE = [_]u21{
     X,X,X,X,X,
     O,O,O,X,X,
     X,X,X,X,X,
     O,O,O,X,X,
     X,X,X,X,X,
 };
-const FOUR = [_]u32{
+const FOUR = [_]u21{
     X,X,O,X,X,
     X,X,O,X,X,
     X,X,X,X,X,
     O,O,O,X,X,
     O,O,O,X,X,
 };
-const FIVE = [_]u32{
+const FIVE = [_]u21{
     X,X,X,X,X,
     X,X,O,O,O,
     X,X,X,X,X,
     O,O,O,X,X,
     X,X,X,X,X,
 };
-const SIX = [_]u32{
+const SIX = [_]u21{
     X,X,X,X,X,
     X,X,O,O,O,
     X,X,X,X,X,
     X,X,O,X,X,
     X,X,X,X,X,
 };
-const SEVEN = [_]u32{
+const SEVEN = [_]u21{
     X,X,X,X,X,
     O,O,O,X,X,
     O,O,O,X,X,
     O,O,O,X,X,
     O,O,O,X,X,
 };
-const EIGHT = [_]u32{
+const EIGHT = [_]u21{
     X,X,X,X,X,
     X,X,O,X,X,
     X,X,X,X,X,
     X,X,O,X,X,
     X,X,X,X,X,
 };
-const NINE = [_]u32{
+const NINE = [_]u21{
     X,X,X,X,X,
     X,X,O,X,X,
     X,X,X,X,X,
     O,O,O,X,X,
     X,X,X,X,X,
 };
-const S = [_]u32{
+const S = [_]u21{
     O,O,O,O,O,
     O,O,X,O,O,
     O,O,O,O,O,
     O,O,X,O,O,
     O,O,O,O,O,
 };
-const E = [_]u32{
+const E = [_]u21{
     O,O,O,O,O,
     O,O,O,O,O,
     O,O,O,O,O,
@@ -122,7 +122,7 @@ pub fn alphaBlit(buffer: [*]termbox.tb_cell, x: u64, y: u64, tb_width: u64, tb_h
     }
 }
 
-fn toBigNumber(char: u8) []const u32 {
+fn toBigNumber(char: u8) []const u21 {
     return switch (char) {
         '0' => &ZERO,
         '1' => &ONE,
