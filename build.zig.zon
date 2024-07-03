@@ -1,6 +1,7 @@
 .{
     .name = "ly",
     .version = "1.0.0",
+    .minimum_zig_version = "0.12.0",
     .dependencies = .{
         .clap = .{
             .url = "https://github.com/Hejsil/zig-clap/archive/8c98e6404b22aafc0184e999d8f068b81cc22fa1.tar.gz",
