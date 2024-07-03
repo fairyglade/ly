@@ -508,13 +508,14 @@ pub fn main() !void {
                         var brightness = std.ChildProcess.init(&[_][]const u8{ config.brightnessctl, "-q", "s", brightness_str }, allocator);
                         _ = brightness.spawnAndWait() catch .{};
                     }
-                } else if (pressed_key == brightness_up_key) {
-                    if (unistd.access(&config.brightnessctl[0], unistd.X_OK) == 0) {
-                        const brightness_str = std.fmt.allocPrint(allocator, "+{s}%", .{config.brightness_change}) catch unreachable;
-                        defer allocator.free(brightness_str);
-                        var brightness = std.ChildProcess.init(&[_][]const u8{ config.brightnessctl, "-q", "s", brightness_str }, allocator);
-                        _ = brightness.spawnAndWait() catch .{};
-                    }
+                } else if (pressed_key == brightness_up_key and unistd.access(&config.brightnessctl[0], unistd.X_OK) == 0) brightness_change: {
+                    const brightness_str = std.fmt.allocPrint(allocator, "+{s}%", .{config.brightness_change}) catch {
+                        try info_line.setText(lang.err_alloc);
+                        break :brightness_change;
+                    };
+                    defer allocator.free(brightness_str);
+                    var brightness = std.ChildProcess.init(&[_][]const u8{ config.brightnessctl, "-q", "s", brightness_str }, allocator);
+                    _ = brightness.spawnAndWait() catch .{};
                 }
             },
             termbox.TB_KEY_CTRL_C => run = false,
