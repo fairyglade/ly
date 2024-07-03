@@ -6,13 +6,15 @@ var data_directory: []const u8 = undefined;
 var exe_name: []const u8 = undefined;
 
 pub fn build(b: *std.Build) !void {
-    dest_directory = b.option([]const u8, "dest_directory", "Specify a dest directory for installation") orelse "";
-    data_directory = b.option([]const u8, "data_directory", "Specify a default data directory (default is /etc/ly)") orelse "/etc/ly";
-    data_directory = try std.fs.path.join(b.allocator, &[_][]const u8{ dest_directory, data_directory });
+    dest_directory = b.option([]const u8, "dest_directory", "Specify a destination directory for installation") orelse "";
+    data_directory = b.option([]const u8, "data_directory", "Specify a default data directory (default is /etc/ly). This path gets embedded into the binary") orelse "/etc/ly";
     exe_name = b.option([]const u8, "name", "Specify installed executable file name (default is ly)") orelse "ly";
 
+    const bin_directory = try b.allocator.dupe(u8, data_directory);
+    data_directory = try std.fs.path.join(b.allocator, &[_][]const u8{ dest_directory, data_directory });
+
     const build_options = b.addOptions();
-    build_options.addOption([]const u8, "data_directory", data_directory);
+    build_options.addOption([]const u8, "data_directory", bin_directory);
 
     const version_str = try getVersionStr(b, "ly", ly_version);
 
@@ -113,7 +115,7 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                 .Openrc => {
                     const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/init.d" });
                     std.fs.cwd().makePath(service_path) catch {};
-                    var service_dir = std.fs.openDirAbsolute(service_path, .{}) catch unreachable;
+                    var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
                     try std.fs.cwd().copyFile("res/ly-openrc", service_dir, exe_name, .{ .override_mode = 755 });
@@ -121,7 +123,7 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                 .Runit => {
                     const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/sv/ly" });
                     std.fs.cwd().makePath(service_path) catch {};
-                    var service_dir = std.fs.openDirAbsolute(service_path, .{}) catch unreachable;
+                    var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
                     try std.fs.cwd().copyFile("res/ly-runit-service/conf", service_dir, "conf", .{});
@@ -131,7 +133,7 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                 .Systemd => {
                     const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/lib/systemd/system" });
                     std.fs.cwd().makePath(service_path) catch {};
-                    var service_dir = std.fs.openDirAbsolute(service_path, .{}) catch unreachable;
+                    var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
                     try std.fs.cwd().copyFile("res/ly.service", service_dir, "ly.service", .{ .override_mode = 644 });
@@ -161,14 +163,14 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
             };
         }
 
-        var executable_dir = std.fs.openDirAbsolute(exe_path, .{}) catch unreachable;
+        var executable_dir = std.fs.cwd().openDir(exe_path, .{}) catch unreachable;
         defer executable_dir.close();
 
         try current_dir.copyFile("zig-out/bin/ly", executable_dir, exe_name, .{});
     }
 
     {
-        var config_dir = std.fs.openDirAbsolute(data_directory, .{}) catch unreachable;
+        var config_dir = std.fs.cwd().openDir(data_directory, .{}) catch unreachable;
         defer config_dir.close();
 
         if (install_config) {
@@ -179,7 +181,7 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
     }
 
     {
-        var lang_dir = std.fs.openDirAbsolute(lang_path, .{}) catch unreachable;
+        var lang_dir = std.fs.cwd().openDir(lang_path, .{}) catch unreachable;
         defer lang_dir.close();
 
         try current_dir.copyFile("res/lang/cat.ini", lang_dir, "cat.ini", .{});
@@ -208,7 +210,7 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
             };
         }
 
-        var pam_dir = std.fs.openDirAbsolute(pam_path, .{}) catch unreachable;
+        var pam_dir = std.fs.cwd().openDir(pam_path, .{}) catch unreachable;
         defer pam_dir.close();
 
         try current_dir.copyFile("res/pam.d/ly", pam_dir, "ly", .{ .override_mode = 644 });
@@ -217,27 +219,27 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
 
 pub fn uninstallall(step: *std.Build.Step, progress: *std.Progress.Node) !void {
     _ = progress;
-    try std.fs.deleteTreeAbsolute(data_directory);
+    try std.fs.cwd().deleteTree(data_directory);
     const allocator = step.owner.allocator;
 
     const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/bin/", exe_name });
-    try std.fs.deleteFileAbsolute(exe_path);
+    try std.fs.cwd().deleteFile(exe_path);
 
     const pam_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/pam.d/ly" });
-    try std.fs.deleteFileAbsolute(pam_path);
+    try std.fs.cwd().deleteFile(pam_path);
 
     const systemd_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/lib/systemd/system/ly.service" });
-    std.fs.deleteFileAbsolute(systemd_service_path) catch {
+    std.fs.cwd().deleteFile(systemd_service_path) catch {
         std.debug.print("warn: systemd service not found.\n", .{});
     };
 
     const openrc_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/init.d/ly" });
-    std.fs.deleteFileAbsolute(openrc_service_path) catch {
+    std.fs.cwd().deleteFile(openrc_service_path) catch {
         std.debug.print("warn: openrc service not found.\n", .{});
     };
 
     const runit_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/sv/ly" });
-    std.fs.deleteTreeAbsolute(runit_service_path) catch {
+    std.fs.cwd().deleteTree(runit_service_path) catch {
         std.debug.print("warn: runit service not found.\n", .{});
     };
 }
