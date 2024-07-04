@@ -1,9 +1,23 @@
 const std = @import("std");
+const builtin = @import("builtin");
+
+const min_zig_string = "0.12.0";
+const current_zig = builtin.zig_version;
+
+// Implementing zig version detection through compile time
+comptime {
+    const min_zig = std.SemanticVersion.parse(min_zig_string) catch unreachable;
+    if (current_zig.order(min_zig) == .lt) {
+        @compileError(std.fmt.comptimePrint("Your Zig version v{} does not meet the minimum build requirement of v{}", .{ current_zig, min_zig }));
+    }
+}
 
 const ly_version = std.SemanticVersion{ .major = 1, .minor = 1, .patch = 0 };
 var dest_directory: []const u8 = undefined;
 var data_directory: []const u8 = undefined;
 var exe_name: []const u8 = undefined;
+
+const ProgressNode = if (current_zig.minor == 12) *std.Progress.Node else std.Progress.Node;
 
 pub fn build(b: *std.Build) !void {
     dest_directory = b.option([]const u8, "dest_directory", "Specify a destination directory for installation") orelse "";
@@ -94,7 +108,7 @@ pub fn build(b: *std.Build) !void {
 
 pub fn ExeInstaller(install_conf: bool) type {
     return struct {
-        pub fn make(step: *std.Build.Step, _: std.Progress.Node) anyerror!void {
+        pub fn make(step: *std.Build.Step, _: ProgressNode) !void {
             try install_ly(step.owner.allocator, install_conf);
         }
     };
@@ -107,7 +121,7 @@ const InitSystem = enum {
 };
 pub fn ServiceInstaller(comptime init_system: InitSystem) type {
     return struct {
-        pub fn make(step: *std.Build.Step, _: std.Progress.Node) !void {
+        pub fn make(step: *std.Build.Step, _: ProgressNode) !void {
             const allocator = step.owner.allocator;
             switch (init_system) {
                 .Openrc => {
@@ -215,7 +229,7 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
     }
 }
 
-pub fn uninstallall(step: *std.Build.Step, _: std.Progress.Node) !void {
+pub fn uninstallall(step: *std.Build.Step, _: ProgressNode) !void {
     try std.fs.cwd().deleteTree(data_directory);
     const allocator = step.owner.allocator;
 
