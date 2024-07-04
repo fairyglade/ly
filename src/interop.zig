@@ -16,6 +16,10 @@ pub const xcb = @cImport({
     @cInclude("xcb/xcb.h");
 });
 
+pub const unistd = @cImport({
+    @cInclude("unistd.h");
+});
+
 pub const c_size = u64;
 pub const c_uid = u32;
 pub const c_gid = u32;

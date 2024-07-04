@@ -21,6 +21,7 @@ const utils = @import("tui/utils.zig");
 
 const Ini = ini.Ini;
 const termbox = interop.termbox;
+const unistd = interop.unistd;
 
 var session_pid: std.posix.pid_t = -1;
 pub fn signalHandler(i: c_int) callconv(.C) void {
@@ -245,6 +246,10 @@ pub fn main() !void {
     const restart_key = try std.fmt.parseInt(u8, config.restart_key[1..], 10);
     const restart_len = try utils.strWidth(lang.restart);
     const sleep_key = try std.fmt.parseInt(u8, config.sleep_key[1..], 10);
+    const brightness_down_key = try std.fmt.parseInt(u8, config.brightness_down_key[1..], 10);
+    const brightness_down_len = try utils.strWidth(lang.brightness_down);
+    const brightness_up_key = try std.fmt.parseInt(u8, config.brightness_up_key[1..], 10);
+    const brightness_up_len = try utils.strWidth(lang.brightness_up);
 
     var event: termbox.tb_event = undefined;
     var run = true;
@@ -388,6 +393,20 @@ pub fn main() !void {
                     buffer.drawLabel(lang.restart, length, 0);
                     length += restart_len + 1;
 
+                    buffer.drawLabel(config.brightness_down_key, length, 0);
+                    length += config.brightness_down_key.len + 1;
+                    buffer.drawLabel(" ", length - 1, 0);
+
+                    buffer.drawLabel(lang.brightness_down, length, 0);
+                    length += brightness_down_len + 1;
+
+                    buffer.drawLabel(config.brightness_up_key, length, 0);
+                    length += config.brightness_up_key.len + 1;
+                    buffer.drawLabel(" ", length - 1, 0);
+
+                    buffer.drawLabel(lang.brightness_up, length, 0);
+                    length += brightness_up_len + 1;
+
                     if (config.sleep_cmd != null) {
                         buffer.drawLabel(config.sleep_key, length, 0);
                         length += config.sleep_key.len + 1;
@@ -482,6 +501,22 @@ pub fn main() !void {
                         var sleep = std.ChildProcess.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
                         _ = sleep.spawnAndWait() catch .{};
                     }
+                } else if (pressed_key == brightness_down_key and unistd.access(&config.brightnessctl[0], unistd.X_OK) == 0) brightness_change: {
+                    const brightness_str = std.fmt.allocPrint(allocator, "{s}%-", .{config.brightness_change}) catch {
+                        try info_line.setText(lang.err_brightness_change);
+                        break :brightness_change;
+                    };
+                    defer allocator.free(brightness_str);
+                    var brightness = std.ChildProcess.init(&[_][]const u8{ config.brightnessctl, "-q", "s", brightness_str }, allocator);
+                    _ = brightness.spawnAndWait() catch .{};
+                } else if (pressed_key == brightness_up_key and unistd.access(&config.brightnessctl[0], unistd.X_OK) == 0) brightness_change: {
+                    const brightness_str = std.fmt.allocPrint(allocator, "+{s}%", .{config.brightness_change}) catch {
+                        try info_line.setText(lang.err_brightness_change);
+                        break :brightness_change;
+                    };
+                    defer allocator.free(brightness_str);
+                    var brightness = std.ChildProcess.init(&[_][]const u8{ config.brightnessctl, "-q", "s", brightness_str }, allocator);
+                    _ = brightness.spawnAndWait() catch .{};
                 }
             },
             termbox.TB_KEY_CTRL_C => run = false,
