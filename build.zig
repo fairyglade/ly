@@ -15,6 +15,7 @@ comptime {
 const ly_version = std.SemanticVersion{ .major = 1, .minor = 1, .patch = 0 };
 var dest_directory: []const u8 = undefined;
 var data_directory: []const u8 = undefined;
+var default_tty: u8 = 0;
 var exe_name: []const u8 = undefined;
 
 const ProgressNode = if (current_zig.minor == 12) *std.Progress.Node else std.Progress.Node;
@@ -22,6 +23,8 @@ const ProgressNode = if (current_zig.minor == 12) *std.Progress.Node else std.Pr
 pub fn build(b: *std.Build) !void {
     dest_directory = b.option([]const u8, "dest_directory", "Specify a destination directory for installation") orelse "";
     data_directory = b.option([]const u8, "data_directory", "Specify a default data directory (default is /etc/ly). This path gets embedded into the binary") orelse "/etc/ly";
+    default_tty = b.option(u8, "default_tty", "set default tty") orelse 2;
+
     exe_name = b.option([]const u8, "name", "Specify installed executable file name (default is ly)") orelse "ly";
 
     const bin_directory = try b.allocator.dupe(u8, data_directory);
@@ -33,6 +36,8 @@ pub fn build(b: *std.Build) !void {
     const version_str = try getVersionStr(b, "ly", ly_version);
 
     build_options.addOption([]const u8, "version", version_str);
+
+    build_options.addOption(u8, "tty", default_tty);
 
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
