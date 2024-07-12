@@ -1,13 +1,30 @@
 const std = @import("std");
+const builtin = @import("builtin");
+
+const min_zig_string = "0.12.0";
+const current_zig = builtin.zig_version;
+
+// Implementing zig version detection through compile time
+comptime {
+    const min_zig = std.SemanticVersion.parse(min_zig_string) catch unreachable;
+    if (current_zig.order(min_zig) == .lt) {
+        @compileError(std.fmt.comptimePrint("Your Zig version v{} does not meet the minimum build requirement of v{}", .{ current_zig, min_zig }));
+    }
+}
 
 const ly_version = std.SemanticVersion{ .major = 1, .minor = 1, .patch = 0 };
 var dest_directory: []const u8 = undefined;
 var data_directory: []const u8 = undefined;
+var default_tty: u8 = undefined;
 var exe_name: []const u8 = undefined;
+
+const ProgressNode = if (current_zig.minor == 12) *std.Progress.Node else std.Progress.Node;
 
 pub fn build(b: *std.Build) !void {
     dest_directory = b.option([]const u8, "dest_directory", "Specify a destination directory for installation") orelse "";
     data_directory = b.option([]const u8, "data_directory", "Specify a default data directory (default is /etc/ly). This path gets embedded into the binary") orelse "/etc/ly";
+    default_tty = b.option(u8, "default_tty", "set default TTY") orelse 2;
+
     exe_name = b.option([]const u8, "name", "Specify installed executable file name (default is ly)") orelse "ly";
 
     const bin_directory = try b.allocator.dupe(u8, data_directory);
@@ -20,12 +37,14 @@ pub fn build(b: *std.Build) !void {
 
     build_options.addOption([]const u8, "version", version_str);
 
+    build_options.addOption(u8, "tty", default_tty);
+
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
     const exe = b.addExecutable(.{
         .name = "ly",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -38,14 +57,14 @@ pub fn build(b: *std.Build) !void {
     const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("clap", clap.module("clap"));
 
-    exe.addIncludePath(.{ .path = "include" });
+    exe.addIncludePath(b.path("include"));
     exe.linkSystemLibrary("pam");
     exe.linkSystemLibrary("xcb");
     exe.linkLibC();
 
     // HACK: Only fails with ReleaseSafe, so we'll override it.
     const translate_c = b.addTranslateC(.{
-        .root_source_file = .{ .path = "include/termbox2.h" },
+        .root_source_file = b.path("include/termbox2.h"),
         .target = target,
         .optimize = if (optimize == .ReleaseSafe) .ReleaseFast else optimize,
     });
@@ -94,8 +113,7 @@ pub fn build(b: *std.Build) !void {
 
 pub fn ExeInstaller(install_conf: bool) type {
     return struct {
-        pub fn make(step: *std.Build.Step, progress: *std.Progress.Node) !void {
-            _ = progress;
+        pub fn make(step: *std.Build.Step, _: ProgressNode) !void {
             try install_ly(step.owner.allocator, install_conf);
         }
     };
@@ -108,8 +126,7 @@ const InitSystem = enum {
 };
 pub fn ServiceInstaller(comptime init_system: InitSystem) type {
     return struct {
-        pub fn make(step: *std.Build.Step, progress: *std.Progress.Node) !void {
-            _ = progress;
+        pub fn make(step: *std.Build.Step, _: ProgressNode) !void {
             const allocator = step.owner.allocator;
             switch (init_system) {
                 .Openrc => {
@@ -217,8 +234,7 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
     }
 }
 
-pub fn uninstallall(step: *std.Build.Step, progress: *std.Progress.Node) !void {
-    _ = progress;
+pub fn uninstallall(step: *std.Build.Step, _: ProgressNode) !void {
     try std.fs.cwd().deleteTree(data_directory);
     const allocator = step.owner.allocator;
 
