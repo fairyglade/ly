@@ -556,7 +556,7 @@ pub fn main() !void {
             _ = termbox.tb_present();
         }
 
-        var timeout: i32 = 100;
+        var timeout: i32 = -1;
 
         // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for 100ms instead
         if (animate and !animation_timed_out) {
@@ -586,28 +586,32 @@ pub fn main() !void {
             timeout = @intCast(1000 - @divTrunc(tv.tv_usec, 1000) + 1);
         }
 
-        timeout = @min(timeout, 100);
+        const timeoutEnd: i64 = if (timeout == -1) std.math.maxInt(i64) else std.time.milliTimestamp() + timeout;
 
-        const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
+        const maxtimeout = 100;
+        var skipEvent: bool = false;
+        while (timeoutEnd - std.time.milliTimestamp() > 0) {
+            const event_error = termbox.tb_peek_event(&event, @intCast(@min(timeoutEnd - std.time.milliTimestamp(), maxtimeout)));
 
-        update = timeout != -1;
-        if (asyncPamHandle) |handle| {
-            if (auth.postFingerprintAuth(config, session, handle, currentLogin.?)) |_| {
-                try info_line.setText(lang.logout);
-            } else |err| {
-                active_input = .password;
-                try info_line.setText(getAuthErrorMsg(err, lang));
-                try startFingerPrintLogin(allocator, config, login);
+            if (asyncPamHandle) |handle| {
+                if (auth.postFingerprintAuth(config, session, handle, currentLogin.?)) |_| {
+                    try info_line.setText(lang.logout);
+                } else |err| {
+                    active_input = .password;
+                    try info_line.setText(getAuthErrorMsg(err, lang));
+                    try startFingerPrintLogin(allocator, config, login);
+                }
+
+                asyncPamHandle = null;
+                try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
+                _ = termbox.tb_clear();
+                _ = termbox.tb_present();
             }
-
-            asyncPamHandle = null;
-            try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
-            _ = termbox.tb_clear();
-            _ = termbox.tb_present();
-            std.time.sleep(1000000000);
+            skipEvent = event_error < 0;
+            if ((event_error < 0 and event_error != -6) or event.type == termbox.TB_EVENT_KEY) break;
         }
-
-        if (event_error < 0 or event.type != termbox.TB_EVENT_KEY) continue;
+        update = timeout != -1;
+        if (skipEvent or event.type != termbox.TB_EVENT_KEY) continue;
 
         switch (event.key) {
             termbox.TB_KEY_ESC => {
