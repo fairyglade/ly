@@ -507,7 +507,7 @@ pub fn main() !void {
                         break :brightness_change;
                     };
                     defer allocator.free(brightness_str);
-                    var brightness = std.ChildProcess.init(&[_][]const u8{ config.brightnessctl, "-q", "s", brightness_str }, allocator);
+                    var brightness = std.process.Child.init(&[_][]const u8{ config.brightnessctl, "-q", "s", brightness_str }, allocator);
                     _ = brightness.spawnAndWait() catch .{};
                 } else if (pressed_key == brightness_up_key and unistd.access(&config.brightnessctl[0], unistd.X_OK) == 0) brightness_change: {
                     const brightness_str = std.fmt.allocPrint(allocator, "+{s}%", .{config.brightness_change}) catch {
@@ -515,7 +515,7 @@ pub fn main() !void {
                         break :brightness_change;
                     };
                     defer allocator.free(brightness_str);
-                    var brightness = std.ChildProcess.init(&[_][]const u8{ config.brightnessctl, "-q", "s", brightness_str }, allocator);
+                    var brightness = std.process.Child.init(&[_][]const u8{ config.brightnessctl, "-q", "s", brightness_str }, allocator);
                     _ = brightness.spawnAndWait() catch .{};
                 }
             },
