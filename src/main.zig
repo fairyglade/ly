@@ -45,7 +45,7 @@ var asyncPamHandle: ?*interop.pam.pam_handle = null;
 
 fn fingerprintLogin(config: Config, login: [:0]const u8) !void {
     // TODO: loop if there was an error
-    const pamHandle = try auth.fingerprintAuth(config, login);
+    const pamHandle = try auth.authenticate(config, login, "");
     if (currentLogin != null and !std.mem.eql(u8, std.mem.span(@as([*:0]const u8, currentLogin.?)), login)) {
         return;
     }
@@ -594,18 +594,49 @@ pub fn main() !void {
             const event_error = termbox.tb_peek_event(&event, @intCast(@min(timeoutEnd - std.time.milliTimestamp(), maxtimeout)));
 
             if (asyncPamHandle) |handle| {
-                if (auth.postFingerprintAuth(config, session, handle, currentLogin.?)) |_| {
-                    try info_line.setText(lang.logout);
-                } else |err| {
-                    active_input = .password;
-                    try info_line.setText(getAuthErrorMsg(err, lang));
-                    try startFingerPrintLogin(allocator, config, login);
+                var shared_err = try SharedError.init();
+                defer shared_err.deinit();
+
+                {
+                    const login_text = try allocator.dupeZ(u8, login.text.items);
+                    defer allocator.free(login_text);
+
+                    InfoLine.clearRendered(allocator, buffer) catch {};
+                    info_line.draw(buffer);
+                    _ = termbox.tb_present();
+
+                    session_pid = try std.posix.fork();
+                    if (session_pid == 0) {
+                        const current_environment = session.environments.items[session.current];
+                        auth.finaliseAuth(config, current_environment, handle, login_text) catch |err| {
+                            shared_err.writeError(err);
+                            std.process.exit(1);
+                        };
+
+                        std.process.exit(0);
+                    }
+                    _ = std.posix.waitpid(session_pid, 0);
+
+                    session_pid = -1;
                 }
 
+                const auth_err = shared_err.readError();
+                if (auth_err) |err| {
+                    try info_line.setText(getAuthErrorMsg(err, lang));
+                } else {
+                    try info_line.setText(lang.logout);
+                }
                 asyncPamHandle = null;
+                try startFingerPrintLogin(allocator, config, login);
+
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
                 _ = termbox.tb_clear();
                 _ = termbox.tb_present();
+
+                update = true;
+
+                var restore_cursor = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
+                _ = restore_cursor.spawnAndWait() catch .{};
             }
             skipEvent = event_error < 0;
             if ((event_error < 0 and event_error != -6) or event.type == termbox.TB_EVENT_KEY) break;
@@ -721,16 +752,21 @@ pub fn main() !void {
                     _ = termbox.tb_shutdown();
 
                     session_pid = try std.posix.fork();
-                    if (session_pid == 0) {
-                        const current_environment = session.label.list.items[session.label.current];
-                        auth.authenticate(config, current_environment, login_text, password_text) catch |err| {
-                            shared_err.writeError(err);
-                            std.process.exit(1);
-                        };
-                        std.process.exit(0);
+                    const current_environment = session.environments.items[session.current];
+                    if (auth.authenticate(config, login_text, password_text)) |handle| {
+                        if (session_pid == 0) {
+                            auth.finaliseAuth(config, current_environment, handle, login_text) catch |err| {
+                                shared_err.writeError(err);
+                                std.process.exit(1);
+                            };
+
+                            std.process.exit(0);
+                        }
+                        _ = std.posix.waitpid(session_pid, 0);
+                    } else |err| {
+                        shared_err.writeError(err);
                     }
 
-                    _ = std.posix.waitpid(session_pid, 0);
                     session_pid = -1;
                 }
 
