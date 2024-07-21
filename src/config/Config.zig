@@ -3,6 +3,7 @@ const enums = @import("../enums.zig");
 
 const Animation = enums.Animation;
 const Input = enums.Input;
+const ViMode = enums.ViMode;
 
 animation: Animation = .none,
 asterisk: u8 = '*',
@@ -45,6 +46,7 @@ term_reset_cmd: [:0]const u8 = "/usr/bin/tput reset",
 term_restore_cursor_cmd: []const u8 = "/usr/bin/tput cnorm",
 tty: u8 = build_options.tty,
 vi_mode: bool = false,
+vi_default_mode: ViMode = .normal,
 wayland_cmd: []const u8 = build_options.data_directory ++ "/wsetup.sh",
 waylandsessions: []const u8 = "/usr/share/wayland-sessions",
 x_cmd: []const u8 = "/usr/bin/X",
