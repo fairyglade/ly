@@ -42,6 +42,12 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
+    // to be able to stop the animation after some time
+
+    var tv_zero: std.c.timeval = undefined;
+    _ = std.c.gettimeofday(&tv_zero, null);
+    var animation_timed_out: bool = false;
+
     const allocator = gpa.allocator();
     const stderr = std.io.getStdErr().writer();
 
@@ -314,10 +320,12 @@ pub fn main() !void {
             if (auth_fails < 10) {
                 _ = termbox.tb_clear();
 
-                switch (config.animation) {
-                    .none => {},
-                    .doom => doom.draw(),
-                    .matrix => matrix.draw(),
+                if (!animation_timed_out) {
+                    switch (config.animation) {
+                        .none => {},
+                        .doom => doom.draw(),
+                        .matrix => matrix.draw(),
+                    }
                 }
 
                 if (config.bigclock and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) draw_big_clock: {
@@ -463,8 +471,21 @@ pub fn main() !void {
         var timeout: i32 = -1;
 
         // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for the event indefinitely instead
-        if (animate) {
+        if (animate and !animation_timed_out) {
             timeout = config.min_refresh_delta;
+
+            // check how long we have been running so we can turn off the animation
+            var tv: std.c.timeval = undefined;
+            _ = std.c.gettimeofday(&tv, null);
+
+            if (config.animation_timeout_sec > 0 and tv.tv_sec - tv_zero.tv_sec > config.animation_timeout_sec) {
+                animation_timed_out = true;
+                switch (config.animation) {
+                    .none => {},
+                    .doom => doom.deinit(),
+                    .matrix => matrix.deinit(),
+                }
+            }
         } else if (config.bigclock and config.clock == null) {
             var tv: std.c.timeval = undefined;
             _ = std.c.gettimeofday(&tv, null);
