@@ -34,8 +34,9 @@ dots: []Dot,
 lines: []Line,
 frame: u64,
 count: u64,
+fg_ini: u16,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer) !Matrix {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u16) !Matrix {
     const dots = try allocator.alloc(Dot, terminal_buffer.width * (terminal_buffer.height + 1));
     const lines = try allocator.alloc(Line, terminal_buffer.width);
 
@@ -48,6 +49,7 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer) !Matrix {
         .lines = lines,
         .frame = 3,
         .count = 0,
+        .fg_ini = fg_ini,
     };
 }
 
@@ -145,7 +147,8 @@ pub fn draw(self: *Matrix) void {
         var y: u64 = 1;
         while (y <= self.terminal_buffer.height) : (y += 1) {
             const dot = self.dots[buf_width * y + x];
-            var fg: u16 = @intCast(termbox.TB_GREEN);
+
+            var fg: u16 = self.fg_ini;
 
             if (dot.value == -1 or dot.value == ' ') {
                 _ = termbox.tb_set_cell(@intCast(x), @intCast(y - 1), ' ', fg, termbox.TB_DEFAULT);
