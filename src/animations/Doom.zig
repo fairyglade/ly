@@ -28,8 +28,9 @@ pub const FIRE = [_]termbox.tb_cell{
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
 buffer: []u8,
+delay: u64,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer) !Doom {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, delay: u64) !Doom {
     const buffer = try allocator.alloc(u8, terminal_buffer.width * terminal_buffer.height);
     initBuffer(buffer, terminal_buffer.width);
 
@@ -37,6 +38,7 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer) !Doom {
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
         .buffer = buffer,
+        .delay = delay,
     };
 }
 
@@ -72,6 +74,8 @@ pub fn draw(self: Doom) void {
             self.terminal_buffer.buffer[source] = FIRE[buffer_source];
         }
     }
+    // Delay related code
+    std.time.sleep(std.time.ns_per_ms * self.delay);
 }
 
 fn initBuffer(buffer: []u8, width: u64) void {

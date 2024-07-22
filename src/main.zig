@@ -229,7 +229,7 @@ pub fn main() !void {
 
     switch (config.animation) {
         .none => {},
-        .doom => doom = try Doom.init(allocator, &buffer),
+        .doom => doom = try Doom.init(allocator, &buffer, config.doom_delay),
         .matrix => matrix = try Matrix.init(allocator, &buffer, config.cmatrix_fg),
     }
     defer {
