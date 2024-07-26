@@ -4,7 +4,7 @@ const interop = @import("../interop.zig");
 const utils = @import("utils.zig");
 const Config = @import("../config/Config.zig");
 
-const Random = std.rand.Random;
+const Random = std.Random;
 
 const termbox = interop.termbox;
 
@@ -35,11 +35,9 @@ box_height: u64,
 margin_box_v: u8,
 margin_box_h: u8,
 
-pub fn init(config: Config, labels_max_length: u64) TerminalBuffer {
-    var prng = std.rand.Isaac64.init(@intCast(std.time.timestamp()));
-
+pub fn init(config: Config, labels_max_length: u64, random: Random) TerminalBuffer {
     return .{
-        .random = prng.random(),
+        .random = random,
         .width = @intCast(termbox.tb_width()),
         .height = @intCast(termbox.tb_height()),
         .buffer = termbox.tb_cell_buffer(),
