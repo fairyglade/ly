@@ -135,7 +135,7 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                     var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
-                    try std.fs.cwd().copyFile("res/ly-openrc", service_dir, exe_name, .{ .override_mode = 755 });
+                    try std.fs.cwd().copyFile("res/ly-openrc", service_dir, exe_name, .{ .override_mode = 0o755 });
                 },
                 .Runit => {
                     const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/sv/ly" });
@@ -153,7 +153,7 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                     var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
-                    try std.fs.cwd().copyFile("res/ly.service", service_dir, "ly.service", .{ .override_mode = 644 });
+                    try std.fs.cwd().copyFile("res/ly.service", service_dir, "ly.service", .{ .override_mode = 0o644 });
                 },
             }
         }
@@ -230,7 +230,7 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
         var pam_dir = std.fs.cwd().openDir(pam_path, .{}) catch unreachable;
         defer pam_dir.close();
 
-        try current_dir.copyFile("res/pam.d/ly", pam_dir, "ly", .{ .override_mode = 644 });
+        try current_dir.copyFile("res/pam.d/ly", pam_dir, "ly", .{ .override_mode = 0o644 });
     }
 }
 
