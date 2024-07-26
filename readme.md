@@ -132,7 +132,7 @@ then you have to disable getty, so it doesn't respawn on top of ly
 # ln -s /etc/sv/ly /var/service/
 ```
 
-By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini` 
+By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini`
 
 You should as well disable your existing display manager service if needed, e.g.:
 
@@ -196,7 +196,7 @@ Take a look at your .xsession if X doesn't start, as it can interfere
 
 ## PSX DOOM fire animation
 To enable the famous PSX DOOM fire described by [Fabien Sanglard](http://fabiensanglard.net/doom_fire_psx/index.html),
-just uncomment `animate = true` in `/etc/ly/config.ini`. You may also
+just set `animation = doom` in `/etc/ly/config.ini`. You may also
 disable the main box borders with `hide_borders = true`.
 
 ## Additional Information
