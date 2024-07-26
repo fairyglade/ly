@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 # Xsession - run as user
 # Copyright (C) 2016 Pier Luigi Fiorini <pierluigi.fiorini@gmail.com>
 
