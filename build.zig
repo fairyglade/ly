@@ -127,8 +127,8 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                     defer service_dir.close();
 
                     try std.fs.cwd().copyFile("res/ly-runit-service/conf", service_dir, "conf", .{});
-                    try std.fs.cwd().copyFile("res/ly-runit-service/finish", service_dir, "finish", .{});
-                    try std.fs.cwd().copyFile("res/ly-runit-service/run", service_dir, "run", .{});
+                    try std.fs.cwd().copyFile("res/ly-runit-service/finish", service_dir, "finish", .{ .override_mode = 0o755 });
+                    try std.fs.cwd().copyFile("res/ly-runit-service/run", service_dir, "run", .{ .override_mode = 0o755 });
                 },
                 .Systemd => {
                     const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/lib/systemd/system" });
