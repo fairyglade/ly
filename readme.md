@@ -6,10 +6,10 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 ## Dependencies
 - Compile-time:
-  - zig 0.12.0
-  - a C standard library
+  - zig >=0.12.0
+  - libc
   - pam
-  - xcb
+  - xcb (optional, required by default; needed for X11 support)
 - Runtime (with default config):
   - xorg
   - xorg-xauth
