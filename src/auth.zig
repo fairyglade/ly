@@ -1,5 +1,6 @@
 const std = @import("std");
 const build_options = @import("build_options");
+const builtin = @import("builtin");
 const enums = @import("enums.zig");
 const interop = @import("interop.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
@@ -8,7 +9,7 @@ const Text = @import("tui/components/Text.zig");
 const Config = @import("config/Config.zig");
 const Allocator = std.mem.Allocator;
 const utmp = interop.utmp;
-const Utmp = utmp.utmp;
+const Utmp = utmp.utmpx;
 const SharedError = @import("SharedError.zig");
 
 var xorg_pid: std.posix.pid_t = 0;
@@ -486,18 +487,18 @@ fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
     };
     entry.ut_addr_v6[0] = 0;
 
-    utmp.setutent();
-    _ = utmp.pututline(entry);
-    utmp.endutent();
+    utmp.setutxent();
+    _ = utmp.pututxline(entry);
+    utmp.endutxent();
 }
 
 fn removeUtmpEntry(entry: *Utmp) void {
     entry.ut_type = utmp.DEAD_PROCESS;
     entry.ut_line[0] = 0;
     entry.ut_user[0] = 0;
-    utmp.setutent();
-    _ = utmp.pututline(entry);
-    utmp.endutent();
+    utmp.setutxent();
+    _ = utmp.pututxline(entry);
+    utmp.endutxent();
 }
 
 fn pamDiagnose(status: c_int) anyerror {

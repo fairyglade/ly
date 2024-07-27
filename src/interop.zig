@@ -9,7 +9,7 @@ pub const pam = @cImport({
 });
 
 pub const utmp = @cImport({
-    @cInclude("utmp.h");
+    @cInclude("utmpx.h");
 });
 
 pub const xcb = @cImport({
