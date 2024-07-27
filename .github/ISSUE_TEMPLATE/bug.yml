@@ -10,8 +10,7 @@ body:
       description: By submitting this issue, you agree to have done the following.
       options:
         - label: I have looked for any other duplicate issues
-    validations:
-      required: true
+          required: true
   - type: input
     id: version
     attributes:
