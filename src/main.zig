@@ -161,7 +161,14 @@ pub fn main() !void {
     // Initialize terminal buffer
     const labels_max_length = @max(lang.login.len, lang.password.len);
 
-    var buffer = TerminalBuffer.init(config, labels_max_length);
+    // Get a random seed for the PRNG (used by animations)
+    var seed: u64 = undefined;
+    try std.posix.getrandom(std.mem.asBytes(&seed));
+
+    var prng = std.Random.DefaultPrng.init(seed);
+    const random = prng.random();
+
+    var buffer = TerminalBuffer.init(config, labels_max_length, random);
 
     // Initialize components
     var desktop = try Desktop.init(allocator, &buffer, config.max_desktop_len, lang);
