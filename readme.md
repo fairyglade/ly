@@ -36,6 +36,7 @@ The following desktop environments were tested with success:
  - bspwm
  - budgie
  - cinnamon
+ - cosmic
  - deepin
  - dwl
  - dwm
