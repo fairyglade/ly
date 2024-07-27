@@ -16,3 +16,8 @@ pub const Input = enum {
     login,
     password,
 };
+
+pub const ViMode = enum {
+    normal,
+    insert,
+};

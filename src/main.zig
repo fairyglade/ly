@@ -194,7 +194,7 @@ pub fn main() !void {
     defer password.deinit();
 
     var active_input = config.default_input;
-    var insert_mode = !config.vi_mode;
+    var insert_mode = !config.vi_mode or config.vi_default_mode == .insert;
 
     // Load last saved username and desktop selection, if any
     if (config.load) {
