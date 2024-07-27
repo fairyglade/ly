@@ -111,6 +111,10 @@ pub fn build(b: *std.Build) !void {
     installs6_step.makeFn = ServiceInstaller(.S6).make;
     installs6_step.dependOn(installexe_step);
 
+    const installdinit_step = b.step("installdinit", "Install the Ly dinit service");
+    installdinit_step.makeFn = ServiceInstaller(.Dinit).make;
+    installdinit_step.dependOn(installexe_step);
+
     const uninstallall_step = b.step("uninstallall", "Uninstall Ly and all services");
     uninstallall_step.makeFn = uninstallall;
 }
@@ -128,6 +132,7 @@ const InitSystem = enum {
     Openrc,
     Runit,
     S6,
+    Dinit,
 };
 pub fn ServiceInstaller(comptime init_system: InitSystem) type {
     return struct {
@@ -176,6 +181,14 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
 
                     try std.fs.cwd().copyFile("res/ly-s6/run", service_dir, "run", .{ .override_mode = 0o755 });
                     try std.fs.cwd().copyFile("res/ly-s6/type", service_dir, "type", .{});
+                },
+                .Dinit => {
+                    const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/dinit.d" });
+                    std.fs.cwd().makePath(service_path) catch {};
+                    var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
+                    defer service_dir.close();
+
+                    try std.fs.cwd().copyFile("res/ly-dinit", service_dir, "ly", .{});
                 },
             }
         }
@@ -286,9 +299,14 @@ pub fn uninstallall(step: *std.Build.Step, _: ProgressNode) !void {
         std.debug.print("warn: s6 service not found.\n", .{});
     };
 
-    const s6_admin_service_file = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/s6/adminsv/default/contents.d/ly-srv" });
-    std.fs.cwd().deleteFile(s6_admin_service_file) catch {
+    const s6_admin_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/s6/adminsv/default/contents.d/ly-srv" });
+    std.fs.cwd().deleteFile(s6_admin_service_path) catch {
         std.debug.print("warn: s6 admin service not found.\n", .{});
+    };
+
+    const dinit_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/dinit.d/ly" });
+    std.fs.cwd().deleteFile(dinit_service_path) catch {
+        std.debug.print("warn: dinit service not found.\n", .{});
     };
 }
 

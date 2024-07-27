@@ -163,6 +163,16 @@ Finally, enable the service:
 # s6-rc -u change ly-srv
 ```
 
+### dinit
+```
+# zig build installdinit
+# dinitctl enable ly
+```
+
+In addition to the steps above, you will also have to keep a TTY free within `/etc/dinit.d/config/console.conf`.
+
+To do that, change `ACTIVE_CONSOLES` so that the tty that ly should use in `/etc/ly/config.ini` is free.
+
 ### Updating
 You can also install Ly without copying the system service and the configuration file. That's
 called *updating*. To update, simply run:
