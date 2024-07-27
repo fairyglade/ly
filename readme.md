@@ -132,7 +132,7 @@ then you have to disable getty, so it doesn't respawn on top of ly
 # ln -s /etc/sv/ly /var/service/
 ```
 
-By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini` 
+By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini`
 
 You should as well disable your existing display manager service if needed, e.g.:
 
@@ -146,6 +146,21 @@ you should disable the agetty-tty2 service like this:
 
 ```
 # rm /var/service/agetty-tty2
+```
+
+### s6
+```
+# zig build installs6
+```
+
+Then, edit `/etc/s6/config/ttyX.conf` and set `SPAWN="no"`, where X is the TTY ID (e.g. `2`).
+
+Finally, enable the service:
+
+```
+# s6-service add default ly-srv
+# s6-db-reload
+# s6-rc -u change ly-srv
 ```
 
 ### Updating

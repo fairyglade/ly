@@ -106,6 +106,11 @@ pub fn build(b: *std.Build) !void {
     const installrunit_step = b.step("installrunit", "Install the Ly runit service");
     installrunit_step.makeFn = ServiceInstaller(.Runit).make;
     installrunit_step.dependOn(installexe_step);
+    installopenrc_step.dependOn(installexe_step);
+
+    const installs6_step = b.step("installs6", "Install the Ly s6 service");
+    installs6_step.makeFn = ServiceInstaller(.S6).make;
+    installs6_step.dependOn(installexe_step);
 
     const uninstallall_step = b.step("uninstallall", "Uninstall Ly and all services");
     uninstallall_step.makeFn = uninstallall;
@@ -123,12 +128,21 @@ const InitSystem = enum {
     Systemd,
     Openrc,
     Runit,
+    S6,
 };
 pub fn ServiceInstaller(comptime init_system: InitSystem) type {
     return struct {
         pub fn make(step: *std.Build.Step, _: ProgressNode) !void {
             const allocator = step.owner.allocator;
             switch (init_system) {
+                .Systemd => {
+                    const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/lib/systemd/system" });
+                    std.fs.cwd().makePath(service_path) catch {};
+                    var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
+                    defer service_dir.close();
+
+                    try std.fs.cwd().copyFile("res/ly.service", service_dir, "ly.service", .{ .override_mode = 0o644 });
+                },
                 .Openrc => {
                     const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/init.d" });
                     std.fs.cwd().makePath(service_path) catch {};
@@ -147,13 +161,22 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                     try std.fs.cwd().copyFile("res/ly-runit-service/finish", service_dir, "finish", .{ .override_mode = 0o755 });
                     try std.fs.cwd().copyFile("res/ly-runit-service/run", service_dir, "run", .{ .override_mode = 0o755 });
                 },
-                .Systemd => {
-                    const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/lib/systemd/system" });
+                .S6 => {
+                    const admin_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/s6/adminsv/default/contents.d" });
+                    std.fs.cwd().makePath(admin_service_path) catch {};
+                    var admin_service_dir = std.fs.cwd().openDir(admin_service_path, .{}) catch unreachable;
+                    defer admin_service_dir.close();
+
+                    const file = try admin_service_dir.createFile("ly-srv", .{});
+                    file.close();
+
+                    const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/s6/sv/ly-srv" });
                     std.fs.cwd().makePath(service_path) catch {};
                     var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
-                    try std.fs.cwd().copyFile("res/ly.service", service_dir, "ly.service", .{ .override_mode = 0o644 });
+                    try std.fs.cwd().copyFile("res/ly-s6/run", service_dir, "run", .{ .override_mode = 0o755 });
+                    try std.fs.cwd().copyFile("res/ly-s6/type", service_dir, "type", .{});
                 },
             }
         }
@@ -257,6 +280,16 @@ pub fn uninstallall(step: *std.Build.Step, _: ProgressNode) !void {
     const runit_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/sv/ly" });
     std.fs.cwd().deleteTree(runit_service_path) catch {
         std.debug.print("warn: runit service not found.\n", .{});
+    };
+
+    const s6_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/s6/sv/ly-srv" });
+    std.fs.cwd().deleteTree(s6_service_path) catch {
+        std.debug.print("warn: s6 service not found.\n", .{});
+    };
+
+    const s6_admin_service_file = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/s6/adminsv/default/contents.d/ly-srv" });
+    std.fs.cwd().deleteFile(s6_admin_service_file) catch {
+        std.debug.print("warn: s6 admin service not found.\n", .{});
     };
 }
 
