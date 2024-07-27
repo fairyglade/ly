@@ -40,6 +40,7 @@ case $SHELL in
     ;;
   */fish)
     [ -f /etc/profile ] && . /etc/profile
+    [ -f $HOME/.profile ] && . $HOME/.profile
     xsess_tmp=`mktemp /tmp/xsess-env-XXXXXX`
     $SHELL --login -c "/bin/sh -c 'export -p' > $xsess_tmp"
     . $xsess_tmp
