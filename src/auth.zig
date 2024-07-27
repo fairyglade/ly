@@ -20,14 +20,7 @@ pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(config: Config, current_environment: Desktop.Environment, login: [:0]const u8, password: [:0]const u8) !void {
-    var tty_buffer: [2]u8 = undefined;
-    const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
-
-    // Set the XDG environment variables
-    setXdgSessionEnv(current_environment.display_server);
-    try setXdgEnv(tty_str, current_environment.xdg_session_desktop, current_environment.xdg_desktop_names orelse "");
-
+pub fn authenticate(config: Config, login: [:0]const u8, password: [:0]const u8) !*interop.pam.pam_handle {
     // Open the PAM session
     var credentials = [_:null]?[*:0]const u8{ login, password };
 
@@ -37,11 +30,13 @@ pub fn authenticate(config: Config, current_environment: Desktop.Environment, lo
     };
     var handle: ?*interop.pam.pam_handle = undefined;
 
-    var status = interop.pam.pam_start(config.service_name.ptr, null, &conv, &handle);
-    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
-    defer _ = interop.pam.pam_end(handle, status);
-
     // Do the PAM routine
+    var status = interop.pam.pam_start(config.service_name.ptr, null, &conv, &handle);
+    defer {
+        if (status != interop.pam.PAM_SUCCESS) _ = interop.pam.pam_end(handle, status);
+    }
+    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+
     status = interop.pam.pam_authenticate(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
@@ -49,12 +44,27 @@ pub fn authenticate(config: Config, current_environment: Desktop.Environment, lo
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     status = interop.pam.pam_setcred(handle, interop.pam.PAM_ESTABLISH_CRED);
+    defer {
+        if (status != interop.pam.PAM_SUCCESS) _ = interop.pam.pam_end(handle, status);
+    }
+    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+    return handle.?;
+}
+
+pub fn finaliseAuth(config: Config, current_environment: Desktop.Environment, handle: ?*interop.pam.pam_handle, login: [:0]const u8) !void {
+    var tty_buffer: [2]u8 = undefined;
+    const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
+
+    // Close the PAM session
+    var status = interop.pam.pam_open_session(handle, 0);
+    defer status = interop.pam.pam_close_session(handle, status);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
+    defer status = interop.pam.pam_end(handle, status);
 
-    status = interop.pam.pam_open_session(handle, 0);
-    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
-    defer status = interop.pam.pam_close_session(handle, 0);
+    // Set the XDG environment variables
+    setXdgSessionEnv(current_environment.display_server);
+    try setXdgEnv(tty_str, current_environment.xdg_session_desktop, current_environment.xdg_desktop_names orelse "");
 
     var pwd: *interop.passwd = undefined;
     {

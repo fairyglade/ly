@@ -38,6 +38,33 @@ pub fn signalHandler(i: c_int) callconv(.C) void {
     std.c.exit(i);
 }
 
+// When setting the currentLogin you must deallocate the previous currentLogin first
+var currentLogin: ?[:0]const u8 = null;
+var asyncPamHandle: ?*interop.pam.pam_handle = null;
+
+fn fingerprintLogin(config: Config, login: [:0]const u8) !void {
+    // TODO: loop if there was an error
+    const pamHandle = try auth.authenticate(config, login, "");
+    if (currentLogin != null and !std.mem.eql(u8, std.mem.span(@as([*:0]const u8, currentLogin.?)), login)) {
+        return;
+    }
+    asyncPamHandle = pamHandle;
+}
+
+fn startFingerPrintLogin(allocator: std.mem.Allocator, config: Config, login: Text) !void {
+    if (currentLogin) |clogin| {
+        allocator.free(clogin);
+        currentLogin = null;
+    }
+    const login_text = try allocator.dupeZ(u8, login.text.items);
+    currentLogin = login_text;
+    var handle = try std.Thread.spawn(.{}, fingerprintLogin, .{
+        config,
+        login_text,
+    });
+    handle.detach();
+}
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -209,6 +236,9 @@ pub fn main() !void {
             if (session_index < desktop.environments.items.len) desktop.current = session_index;
         }
     }
+
+    try startFingerPrintLogin(allocator, config, login);
+    defer allocator.free(currentLogin.?);
 
     // Place components on the screen
     {
@@ -469,7 +499,7 @@ pub fn main() !void {
 
         var timeout: i32 = -1;
 
-        // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for the event indefinitely instead
+        // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for 100ms instead
         if (animate) {
             timeout = config.min_refresh_delta;
         } else if (config.bigclock and config.clock == null) {
@@ -484,9 +514,62 @@ pub fn main() !void {
             timeout = @intCast(1000 - @divTrunc(tv.tv_usec, 1000) + 1);
         }
 
-        const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
+        const timeoutEnd: i64 = if (timeout == -1) std.math.maxInt(i64) else std.time.milliTimestamp() + timeout;
 
-        if (event_error < 0 or event.type != termbox.TB_EVENT_KEY) continue;
+        const maxtimeout = 100;
+        var skipEvent: bool = false;
+        while (timeoutEnd - std.time.milliTimestamp() > 0) {
+            const event_error = termbox.tb_peek_event(&event, @intCast(@min(timeoutEnd - std.time.milliTimestamp(), maxtimeout)));
+
+            if (asyncPamHandle) |handle| {
+                var shared_err = try SharedError.init();
+                defer shared_err.deinit();
+
+                {
+                    const login_text = try allocator.dupeZ(u8, login.text.items);
+                    defer allocator.free(login_text);
+
+                    InfoLine.clearRendered(allocator, buffer) catch {};
+                    info_line.draw(buffer);
+                    _ = termbox.tb_present();
+
+                    session_pid = try std.posix.fork();
+                    if (session_pid == 0) {
+                        const current_environment = desktop.environments.items[desktop.current];
+                        auth.finaliseAuth(config, current_environment, handle, login_text) catch |err| {
+                            shared_err.writeError(err);
+                            std.process.exit(1);
+                        };
+
+                        std.process.exit(0);
+                    }
+                    _ = std.posix.waitpid(session_pid, 0);
+
+                    session_pid = -1;
+                }
+
+                const auth_err = shared_err.readError();
+                if (auth_err) |err| {
+                    try info_line.setText(getAuthErrorMsg(err, lang));
+                } else {
+                    try info_line.setText(lang.logout);
+                }
+                asyncPamHandle = null;
+                try startFingerPrintLogin(allocator, config, login);
+
+                try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
+                _ = termbox.tb_clear();
+                _ = termbox.tb_present();
+
+                update = true;
+
+                var restore_cursor = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
+                _ = restore_cursor.spawnAndWait() catch .{};
+            }
+            skipEvent = event_error < 0;
+            if ((event_error < 0 and event_error != -6) or event.type == termbox.TB_EVENT_KEY) break;
+        }
+        if (skipEvent or event.type != termbox.TB_EVENT_KEY) continue;
 
         switch (event.key) {
             termbox.TB_KEY_ESC => {
@@ -594,16 +677,21 @@ pub fn main() !void {
                     _ = termbox.tb_present();
 
                     session_pid = try std.posix.fork();
-                    if (session_pid == 0) {
-                        const current_environment = desktop.environments.items[desktop.current];
-                        auth.authenticate(config, current_environment, login_text, password_text) catch |err| {
-                            shared_err.writeError(err);
-                            std.process.exit(1);
-                        };
-                        std.process.exit(0);
+                    const current_environment = desktop.environments.items[desktop.current];
+                    if (auth.authenticate(config, login_text, password_text)) |handle| {
+                        if (session_pid == 0) {
+                            auth.finaliseAuth(config, current_environment, handle, login_text) catch |err| {
+                                shared_err.writeError(err);
+                                std.process.exit(1);
+                            };
+
+                            std.process.exit(0);
+                        }
+                        _ = std.posix.waitpid(session_pid, 0);
+                    } else |err| {
+                        shared_err.writeError(err);
                     }
 
-                    _ = std.posix.waitpid(session_pid, 0);
                     session_pid = -1;
                 }
 
@@ -659,8 +747,20 @@ pub fn main() !void {
 
                 switch (active_input) {
                     .session => desktop.handle(&event, insert_mode),
-                    .login => login.handle(&event, insert_mode) catch {
-                        try info_line.setText(lang.err_alloc);
+                    .login => {
+                        const shouldFingerprint = switch (event.key) {
+                            termbox.TB_KEY_DELETE => true,
+                            termbox.TB_KEY_BACKSPACE, termbox.TB_KEY_BACKSPACE2 => true,
+                            else => event.ch > 31 and event.ch < 127,
+                        };
+
+                        if (shouldFingerprint) {
+                            try startFingerPrintLogin(allocator, config, login);
+                        }
+
+                        login.handle(&event, insert_mode) catch {
+                            try info_line.setText(lang.err_alloc);
+                        };
                     },
                     .password => password.handle(&event, insert_mode) catch {
                         try info_line.setText(lang.err_alloc);
