@@ -106,7 +106,6 @@ pub fn build(b: *std.Build) !void {
     const installrunit_step = b.step("installrunit", "Install the Ly runit service");
     installrunit_step.makeFn = ServiceInstaller(.Runit).make;
     installrunit_step.dependOn(installexe_step);
-    installopenrc_step.dependOn(installexe_step);
 
     const installs6_step = b.step("installs6", "Install the Ly s6 service");
     installs6_step.makeFn = ServiceInstaller(.S6).make;
