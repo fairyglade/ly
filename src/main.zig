@@ -128,6 +128,8 @@ pub fn main() !void {
         }
     }
 
+    if (!build_options.enable_x11_support) try info_line.setText(lang.no_x11_support);
+
     interop.setNumlock(config.numlock) catch {};
 
     if (config.initial_info_text) |text| {
@@ -178,14 +180,17 @@ pub fn main() !void {
     desktop.addEnvironment(.{ .Name = lang.shell }, "", .shell) catch {
         try info_line.setText(lang.err_alloc);
     };
-    if (config.xinitrc) |xinitrc| {
-        desktop.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, "", .xinitrc) catch {
-            try info_line.setText(lang.err_alloc);
-        };
+
+    if (build_options.enable_x11_support) {
+        if (config.xinitrc) |xinitrc| {
+            desktop.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, "", .xinitrc) catch {
+                try info_line.setText(lang.err_alloc);
+            };
+        }
     }
 
     try desktop.crawl(config.waylandsessions, .wayland);
-    try desktop.crawl(config.xsessions, .x11);
+    if (build_options.enable_x11_support) try desktop.crawl(config.xsessions, .x11);
 
     var login = try Text.init(allocator, &buffer, config.max_login_len);
     defer login.deinit();

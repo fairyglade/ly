@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const enums = @import("enums.zig");
 const interop = @import("interop.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
@@ -142,7 +143,7 @@ fn startSession(
     switch (current_environment.display_server) {
         .wayland => try executeWaylandCmd(pwd.pw_shell, config.wayland_cmd, current_environment.cmd),
         .shell => try executeShellCmd(pwd.pw_shell),
-        .xinitrc, .x11 => {
+        .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{config.tty});
             try executeX11Cmd(pwd.pw_shell, pwd.pw_dir, config, current_environment.cmd, vt);
