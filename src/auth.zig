@@ -25,6 +25,9 @@ pub fn authenticate(config: Config, current_environment: Desktop.Environment, lo
     var tty_buffer: [3]u8 = undefined;
     const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
 
+    var pam_tty_buffer: [6]u8 = undefined;
+    const pam_tty_str = try std.fmt.bufPrintZ(&pam_tty_buffer, "tty{d}", .{config.tty});
+
     // Set the XDG environment variables
     setXdgSessionEnv(current_environment.display_server);
     try setXdgEnv(tty_str, current_environment.xdg_session_desktop, current_environment.xdg_desktop_names orelse "");
@@ -41,6 +44,10 @@ pub fn authenticate(config: Config, current_environment: Desktop.Environment, lo
     var status = interop.pam.pam_start(config.service_name.ptr, null, &conv, &handle);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer _ = interop.pam.pam_end(handle, status);
+
+    // Set PAM_TTY as the current TTY. This is required in case it isn't being set by another PAM module
+    status = interop.pam.pam_set_item(handle, interop.pam.PAM_TTY, pam_tty_str.ptr);
+    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     // Do the PAM routine
     status = interop.pam.pam_authenticate(handle, 0);
