@@ -1,6 +1,6 @@
 
 # Ly - a TUI display manager
-![Ly screenshot](https://user-images.githubusercontent.com/5473047/88958888-65efbf80-d2a1-11ea-8ae5-3f263bce9cce.png "Ly screenshot")
+![Ly screenshot](.github/screenshot.png "Ly screenshot")
 
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
