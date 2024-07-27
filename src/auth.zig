@@ -21,7 +21,7 @@ pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
 }
 
 pub fn authenticate(config: Config, current_environment: Desktop.Environment, login: [:0]const u8, password: [:0]const u8) !void {
-    var tty_buffer: [2]u8 = undefined;
+    var tty_buffer: [3]u8 = undefined;
     const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
 
     // Set the XDG environment variables
