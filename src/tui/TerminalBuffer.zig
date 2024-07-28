@@ -14,8 +14,8 @@ random: Random,
 width: u64,
 height: u64,
 buffer: [*]termbox.tb_cell,
-fg: u8,
-bg: u8,
+fg: u16,
+bg: u16,
 border_fg: u8,
 box_chars: struct {
     left_up: u32,
@@ -158,13 +158,17 @@ pub fn calculateComponentCoordinates(self: TerminalBuffer) struct {
 }
 
 pub fn drawLabel(self: TerminalBuffer, text: []const u8, x: u64, y: u64) void {
+    drawColorLabel(text, x, y, self.fg, self.bg);
+}
+
+pub fn drawColorLabel(text: []const u8, x: u64, y: u64, fg: u16, bg: u16) void {
     const yc: c_int = @intCast(y);
     const utf8view = std.unicode.Utf8View.init(text) catch return;
     var utf8 = utf8view.iterator();
 
     var i = x;
     while (utf8.nextCodepoint()) |codepoint| : (i += 1) {
-        _ = termbox.tb_set_cell(@intCast(i), yc, codepoint, self.fg, self.bg);
+        _ = termbox.tb_set_cell(@intCast(i), yc, codepoint, fg, bg);
     }
 }
 

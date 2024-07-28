@@ -99,7 +99,7 @@ const E = [_]u21{
 };
 // zig fmt: on
 
-pub fn clockCell(animate: bool, char: u8, fg: u8, bg: u8) [SIZE]termbox.tb_cell {
+pub fn clockCell(animate: bool, char: u8, fg: u16, bg: u16) [SIZE]termbox.tb_cell {
     var cells: [SIZE]termbox.tb_cell = undefined;
 
     var tv: std.c.timeval = undefined;
