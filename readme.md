@@ -105,7 +105,7 @@ disable getty on Ly's tty to prevent "login" from spawning on top of it
 ```
 
 ### OpenRC
-**NOTE**: On Gentoo, Ly will disable the `display-manager-init` service in order to run.
+**NOTE 1**: On Gentoo, Ly will disable the `display-manager-init` service in order to run.
 
 Clone, compile and test.
 
@@ -126,6 +126,8 @@ then you have to disable getty, so it doesn't respawn on top of ly
 ```
 # rc-update del agetty.tty2
 ```
+
+**NOTE 2**: To avoid a console spawning on top on Ly, comment out the appropriate line from /etc/inittab (default is 2).
 
 ### runit
 ```
@@ -228,6 +230,3 @@ disable the main box borders with `hide_borders = true`.
 ## Additional Information
 The name "Ly" is a tribute to the fairy from the game Rayman.
 Ly was tested by oxodao, who is some seriously awesome dude.
-
-## Gentoo (OpenRC) installation tip
-To avoid a console spawning on top on Ly, comment out the appropriate line from /etc/inittab (default is 2).
