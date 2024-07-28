@@ -160,9 +160,12 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                     var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
+                    const supervise_path = try std.fs.path.join(allocator, &[_][]const u8{ service_path, "supervise" });
+
                     try std.fs.cwd().copyFile("res/ly-runit-service/conf", service_dir, "conf", .{});
                     try std.fs.cwd().copyFile("res/ly-runit-service/finish", service_dir, "finish", .{ .override_mode = 0o755 });
                     try std.fs.cwd().copyFile("res/ly-runit-service/run", service_dir, "run", .{ .override_mode = 0o755 });
+                    try std.fs.cwd().symLink("/run/runit/supervise.ly", supervise_path, .{});
                 },
                 .S6 => {
                     const admin_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/s6/adminsv/default/contents.d" });
