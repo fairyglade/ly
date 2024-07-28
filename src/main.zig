@@ -102,8 +102,8 @@ pub fn main() !void {
         defer allocator.free(config_path);
 
         config = config_ini.readFileToStructWithMap(config_path, mapped_config_fields) catch _config: {
-            // literal error message, due to language file not yet available
-            try info_line.addError("unable to parse config file");
+            // We're using a literal error message here since the language file hasn't yet been loaded
+            try info_line.addMessage("unable to parse config file", @intCast(interop.termbox.TB_DEFAULT), @intCast(interop.termbox.TB_RED | interop.termbox.TB_BOLD));
             break :_config Config{};
         };
 
@@ -122,7 +122,7 @@ pub fn main() !void {
     } else {
         config = config_ini.readFileToStructWithMap(build_options.data_directory ++ "/config.ini", mapped_config_fields) catch _config: {
             // literal error message, due to language file not yet available
-            try info_line.addError("unable to parse config file");
+            try info_line.addMessage("unable to parse config file", @intCast(interop.termbox.TB_DEFAULT), @intCast(interop.termbox.TB_RED | interop.termbox.TB_BOLD));
             break :_config Config{};
         };
 
@@ -137,23 +137,20 @@ pub fn main() !void {
         }
     }
 
-    info_line.error_bg = config.error_bg;
-    info_line.error_fg = config.error_fg;
-
-    if (!build_options.enable_x11_support) try info_line.setText(lang.no_x11_support);
+    if (!build_options.enable_x11_support) try info_line.addMessage(lang.no_x11_support, config.bg, config.fg);
 
     interop.setNumlock(config.numlock) catch {};
 
     if (config.initial_info_text) |text| {
-        try info_line.setText(text);
+        try info_line.addMessage(text, config.bg, config.fg);
     } else get_host_name: {
         // Initialize information line with host name
         var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
         const hostname = std.posix.gethostname(&name_buf) catch {
-            try info_line.setText(lang.err_hostname);
+            try info_line.addMessage(lang.err_hostname, config.error_bg, config.error_fg);
             break :get_host_name;
         };
-        try info_line.setText(hostname);
+        try info_line.addMessage(hostname, config.bg, config.fg);
     }
 
     // Initialize termbox
@@ -190,13 +187,13 @@ pub fn main() !void {
     defer desktop.deinit();
 
     desktop.addEnvironment(.{ .Name = lang.shell }, "", .shell) catch {
-        try info_line.addError(lang.err_alloc);
+        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
     };
 
     if (build_options.enable_x11_support) {
         if (config.xinitrc) |xinitrc| {
             desktop.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, "", .xinitrc) catch {
-                try info_line.addError(lang.err_alloc);
+                try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
             };
         }
     }
@@ -239,10 +236,10 @@ pub fn main() !void {
         switch (active_input) {
             .session => desktop.handle(null, insert_mode),
             .login => login.handle(null, insert_mode) catch {
-                try info_line.addError(lang.err_alloc);
+                try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
             },
             .password => password.handle(null, insert_mode) catch {
-                try info_line.addError(lang.err_alloc);
+                try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
             },
         }
     }
@@ -286,7 +283,7 @@ pub fn main() !void {
     // Switch to selected TTY if possible
     open_console_dev: {
         const fd = std.posix.open(config.console_dev, .{ .ACCMODE = .WRONLY }, 0) catch {
-            try info_line.addError(lang.err_console_dev);
+            try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
             break :open_console_dev;
         };
         defer std.posix.close(fd);
@@ -322,10 +319,10 @@ pub fn main() !void {
                 switch (config.animation) {
                     .none => {},
                     .doom => doom.realloc() catch {
-                        try info_line.addError(lang.err_alloc);
+                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
                     .matrix => matrix.realloc() catch {
-                        try info_line.addError(lang.err_alloc);
+                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
                 }
 
@@ -374,10 +371,10 @@ pub fn main() !void {
                 switch (active_input) {
                     .session => desktop.handle(null, insert_mode),
                     .login => login.handle(null, insert_mode) catch {
-                        try info_line.addError(lang.err_alloc);
+                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
                     .password => password.handle(null, insert_mode) catch {
-                        try info_line.addError(lang.err_alloc);
+                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
                 }
 
@@ -451,7 +448,7 @@ pub fn main() !void {
 
                 draw_lock_state: {
                     const lock_state = interop.getLockState(config.console_dev) catch {
-                        try info_line.addError(lang.err_console_dev);
+                        try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
                         break :draw_lock_state;
                     };
 
@@ -527,7 +524,7 @@ pub fn main() !void {
                     }
                 } else if (pressed_key == brightness_down_key and unistd.access(&config.brightnessctl[0], unistd.X_OK) == 0) brightness_change: {
                     const brightness_str = std.fmt.allocPrint(allocator, "{s}%-", .{config.brightness_change}) catch {
-                        try info_line.addError(lang.err_brightness_change);
+                        try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
                         break :brightness_change;
                     };
                     defer allocator.free(brightness_str);
@@ -535,7 +532,7 @@ pub fn main() !void {
                     _ = brightness.spawnAndWait() catch .{};
                 } else if (pressed_key == brightness_up_key and unistd.access(&config.brightnessctl[0], unistd.X_OK) == 0) brightness_change: {
                     const brightness_str = std.fmt.allocPrint(allocator, "+{s}%", .{config.brightness_change}) catch {
-                        try info_line.addError(lang.err_brightness_change);
+                        try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
                         break :brightness_change;
                     };
                     defer allocator.free(brightness_str);
@@ -605,7 +602,7 @@ pub fn main() !void {
                     const password_text = try allocator.dupeZ(u8, password.text.items);
                     defer allocator.free(password_text);
 
-                    try info_line.setText(lang.authenticating);
+                    try info_line.addMessage(lang.authenticating, config.bg, config.fg);
                     InfoLine.clearRendered(allocator, buffer) catch {};
                     try info_line.draw(buffer);
                     _ = termbox.tb_present();
@@ -628,11 +625,11 @@ pub fn main() !void {
                 if (auth_err) |err| {
                     auth_fails += 1;
                     active_input = .password;
-                    try info_line.addError(getAuthErrorMsg(err, lang));
+                    try info_line.addMessage(getAuthErrorMsg(err, lang), config.error_bg, config.error_fg);
                     if (config.clear_password or err != error.PamAuthError) password.clear();
                 } else {
                     password.clear();
-                    try info_line.setText(lang.logout);
+                    try info_line.addMessage(lang.logout, config.bg, config.fg);
                 }
 
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
@@ -677,10 +674,10 @@ pub fn main() !void {
                 switch (active_input) {
                     .session => desktop.handle(&event, insert_mode),
                     .login => login.handle(&event, insert_mode) catch {
-                        try info_line.addError(lang.err_alloc);
+                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
                     .password => password.handle(&event, insert_mode) catch {
-                        try info_line.addError(lang.err_alloc);
+                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
                 }
                 update = true;
