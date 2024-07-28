@@ -12,12 +12,18 @@ pub const utmp = @cImport({
     @cInclude("utmpx.h");
 });
 
+// Exists for X11 support only
 pub const xcb = @cImport({
     @cInclude("xcb/xcb.h");
 });
 
 pub const unistd = @cImport({
     @cInclude("unistd.h");
+});
+
+// Exists for FreeBSD only
+pub const logincap = @cImport({
+    @cInclude("login_cap.h");
 });
 
 pub const c_size = u64;

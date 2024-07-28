@@ -130,8 +130,14 @@ fn startSession(
     const status = interop.initgroups(pwd.pw_name, pwd.pw_gid);
     if (status != 0) return error.GroupInitializationFailed;
 
-    std.posix.setgid(pwd.pw_gid) catch return error.SetUserGidFailed;
-    std.posix.setuid(pwd.pw_uid) catch return error.SetUserUidFailed;
+    if (builtin.os.tag == .freebsd) {
+        // FreeBSD sets the GID and UID with setusercontext()
+        const result = std.c.setusercontext(null, pwd, pwd.pw_uid, interop.logincap.LOGIN_SETALL);
+        if (result != 0) return error.SetUserUidFailed;
+    } else {
+        std.posix.setgid(pwd.pw_gid) catch return error.SetUserGidFailed;
+        std.posix.setuid(pwd.pw_uid) catch return error.SetUserUidFailed;
+    }
 
     // Set up the environment
     try initEnv(pwd, config.path);
@@ -181,12 +187,19 @@ fn setXdgSessionEnv(display_server: enums.DisplayServer) void {
 }
 
 fn setXdgEnv(tty_str: [:0]u8, desktop_name: [:0]const u8, xdg_desktop_names: [:0]const u8) !void {
-    const uid = interop.getuid();
-    var uid_buffer: [10 + @sizeOf(u32) + 1]u8 = undefined;
-    const uid_str = try std.fmt.bufPrintZ(&uid_buffer, "/run/user/{d}", .{uid});
+    // The "/run/user/%d" directory is not available on FreeBSD. It is much
+    // better to stick to the defaults and let applications using
+    // XDG_RUNTIME_DIR to fall back to directories inside user's home
+    // directory.
+    if (builtin.os.tag != .freebsd) {
+        const uid = interop.getuid();
+        var uid_buffer: [10 + @sizeOf(u32) + 1]u8 = undefined;
+        const uid_str = try std.fmt.bufPrintZ(&uid_buffer, "/run/user/{d}", .{uid});
+
+        _ = interop.setenv("XDG_RUNTIME_DIR", uid_str.ptr, 0);
+    }
 
     _ = interop.setenv("XDG_CURRENT_DESKTOP", xdg_desktop_names.ptr, 0);
-    _ = interop.setenv("XDG_RUNTIME_DIR", uid_str.ptr, 0);
     _ = interop.setenv("XDG_SESSION_CLASS", "user", 0);
     _ = interop.setenv("XDG_SESSION_ID", "1", 0);
     _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name.ptr, 0);
@@ -463,18 +476,18 @@ fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
     var buf: [4096]u8 = undefined;
     const ttyname = try std.os.getFdPath(std.posix.STDIN_FILENO, &buf);
 
-    var ttyname_buf: [32]u8 = undefined;
+    var ttyname_buf: [@sizeOf(@TypeOf(entry.ut_line))]u8 = undefined;
     _ = try std.fmt.bufPrintZ(&ttyname_buf, "{s}", .{ttyname["/dev/".len..]});
 
     entry.ut_line = ttyname_buf;
     entry.ut_id = ttyname_buf["tty".len..7].*;
 
-    var username_buf: [32]u8 = undefined;
+    var username_buf: [@sizeOf(@TypeOf(entry.ut_user))]u8 = undefined;
     _ = try std.fmt.bufPrintZ(&username_buf, "{s}", .{username});
 
     entry.ut_user = username_buf;
 
-    var host: [256]u8 = undefined;
+    var host: [@sizeOf(@TypeOf(entry.ut_host))]u8 = undefined;
     host[0] = 0;
     entry.ut_host = host;
 
