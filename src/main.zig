@@ -102,7 +102,8 @@ pub fn main() !void {
         defer allocator.free(config_path);
 
         config = config_ini.readFileToStructWithMap(config_path, mapped_config_fields) catch _config: {
-            try info_line.addError("Unable to parse config file");
+            // literal error message, due to language file not yet available
+            try info_line.addError("unable to parse config file");
             break :_config Config{};
         };
 
@@ -120,7 +121,8 @@ pub fn main() !void {
         }
     } else {
         config = config_ini.readFileToStructWithMap(build_options.data_directory ++ "/config.ini", mapped_config_fields) catch _config: {
-            try info_line.addError("Unable to parse config file");
+            // literal error message, due to language file not yet available
+            try info_line.addError("unable to parse config file");
             break :_config Config{};
         };
 
@@ -138,20 +140,20 @@ pub fn main() !void {
     info_line.error_bg = config.error_bg;
     info_line.error_fg = config.error_fg;
 
-    if (!build_options.enable_x11_support) info_line.setText(lang.no_x11_support);
+    if (!build_options.enable_x11_support) try info_line.setText(lang.no_x11_support);
 
     interop.setNumlock(config.numlock) catch {};
 
     if (config.initial_info_text) |text| {
-        info_line.setText(text);
+        try info_line.setText(text);
     } else get_host_name: {
         // Initialize information line with host name
         var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
         const hostname = std.posix.gethostname(&name_buf) catch {
-            info_line.setText(lang.err_hostname);
+            try info_line.setText(lang.err_hostname);
             break :get_host_name;
         };
-        info_line.setText(hostname);
+        try info_line.setText(hostname);
     }
 
     // Initialize termbox
@@ -603,7 +605,7 @@ pub fn main() !void {
                     const password_text = try allocator.dupeZ(u8, password.text.items);
                     defer allocator.free(password_text);
 
-                    info_line.setText(lang.authenticating);
+                    try info_line.setText(lang.authenticating);
                     InfoLine.clearRendered(allocator, buffer) catch {};
                     try info_line.draw(buffer);
                     _ = termbox.tb_present();
@@ -630,7 +632,7 @@ pub fn main() !void {
                     if (config.clear_password or err != error.PamAuthError) password.clear();
                 } else {
                     password.clear();
-                    info_line.setText(lang.logout);
+                    try info_line.setText(lang.logout);
                 }
 
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
