@@ -138,7 +138,7 @@ pub fn main() !void {
     info_line.error_bg = config.error_bg;
     info_line.error_fg = config.error_fg;
 
-    if (!build_options.enable_x11_support) try info_line.addError(lang.no_x11_support);
+    if (!build_options.enable_x11_support) info_line.setText(lang.no_x11_support);
 
     interop.setNumlock(config.numlock) catch {};
 
@@ -626,7 +626,7 @@ pub fn main() !void {
                 if (auth_err) |err| {
                     auth_fails += 1;
                     active_input = .password;
-                    info_line.setText(getAuthErrorMsg(err, lang));
+                    try info_line.addError(getAuthErrorMsg(err, lang));
                     if (config.clear_password or err != error.PamAuthError) password.clear();
                 } else {
                     password.clear();
