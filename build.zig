@@ -133,6 +133,7 @@ const InitSystem = enum {
     S6,
     Dinit,
 };
+
 pub fn ServiceInstaller(comptime init_system: InitSystem) type {
     return struct {
         pub fn make(step: *std.Build.Step, _: ProgressNode) !void {
@@ -144,7 +145,7 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                     var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
-                    try std.fs.cwd().copyFile("res/ly.service", service_dir, "ly.service", .{ .override_mode = 0o644 });
+                    try installFile("res/ly.service", service_dir, service_path, "ly.service", .{ .override_mode = 0o644 });
                 },
                 .Openrc => {
                     const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/init.d" });
@@ -152,7 +153,7 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                     var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
-                    try std.fs.cwd().copyFile("res/ly-openrc", service_dir, exe_name, .{ .override_mode = 0o755 });
+                    try installFile("res/ly-openrc", service_dir, service_path, exe_name, .{ .override_mode = 0o755 });
                 },
                 .Runit => {
                     const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/sv/ly" });
@@ -162,10 +163,12 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
 
                     const supervise_path = try std.fs.path.join(allocator, &[_][]const u8{ service_path, "supervise" });
 
-                    try std.fs.cwd().copyFile("res/ly-runit-service/conf", service_dir, "conf", .{});
-                    try std.fs.cwd().copyFile("res/ly-runit-service/finish", service_dir, "finish", .{ .override_mode = 0o755 });
-                    try std.fs.cwd().copyFile("res/ly-runit-service/run", service_dir, "run", .{ .override_mode = 0o755 });
+                    try installFile("res/ly-runit-service/conf", service_dir, service_path, "conf", .{});
+                    try installFile("res/ly-runit-service/finish", service_dir, service_path, "finish", .{ .override_mode = 0o755 });
+                    try installFile("res/ly-runit-service/run", service_dir, service_path, "run", .{ .override_mode = 0o755 });
+
                     try std.fs.cwd().symLink("/run/runit/supervise.ly", supervise_path, .{});
+                    std.debug.print("info: installed symlink /run/runit/supervise.ly\n", .{});
                 },
                 .S6 => {
                     const admin_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/s6/adminsv/default/contents.d" });
@@ -181,8 +184,8 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                     var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
-                    try std.fs.cwd().copyFile("res/ly-s6/run", service_dir, "run", .{ .override_mode = 0o755 });
-                    try std.fs.cwd().copyFile("res/ly-s6/type", service_dir, "type", .{});
+                    try installFile("res/ly-s6/run", service_dir, service_path, "run", .{ .override_mode = 0o755 });
+                    try installFile("res/ly-s6/type", service_dir, service_path, "type", .{});
                 },
                 .Dinit => {
                     const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/dinit.d" });
@@ -190,7 +193,7 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
                     var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
                     defer service_dir.close();
 
-                    try std.fs.cwd().copyFile("res/ly-dinit", service_dir, "ly", .{});
+                    try installFile("res/ly-dinit", service_dir, service_path, "ly", .{});
                 },
             }
         }
@@ -207,8 +210,6 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
         std.debug.print("warn: {s} already exists as a directory.\n", .{data_directory});
     };
 
-    var current_dir = std.fs.cwd();
-
     {
         const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/bin" });
         if (!std.mem.eql(u8, dest_directory, "")) {
@@ -220,7 +221,7 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
         var executable_dir = std.fs.cwd().openDir(exe_path, .{}) catch unreachable;
         defer executable_dir.close();
 
-        try current_dir.copyFile("zig-out/bin/ly", executable_dir, exe_name, .{});
+        try installFile("zig-out/bin/ly", executable_dir, exe_path, exe_name, .{});
     }
 
     {
@@ -228,32 +229,32 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
         defer config_dir.close();
 
         if (install_config) {
-            try current_dir.copyFile("res/config.ini", config_dir, "config.ini", .{});
+            try installFile("res/config.ini", config_dir, data_directory, "config.ini", .{});
         }
-        try current_dir.copyFile("res/xsetup.sh", config_dir, "xsetup.sh", .{});
-        try current_dir.copyFile("res/wsetup.sh", config_dir, "wsetup.sh", .{});
+        try installFile("res/xsetup.sh", config_dir, data_directory, "xsetup.sh", .{});
+        try installFile("res/wsetup.sh", config_dir, data_directory, "wsetup.sh", .{});
     }
 
     {
         var lang_dir = std.fs.cwd().openDir(lang_path, .{}) catch unreachable;
         defer lang_dir.close();
 
-        try current_dir.copyFile("res/lang/cat.ini", lang_dir, "cat.ini", .{});
-        try current_dir.copyFile("res/lang/cs.ini", lang_dir, "cs.ini", .{});
-        try current_dir.copyFile("res/lang/de.ini", lang_dir, "de.ini", .{});
-        try current_dir.copyFile("res/lang/en.ini", lang_dir, "en.ini", .{});
-        try current_dir.copyFile("res/lang/es.ini", lang_dir, "es.ini", .{});
-        try current_dir.copyFile("res/lang/fr.ini", lang_dir, "fr.ini", .{});
-        try current_dir.copyFile("res/lang/it.ini", lang_dir, "it.ini", .{});
-        try current_dir.copyFile("res/lang/pl.ini", lang_dir, "pl.ini", .{});
-        try current_dir.copyFile("res/lang/pt.ini", lang_dir, "pt.ini", .{});
-        try current_dir.copyFile("res/lang/pt_BR.ini", lang_dir, "pt_BR.ini", .{});
-        try current_dir.copyFile("res/lang/ro.ini", lang_dir, "ro.ini", .{});
-        try current_dir.copyFile("res/lang/ru.ini", lang_dir, "ru.ini", .{});
-        try current_dir.copyFile("res/lang/sr.ini", lang_dir, "sr.ini", .{});
-        try current_dir.copyFile("res/lang/sv.ini", lang_dir, "sv.ini", .{});
-        try current_dir.copyFile("res/lang/tr.ini", lang_dir, "tr.ini", .{});
-        try current_dir.copyFile("res/lang/uk.ini", lang_dir, "uk.ini", .{});
+        try installFile("res/lang/cat.ini", lang_dir, lang_path, "cat.ini", .{});
+        try installFile("res/lang/cs.ini", lang_dir, lang_path, "cs.ini", .{});
+        try installFile("res/lang/de.ini", lang_dir, lang_path, "de.ini", .{});
+        try installFile("res/lang/en.ini", lang_dir, lang_path, "en.ini", .{});
+        try installFile("res/lang/es.ini", lang_dir, lang_path, "es.ini", .{});
+        try installFile("res/lang/fr.ini", lang_dir, lang_path, "fr.ini", .{});
+        try installFile("res/lang/it.ini", lang_dir, lang_path, "it.ini", .{});
+        try installFile("res/lang/pl.ini", lang_dir, lang_path, "pl.ini", .{});
+        try installFile("res/lang/pt.ini", lang_dir, lang_path, "pt.ini", .{});
+        try installFile("res/lang/pt_BR.ini", lang_dir, lang_path, "pt_BR.ini", .{});
+        try installFile("res/lang/ro.ini", lang_dir, lang_path, "ro.ini", .{});
+        try installFile("res/lang/ru.ini", lang_dir, lang_path, "ru.ini", .{});
+        try installFile("res/lang/sr.ini", lang_dir, lang_path, "sr.ini", .{});
+        try installFile("res/lang/sv.ini", lang_dir, lang_path, "sv.ini", .{});
+        try installFile("res/lang/tr.ini", lang_dir, lang_path, "tr.ini", .{});
+        try installFile("res/lang/uk.ini", lang_dir, lang_path, "uk.ini", .{});
     }
 
     {
@@ -267,49 +268,32 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
         var pam_dir = std.fs.cwd().openDir(pam_path, .{}) catch unreachable;
         defer pam_dir.close();
 
-        try current_dir.copyFile("res/pam.d/ly", pam_dir, "ly", .{ .override_mode = 0o644 });
+        try installFile("res/pam.d/ly", pam_dir, pam_path, "ly", .{ .override_mode = 0o644 });
     }
 }
 
 pub fn uninstallall(step: *std.Build.Step, _: ProgressNode) !void {
-    try std.fs.cwd().deleteTree(data_directory);
+    std.fs.cwd().deleteTree(data_directory) catch {
+        std.debug.print("warn: ly data directory not found.", .{});
+    };
+
     const allocator = step.owner.allocator;
 
     const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/bin/", exe_name });
-    try std.fs.cwd().deleteFile(exe_path);
-
-    const pam_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/pam.d/ly" });
-    try std.fs.cwd().deleteFile(pam_path);
-
-    const systemd_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/lib/systemd/system/ly.service" });
-    std.fs.cwd().deleteFile(systemd_service_path) catch {
-        std.debug.print("warn: systemd service not found.\n", .{});
+    var success = true;
+    std.fs.cwd().deleteFile(exe_path) catch {
+        std.debug.print("warn: ly executable not found.", .{});
+        success = false;
     };
+    if (success) std.debug.print("info: deleted {s}\n", .{exe_path});
 
-    const openrc_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/init.d/ly" });
-    std.fs.cwd().deleteFile(openrc_service_path) catch {
-        std.debug.print("warn: openrc service not found.\n", .{});
-    };
-
-    const runit_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/sv/ly" });
-    std.fs.cwd().deleteTree(runit_service_path) catch {
-        std.debug.print("warn: runit service not found.\n", .{});
-    };
-
-    const s6_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/s6/sv/ly-srv" });
-    std.fs.cwd().deleteTree(s6_service_path) catch {
-        std.debug.print("warn: s6 service not found.\n", .{});
-    };
-
-    const s6_admin_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/s6/adminsv/default/contents.d/ly-srv" });
-    std.fs.cwd().deleteFile(s6_admin_service_path) catch {
-        std.debug.print("warn: s6 admin service not found.\n", .{});
-    };
-
-    const dinit_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/dinit.d/ly" });
-    std.fs.cwd().deleteFile(dinit_service_path) catch {
-        std.debug.print("warn: dinit service not found.\n", .{});
-    };
+    try deleteFile(allocator, "/etc/pam.d/ly", "ly pam file not found");
+    try deleteFile(allocator, "/usr/lib/systemd/system/ly.service", "systemd service not found");
+    try deleteFile(allocator, "/etc/init.d/ly", "openrc service not found");
+    try deleteTree(allocator, "/etc/sv/ly", "runit service not found");
+    try deleteTree(allocator, "/etc/s6/sv/ly-srv", "s6 service not found");
+    try deleteFile(allocator, "/etc/s6/adminsv/default/contents.d/ly-srv", "s6 admin service not found");
+    try deleteFile(allocator, "/etc/dinit.d/ly", "dinit service not found");
 }
 
 fn getVersionStr(b: *std.Build, name: []const u8, version: std.SemanticVersion) ![]const u8 {
@@ -365,4 +349,47 @@ fn getVersionStr(b: *std.Build, name: []const u8, version: std.SemanticVersion) 
             return version_str;
         },
     }
+}
+
+fn installFile(
+    source_file: []const u8,
+    destination_directory: std.fs.Dir,
+    destination_directory_path: []const u8,
+    destination_file: []const u8,
+    options: std.fs.Dir.CopyFileOptions,
+) !void {
+    try std.fs.cwd().copyFile(source_file, destination_directory, destination_file, options);
+    std.debug.print("info: installed {s}/{s}\n", .{ destination_directory_path, destination_file });
+}
+
+fn deleteFile(
+    allocator: std.mem.Allocator,
+    file: []const u8,
+    warning: []const u8,
+) !void {
+    const path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, file });
+    var success = true;
+
+    std.fs.cwd().deleteFile(path) catch {
+        std.debug.print("warn: {s}\n", .{warning});
+        success = false;
+    };
+
+    if (success) std.debug.print("info: deleted {s}\n", .{path});
+}
+
+fn deleteTree(
+    allocator: std.mem.Allocator,
+    directory: []const u8,
+    warning: []const u8,
+) !void {
+    const path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, directory });
+    var success = true;
+
+    std.fs.cwd().deleteTree(path) catch {
+        std.debug.print("warn: {s}\n", .{warning});
+        success = false;
+    };
+
+    if (success) std.debug.print("info: deleted {s}\n", .{path});
 }
