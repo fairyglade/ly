@@ -466,8 +466,6 @@ pub fn main() !void {
                 desktop.draw();
                 login.draw();
                 password.drawMasked(config.asterisk);
-
-                update = animate;
             } else {
                 std.time.sleep(std.time.ns_per_ms * 10);
                 update = buffer.cascade();
@@ -499,6 +497,8 @@ pub fn main() !void {
         }
 
         const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
+
+        update = timeout != -1;
 
         if (event_error < 0 or event.type != termbox.TB_EVENT_KEY) continue;
 
