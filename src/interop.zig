@@ -26,10 +26,10 @@ pub const logincap = @cImport({
     @cInclude("login_cap.h");
 });
 
-pub const c_size = u64;
+pub const c_size = usize;
 pub const c_uid = u32;
 pub const c_gid = u32;
-pub const c_time = c_long;
+pub const c_time = c_longlong;
 pub const tm = extern struct {
     tm_sec: c_int,
     tm_min: c_int,

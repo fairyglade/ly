@@ -77,9 +77,9 @@ pub fn draw(self: *Matrix) void {
         if (self.frame > 4) self.frame = 1;
         self.count = 0;
 
-        var x: u64 = 0;
+        var x: usize = 0;
         while (x < self.terminal_buffer.width) : (x += 2) {
-            var tail: u64 = 0;
+            var tail: usize = 0;
             var line = &self.lines[x];
             if (self.frame <= line.update) continue;
 
@@ -95,7 +95,7 @@ pub fn draw(self: *Matrix) void {
                 }
             }
 
-            var y: u64 = 0;
+            var y: usize = 0;
             var first_col = true;
             var seg_len: u64 = 0;
             height_it: while (y <= buf_height) : (y += 1) {
@@ -142,13 +142,13 @@ pub fn draw(self: *Matrix) void {
         }
     }
 
-    var x: u64 = 0;
+    var x: usize = 0;
     while (x < buf_width) : (x += 2) {
-        var y: u64 = 1;
+        var y: usize = 1;
         while (y <= self.terminal_buffer.height) : (y += 1) {
             const dot = self.dots[buf_width * y + x];
 
-            var fg: u16 = self.fg_ini;
+            var fg = self.fg_ini;
 
             if (dot.value == -1 or dot.value == ' ') {
                 _ = termbox.tb_set_cell(@intCast(x), @intCast(y - 1), ' ', fg, termbox.TB_DEFAULT);
@@ -161,16 +161,16 @@ pub fn draw(self: *Matrix) void {
     }
 }
 
-fn initBuffers(dots: []Dot, lines: []Line, width: u64, height: u64, random: Random) void {
-    var y: u64 = 0;
+fn initBuffers(dots: []Dot, lines: []Line, width: usize, height: usize, random: Random) void {
+    var y: usize = 0;
     while (y <= height) : (y += 1) {
-        var x: u64 = 0;
+        var x: usize = 0;
         while (x < width) : (x += 2) {
             dots[y * width + x].value = -1;
         }
     }
 
-    var x: u64 = 0;
+    var x: usize = 0;
     while (x < width) : (x += 2) {
         var line = lines[x];
         const h: isize = @intCast(height);

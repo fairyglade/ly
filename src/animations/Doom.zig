@@ -74,7 +74,7 @@ pub fn draw(self: Doom) void {
     }
 }
 
-fn initBuffer(buffer: []u8, width: u64) void {
+fn initBuffer(buffer: []u8, width: usize) void {
     const length = buffer.len - width;
     const slice_start = buffer[0..length];
     const slice_end = buffer[length..];

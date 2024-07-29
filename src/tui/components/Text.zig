@@ -13,14 +13,14 @@ const Text = @This();
 allocator: Allocator,
 buffer: *TerminalBuffer,
 text: DynamicString,
-end: u64,
-cursor: u64,
-visible_start: u64,
-visible_length: u64,
-x: u64,
-y: u64,
+end: usize,
+cursor: usize,
+visible_start: usize,
+visible_length: usize,
+x: usize,
+y: usize,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: u64) !Text {
+pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: usize) !Text {
     const text = try DynamicString.initCapacity(allocator, max_length);
 
     return .{
@@ -40,7 +40,7 @@ pub fn deinit(self: Text) void {
     self.text.deinit();
 }
 
-pub fn position(self: *Text, x: u64, y: u64, visible_length: u64) void {
+pub fn position(self: *Text, x: usize, y: usize, visible_length: usize) void {
     self.x = x;
     self.y = y;
     self.visible_length = visible_length;

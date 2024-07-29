@@ -11,8 +11,8 @@ const termbox = interop.termbox;
 const TerminalBuffer = @This();
 
 random: Random,
-width: u64,
-height: u64,
+width: usize,
+height: usize,
 buffer: [*]termbox.tb_cell,
 fg: u16,
 bg: u16,
@@ -27,15 +27,15 @@ box_chars: struct {
     left: u32,
     right: u32,
 },
-labels_max_length: u64,
-box_x: u64,
-box_y: u64,
-box_width: u64,
-box_height: u64,
+labels_max_length: usize,
+box_x: usize,
+box_y: usize,
+box_width: usize,
+box_height: usize,
 margin_box_v: u8,
 margin_box_h: u8,
 
-pub fn init(config: Config, labels_max_length: u64, random: Random) TerminalBuffer {
+pub fn init(config: Config, labels_max_length: usize, random: Random) TerminalBuffer {
     return .{
         .random = random,
         .width = @intCast(termbox.tb_width()),
@@ -142,9 +142,9 @@ pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool)
 }
 
 pub fn calculateComponentCoordinates(self: TerminalBuffer) struct {
-    x: u64,
-    y: u64,
-    visible_length: u64,
+    x: usize,
+    y: usize,
+    visible_length: usize,
 } {
     const x = self.box_x + self.margin_box_h + self.labels_max_length + 1;
     const y = self.box_y + self.margin_box_v;
@@ -157,11 +157,11 @@ pub fn calculateComponentCoordinates(self: TerminalBuffer) struct {
     };
 }
 
-pub fn drawLabel(self: TerminalBuffer, text: []const u8, x: u64, y: u64) void {
+pub fn drawLabel(self: TerminalBuffer, text: []const u8, x: usize, y: usize) void {
     drawColorLabel(text, x, y, self.fg, self.bg);
 }
 
-pub fn drawColorLabel(text: []const u8, x: u64, y: u64, fg: u16, bg: u16) void {
+pub fn drawColorLabel(text: []const u8, x: usize, y: usize, fg: u16, bg: u16) void {
     const yc: c_int = @intCast(y);
     const utf8view = std.unicode.Utf8View.init(text) catch return;
     var utf8 = utf8view.iterator();
@@ -172,7 +172,7 @@ pub fn drawColorLabel(text: []const u8, x: u64, y: u64, fg: u16, bg: u16) void {
     }
 }
 
-pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: u64, y: u64, max_length: u64) void {
+pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: usize, y: usize, max_length: usize) void {
     const yc: c_int = @intCast(y);
     const utf8view = std.unicode.Utf8View.init(text) catch return;
     var utf8 = utf8view.iterator();
@@ -184,7 +184,7 @@ pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: u64, y: u64,
     }
 }
 
-pub fn drawCharMultiple(self: TerminalBuffer, char: u8, x: u64, y: u64, length: u64) void {
+pub fn drawCharMultiple(self: TerminalBuffer, char: u8, x: usize, y: usize, length: usize) void {
     const yc: c_int = @intCast(y);
     const cell = utils.initCell(char, self.fg, self.bg);
 

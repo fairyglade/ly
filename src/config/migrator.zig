@@ -20,9 +20,9 @@ pub fn tryMigrateSaveFile(user_buf: *[32]u8, path: []const u8) Save {
     reader.streamUntilDelimiter(session_fbs.writer(), '\n', 20) catch {};
 
     const session_index_str = session_fbs.getWritten();
-    var session_index: ?u64 = null;
+    var session_index: ?usize = null;
     if (session_index_str.len > 0) {
-        session_index = std.fmt.parseUnsigned(u64, session_index_str, 10) catch return save;
+        session_index = std.fmt.parseUnsigned(usize, session_index_str, 10) catch return save;
     }
     save.session_index = session_index;
 

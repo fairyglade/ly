@@ -299,8 +299,8 @@ pub fn main() !void {
 
             _ = termbox.tb_present(); // Required to update tb_width(), tb_height() and tb_cell_buffer()
 
-            const width: u64 = @intCast(termbox.tb_width());
-            const height: u64 = @intCast(termbox.tb_height());
+            const width: usize = @intCast(termbox.tb_width());
+            const height: usize = @intCast(termbox.tb_height());
 
             if (width != buffer.width) {
                 buffer.width = width;
@@ -398,7 +398,7 @@ pub fn main() !void {
                 try info_line.draw(buffer);
 
                 if (!config.hide_key_hints) {
-                    var length: u64 = 0;
+                    var length: usize = 0;
 
                     buffer.drawLabel(config.shutdown_key, length, 0);
                     length += config.shutdown_key.len + 1;
@@ -453,7 +453,7 @@ pub fn main() !void {
                     };
 
                     var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
-                    const lock_state_y: u64 = if (config.clock != null) 1 else 0;
+                    const lock_state_y: usize = if (config.clock != null) 1 else 0;
 
                     if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
 

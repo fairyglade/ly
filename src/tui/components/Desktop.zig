@@ -35,13 +35,13 @@ pub const Entry = struct { @"Desktop Entry": DesktopEntry = DesktopEntry{} };
 allocator: Allocator,
 buffer: *TerminalBuffer,
 environments: EnvironmentList,
-current: u64,
-visible_length: u64,
-x: u64,
-y: u64,
+current: usize,
+visible_length: usize,
+x: usize,
+y: usize,
 lang: Lang,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: u64, lang: Lang) !Desktop {
+pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: usize, lang: Lang) !Desktop {
     return .{
         .allocator = allocator,
         .buffer = buffer,
@@ -64,7 +64,7 @@ pub fn deinit(self: Desktop) void {
     self.environments.deinit();
 }
 
-pub fn position(self: *Desktop, x: u64, y: u64, visible_length: u64) void {
+pub fn position(self: *Desktop, x: usize, y: usize, visible_length: usize) void {
     self.x = x;
     self.y = y;
     self.visible_length = visible_length;
