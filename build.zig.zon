@@ -8,8 +8,8 @@
             .hash = "122062d301a203d003547b414237229b09a7980095061697349f8bef41be9c30266b",
         },
         .zigini = .{
-            .url = "https://github.com/Kawaii-Ash/zigini/archive/refs/tags/0.2.2.tar.gz",
-            .hash = "1220afda2f3258cd0bb042dd3c2d5a35069ce1785c11325e65f136c5220013b36d00",
+            .url = "https://github.com/Kawaii-Ash/zigini/archive/bdb6fd15c6dcedb0c6c2a46381f2d298e2f05fff.tar.gz",
+            .hash = "12203feb831e21bec081af6aae70dd19b127f1627aa55f3415bd1fa476c174a511cc",
         },
     },
     .paths = .{""},
