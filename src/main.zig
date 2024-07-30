@@ -90,8 +90,7 @@ pub fn main() !void {
         if (save_path_alloc) allocator.free(save_path);
     }
 
-    // Compatibility with v0.6.0
-    const mapped_config_fields = .{.{ "blank_password", "clear_password" }};
+    const comment_characters = "#";
 
     if (res.args.config) |s| {
         const trailing_slash = if (s[s.len - 1] != '/') "/" else "";
@@ -99,31 +98,33 @@ pub fn main() !void {
         const config_path = try std.fmt.allocPrint(allocator, "{s}{s}config.ini", .{ s, trailing_slash });
         defer allocator.free(config_path);
 
-        config = config_ini.readFileToStructWithMap(config_path, mapped_config_fields) catch Config{};
+        config = config_ini.readFileToStruct(config_path, comment_characters, migrator.configFieldHandler) catch Config{};
 
         const lang_path = try std.fmt.allocPrint(allocator, "{s}{s}lang/{s}.ini", .{ s, trailing_slash, config.lang });
         defer allocator.free(lang_path);
 
-        lang = lang_ini.readFileToStruct(lang_path) catch Lang{};
+        lang = lang_ini.readFileToStruct(lang_path, comment_characters, null) catch Lang{};
 
         if (config.load) {
             save_path = try std.fmt.allocPrint(allocator, "{s}{s}save.ini", .{ s, trailing_slash });
             save_path_alloc = true;
 
             var user_buf: [32]u8 = undefined;
-            save = save_ini.readFileToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
+            save = save_ini.readFileToStruct(save_path, comment_characters, null) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
         }
     } else {
-        config = config_ini.readFileToStructWithMap(build_options.data_directory ++ "/config.ini", mapped_config_fields) catch Config{};
+        const config_path = build_options.data_directory ++ "/config.ini";
+
+        config = config_ini.readFileToStruct(config_path, comment_characters, migrator.configFieldHandler) catch Config{};
 
         const lang_path = try std.fmt.allocPrint(allocator, "{s}/lang/{s}.ini", .{ build_options.data_directory, config.lang });
         defer allocator.free(lang_path);
 
-        lang = lang_ini.readFileToStruct(lang_path) catch Lang{};
+        lang = lang_ini.readFileToStruct(lang_path, comment_characters, null) catch Lang{};
 
         if (config.load) {
             var user_buf: [32]u8 = undefined;
-            save = save_ini.readFileToStruct(save_path) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
+            save = save_ini.readFileToStruct(save_path, comment_characters, null) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
         }
     }
 
@@ -541,7 +542,7 @@ pub fn main() !void {
                         .user = login.text.items,
                         .session_index = desktop.current,
                     };
-                    ini.writeFromStruct(save_data, file.writer(), null) catch break :save_last_settings;
+                    ini.writeFromStruct(save_data, file.writer(), null, true, .{}) catch break :save_last_settings;
                 }
 
                 var shared_err = try SharedError.init();

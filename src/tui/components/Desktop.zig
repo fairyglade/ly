@@ -150,7 +150,7 @@ pub fn crawl(self: *Desktop, path: []const u8, display_server: DisplayServer) !v
         const entry_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ path, item.name });
         defer self.allocator.free(entry_path);
         var entry_ini = Ini(Entry).init(self.allocator);
-        _ = try entry_ini.readFileToStruct(entry_path);
+        _ = try entry_ini.readFileToStruct(entry_path, "#", null);
         errdefer entry_ini.deinit();
 
         var xdg_session_desktop: []const u8 = undefined;

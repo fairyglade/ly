@@ -1,6 +1,18 @@
+// The migrator ensures compatibility with <=0.6.0 configuration files
+
 const std = @import("std");
 const ini = @import("zigini");
 const Save = @import("Save.zig");
+
+pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniField {
+    var mapped_field = field;
+
+    if (std.mem.eql(u8, field.key, "blank_password")) {
+        mapped_field.key = "clear_password";
+    }
+
+    return mapped_field;
+}
 
 pub fn tryMigrateSaveFile(user_buf: *[32]u8, path: []const u8) Save {
     var save = Save{};
