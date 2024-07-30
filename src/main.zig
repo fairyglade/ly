@@ -21,6 +21,7 @@ const utils = @import("tui/utils.zig");
 
 const Ini = ini.Ini;
 const termbox = interop.termbox;
+const temporary_allocator = std.heap.page_allocator;
 
 var session_pid: std.posix.pid_t = -1;
 pub fn signalHandler(i: c_int) callconv(.C) void {
@@ -38,11 +39,32 @@ pub fn signalHandler(i: c_int) callconv(.C) void {
 }
 
 pub fn main() !void {
+    var shutdown = false;
+    var restart = false;
+    var shutdown_cmd: []const u8 = undefined;
+    var restart_cmd: []const u8 = undefined;
+
+    const stderr = std.io.getStdErr().writer();
+
+    defer {
+        // If we can't shutdown or restart due to an error, we print it to standard error. If that fails, just bail out
+        if (shutdown) {
+            const shutdown_error = std.process.execv(temporary_allocator, &[_][]const u8{ "/bin/sh", "-c", shutdown_cmd });
+            stderr.print("error: couldn't shutdown: {any}\n", .{shutdown_error}) catch std.process.exit(1);
+        } else if (restart) {
+            const restart_error = std.process.execv(temporary_allocator, &[_][]const u8{ "/bin/sh", "-c", restart_cmd });
+            stderr.print("error: couldn't restart: {any}\n", .{restart_error}) catch std.process.exit(1);
+        } else {
+            // The user has quit Ly using Ctrl+C
+            temporary_allocator.free(shutdown_cmd);
+            temporary_allocator.free(restart_cmd);
+        }
+    }
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
-    const stderr = std.io.getStdErr().writer();
 
     // Load arguments
     const params = comptime clap.parseParamsComptime(
@@ -127,6 +149,11 @@ pub fn main() !void {
             save = save_ini.readFileToStruct(save_path, comment_characters, null) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
         }
     }
+
+    // These strings only end up getting freed if the user quits Ly using Ctrl+C, which is fine since in the other cases
+    // we end up shutting down or restarting the system
+    shutdown_cmd = try temporary_allocator.dupe(u8, config.shutdown_cmd);
+    restart_cmd = try temporary_allocator.dupe(u8, config.restart_cmd);
 
     interop.setNumlock(config.numlock) catch {};
 
@@ -258,8 +285,6 @@ pub fn main() !void {
     var run = true;
     var update = true;
     var resolution_changed = false;
-    var shutdown = false;
-    var restart = false;
     var auth_fails: u64 = 0;
 
     // Switch to selected TTY if possible
@@ -635,12 +660,6 @@ pub fn main() !void {
                 update = true;
             },
         }
-    }
-
-    if (shutdown) {
-        return std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.shutdown_cmd });
-    } else if (restart) {
-        return std.process.execv(allocator, &[_][]const u8{ "/bin/sh", "-c", config.restart_cmd });
     }
 }
 
