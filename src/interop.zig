@@ -21,9 +21,23 @@ pub const unistd = @cImport({
     @cInclude("unistd.h");
 });
 
-// Exists for FreeBSD only
+// FreeBSD-specific headers
 pub const logincap = @cImport({
     @cInclude("login_cap.h");
+});
+
+// BSD-specific headers
+pub const kbio = @cImport({
+    @cInclude("sys/kbio.h");
+});
+
+// Linux-specific headers
+pub const kd = @cImport({
+    @cInclude("sys/kd.h");
+});
+
+pub const vt = @cImport({
+    @cInclude("sys/vt.h");
 });
 
 pub const c_size = usize;
@@ -41,37 +55,12 @@ pub const tm = extern struct {
     tm_yday: c_int,
     tm_isdst: c_int,
 };
-pub const passwd = extern struct {
-    pw_name: [*:0]u8,
-    pw_passwd: [*:0]u8,
-
-    pw_uid: c_uid,
-    pw_gid: c_gid,
-    pw_gecos: [*:0]u8,
-    pw_dir: [*:0]u8,
-    pw_shell: [*:0]u8,
-};
-
-pub const VT_ACTIVATE: c_int = 0x5606;
-pub const VT_WAITACTIVE: c_int = 0x5607;
-
-pub const KDGETLED: c_int = 0x4B31;
-pub const KDSETLED: c_int = 0x4B32;
-pub const KDGKBLED: c_int = 0x4B64;
-pub const KDSKBLED: c_int = 0x4B65;
-
-pub const LED_NUM: c_int = 0x02;
-pub const LED_CAP: c_int = 0x04;
-
-pub const K_NUMLOCK: c_int = 0x02;
-pub const K_CAPSLOCK: c_int = 0x04;
 
 pub extern "c" fn localtime(timer: *const c_time) *tm;
 pub extern "c" fn strftime(str: [*:0]u8, maxsize: c_size, format: [*:0]const u8, timeptr: *const tm) c_size;
-pub extern "c" fn setenv(name: [*:0]const u8, value: [*:0]const u8, overwrite: c_int) c_int;
+pub extern "c" fn setenv(name: [*:0]const u8, value: ?[*:0]const u8, overwrite: c_int) c_int;
 pub extern "c" fn putenv(name: [*:0]u8) c_int;
 pub extern "c" fn getuid() c_uid;
-pub extern "c" fn getpwnam(name: [*:0]const u8) ?*passwd;
 pub extern "c" fn endpwent() void;
 pub extern "c" fn setusershell() void;
 pub extern "c" fn getusershell() [*:0]u8;
@@ -88,27 +77,34 @@ pub fn timeAsString(buf: [:0]u8, format: [:0]const u8) ![]u8 {
     return buf[0..len];
 }
 
-pub fn getLockState(console_dev: [:0]const u8) !struct {
+pub fn switchTty(console_dev: []const u8, tty: u8) !void {
+    const fd = try std.posix.open(console_dev, .{ .ACCMODE = .WRONLY }, 0);
+    defer std.posix.close(fd);
+
+    _ = std.c.ioctl(fd, vt.VT_ACTIVATE, tty);
+    _ = std.c.ioctl(fd, vt.VT_WAITACTIVE, tty);
+}
+
+pub fn getLockState(console_dev: []const u8) !struct {
     numlock: bool,
     capslock: bool,
 } {
-    const fd = std.c.open(console_dev, .{ .ACCMODE = .RDONLY });
-    if (fd < 0) return error.CannotOpenConsoleDev;
-    defer _ = std.c.close(fd);
+    const fd = try std.posix.open(console_dev, .{ .ACCMODE = .RDONLY }, 0);
+    defer std.posix.close(fd);
 
     var numlock = false;
     var capslock = false;
 
     if (builtin.os.tag.isBSD()) {
         var led: c_int = undefined;
-        _ = std.c.ioctl(fd, KDGETLED, &led);
-        numlock = (led & LED_NUM) != 0;
-        capslock = (led & LED_CAP) != 0;
+        _ = std.c.ioctl(fd, kbio.KDGETLED, &led);
+        numlock = (led & kbio.LED_NUM) != 0;
+        capslock = (led & kbio.LED_CAP) != 0;
     } else {
         var led: c_char = undefined;
-        _ = std.c.ioctl(fd, KDGKBLED, &led);
-        numlock = (led & K_NUMLOCK) != 0;
-        capslock = (led & K_CAPSLOCK) != 0;
+        _ = std.c.ioctl(fd, kd.KDGKBLED, &led);
+        numlock = (led & kd.K_NUMLOCK) != 0;
+        capslock = (led & kd.K_CAPSLOCK) != 0;
     }
 
     return .{
@@ -118,12 +114,25 @@ pub fn getLockState(console_dev: [:0]const u8) !struct {
 }
 
 pub fn setNumlock(val: bool) !void {
-    var led: c_char = undefined;
-    _ = std.c.ioctl(0, KDGKBLED, &led);
+    if (builtin.os.tag.isBSD()) {
+        var led: c_int = undefined;
+        _ = std.c.ioctl(0, kbio.KDGETLED, &led);
 
-    const numlock = (led & K_NUMLOCK) != 0;
+        const numlock = (led & kbio.LED_NUM) != 0;
+        if (numlock != val) {
+            const status = std.c.ioctl(std.posix.STDIN_FILENO, kbio.KDSETLED, led ^ kbio.LED_NUM);
+            if (status != 0) return error.FailedToSetNumlock;
+        }
+
+        return;
+    }
+
+    var led: c_char = undefined;
+    _ = std.c.ioctl(0, kd.KDGKBLED, &led);
+
+    const numlock = (led & kd.K_NUMLOCK) != 0;
     if (numlock != val) {
-        const status = std.c.ioctl(std.posix.STDIN_FILENO, KDSKBLED, led ^ K_NUMLOCK);
+        const status = std.c.ioctl(std.posix.STDIN_FILENO, kd.KDSKBLED, led ^ kd.K_NUMLOCK);
         if (status != 0) return error.FailedToSetNumlock;
     }
 }

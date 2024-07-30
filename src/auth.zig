@@ -65,16 +65,16 @@ pub fn authenticate(config: Config, current_environment: Desktop.Environment, lo
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer status = interop.pam.pam_close_session(handle, 0);
 
-    var pwd: *interop.passwd = undefined;
+    var pwd: *std.c.passwd = undefined;
     {
         defer interop.endpwent();
 
         // Get password structure from username
-        pwd = interop.getpwnam(login.ptr) orelse return error.GetPasswordNameFailed;
+        pwd = std.c.getpwnam(login.ptr) orelse return error.GetPasswordNameFailed;
     }
 
     // Set user shell if it hasn't already been set
-    if (pwd.pw_shell[0] == 0) {
+    if (pwd.pw_shell == null) {
         interop.setusershell();
         pwd.pw_shell = interop.getusershell();
         interop.endusershell();
@@ -109,25 +109,25 @@ pub fn authenticate(config: Config, current_environment: Desktop.Environment, lo
         };
         try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
-        try addUtmpEntry(&entry, pwd.pw_name, child_pid);
+        try addUtmpEntry(&entry, pwd.pw_name.?, child_pid);
     }
     // Wait for the session to stop
     _ = std.posix.waitpid(child_pid, 0);
 
     removeUtmpEntry(&entry);
 
-    try resetTerminal(pwd.pw_shell, config.term_reset_cmd);
+    try resetTerminal(pwd.pw_shell.?, config.term_reset_cmd);
 
     if (shared_err.readError()) |err| return err;
 }
 
 fn startSession(
     config: Config,
-    pwd: *interop.passwd,
+    pwd: *std.c.passwd,
     handle: ?*interop.pam.pam_handle,
     current_environment: Desktop.Environment,
 ) !void {
-    const status = interop.initgroups(pwd.pw_name, pwd.pw_gid);
+    const status = interop.initgroups(pwd.pw_name.?, pwd.pw_gid);
     if (status != 0) return error.GroupInitializationFailed;
 
     if (builtin.os.tag == .freebsd) {
@@ -150,22 +150,22 @@ fn startSession(
     for (env_list) |env_var| _ = interop.putenv(env_var.?);
 
     // Execute what the user requested
-    std.posix.chdirZ(pwd.pw_dir) catch return error.ChangeDirectoryFailed;
+    std.posix.chdirZ(pwd.pw_dir.?) catch return error.ChangeDirectoryFailed;
 
-    try resetTerminal(pwd.pw_shell, config.term_reset_cmd);
+    try resetTerminal(pwd.pw_shell.?, config.term_reset_cmd);
 
     switch (current_environment.display_server) {
-        .wayland => try executeWaylandCmd(pwd.pw_shell, config.wayland_cmd, current_environment.cmd),
-        .shell => try executeShellCmd(pwd.pw_shell),
+        .wayland => try executeWaylandCmd(pwd.pw_shell.?, config.wayland_cmd, current_environment.cmd),
+        .shell => try executeShellCmd(pwd.pw_shell.?),
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{config.tty});
-            try executeX11Cmd(pwd.pw_shell, pwd.pw_dir, config, current_environment.cmd, vt);
+            try executeX11Cmd(pwd.pw_shell.?, pwd.pw_dir.?, config, current_environment.cmd, vt);
         },
     }
 }
 
-fn initEnv(pwd: *interop.passwd, path_env: ?[:0]const u8) !void {
+fn initEnv(pwd: *std.c.passwd, path_env: ?[:0]const u8) !void {
     _ = interop.setenv("HOME", pwd.pw_dir, 1);
     _ = interop.setenv("PWD", pwd.pw_dir, 1);
     _ = interop.setenv("SHELL", pwd.pw_shell, 1);

@@ -307,16 +307,9 @@ pub fn main() !void {
     var auth_fails: u64 = 0;
 
     // Switch to selected TTY if possible
-    open_console_dev: {
-        const fd = std.posix.open(config.console_dev, .{ .ACCMODE = .WRONLY }, 0) catch {
-            try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
-            break :open_console_dev;
-        };
-        defer std.posix.close(fd);
-
-        _ = std.c.ioctl(fd, interop.VT_ACTIVATE, config.tty);
-        _ = std.c.ioctl(fd, interop.VT_WAITACTIVE, config.tty);
-    }
+    interop.switchTty(config.console_dev, config.tty) catch {
+        try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
+    };
 
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
