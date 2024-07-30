@@ -273,11 +273,9 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
 }
 
 pub fn uninstallall(step: *std.Build.Step, _: ProgressNode) !void {
-    std.fs.cwd().deleteTree(data_directory) catch {
-        std.debug.print("warn: ly data directory not found.", .{});
-    };
-
     const allocator = step.owner.allocator;
+
+    try deleteTree(allocator, data_directory, "ly data directory not found");
 
     const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/bin/", exe_name });
     var success = true;
