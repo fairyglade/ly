@@ -271,13 +271,13 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
             var patch_map = PatchMap.init(allocator);
             defer patch_map.deinit();
 
-            try patch_map.put("$PREFIX_DIRECTORY", prefix_directory);
+            try patch_map.put("$CONFIG_DIRECTORY", config_directory);
 
             const patched_xsetup = try patchFile(allocator, "res/xsetup.sh", patch_map);
             const patched_wsetup = try patchFile(allocator, "res/wsetup.sh", patch_map);
 
-            try installText(patched_xsetup, config_dir, ly_config_directory, "xsetup.sh", .{});
-            try installText(patched_wsetup, config_dir, ly_config_directory, "wsetup.sh", .{});
+            try installText(patched_xsetup, config_dir, ly_config_directory, "xsetup.sh", .{ .mode = 0o755 });
+            try installText(patched_wsetup, config_dir, ly_config_directory, "wsetup.sh", .{ .mode = 0o755 });
         }
     }
 
