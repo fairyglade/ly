@@ -19,8 +19,10 @@ visible_start: usize,
 visible_length: usize,
 x: usize,
 y: usize,
+masked: bool,
+maybe_mask: ?u8,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: usize) !Text {
+pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: usize, masked: bool, maybe_mask: ?u8) !Text {
     const text = try DynamicString.initCapacity(allocator, max_length);
 
     return .{
@@ -33,6 +35,8 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: usize) !T
         .visible_length = 0,
         .x = 0,
         .y = 0,
+        .masked = masked,
+        .maybe_mask = maybe_mask,
     };
 }
 
@@ -78,10 +82,25 @@ pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, insert_mode: bool) !
         }
     }
 
+    if (self.masked and self.maybe_mask == null) {
+        _ = termbox.tb_set_cursor(@intCast(self.x), @intCast(self.y));
+        return;
+    }
+
     _ = termbox.tb_set_cursor(@intCast(self.x + (self.cursor - self.visible_start)), @intCast(self.y));
 }
 
 pub fn draw(self: Text) void {
+    if (self.masked) {
+        if (self.maybe_mask) |mask| {
+            const length = @min(self.text.items.len, self.visible_length - 1);
+            if (length == 0) return;
+
+            self.buffer.drawCharMultiple(mask, self.x, self.y, length);
+        }
+        return;
+    }
+
     const length = @min(self.text.items.len, self.visible_length);
     if (length == 0) return;
 
@@ -94,13 +113,6 @@ pub fn draw(self: Text) void {
     };
 
     self.buffer.drawLabel(visible_slice, self.x, self.y);
-}
-
-pub fn drawMasked(self: Text, mask: u8) void {
-    const length = @min(self.text.items.len, self.visible_length - 1);
-    if (length == 0) return;
-
-    self.buffer.drawCharMultiple(mask, self.x, self.y, length);
 }
 
 pub fn clear(self: *Text) void {

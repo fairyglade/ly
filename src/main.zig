@@ -253,10 +253,10 @@ pub fn main() !void {
     try desktop.crawl(config.waylandsessions, .wayland);
     if (build_options.enable_x11_support) try desktop.crawl(config.xsessions, .x11);
 
-    var login = try Text.init(allocator, &buffer, config.max_login_len);
+    var login = try Text.init(allocator, &buffer, config.max_login_len, false, null);
     defer login.deinit();
 
-    var password = try Text.init(allocator, &buffer, config.max_password_len);
+    var password = try Text.init(allocator, &buffer, config.max_password_len, true, config.asterisk);
     defer password.deinit();
 
     var active_input = config.default_input;
@@ -508,7 +508,7 @@ pub fn main() !void {
 
                 desktop.draw();
                 login.draw();
-                password.drawMasked(config.asterisk);
+                password.draw();
             } else {
                 std.time.sleep(std.time.ns_per_ms * 10);
                 update = buffer.cascade();

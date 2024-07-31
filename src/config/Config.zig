@@ -6,7 +6,7 @@ const Input = enums.Input;
 const ViMode = enums.ViMode;
 
 animation: Animation = .none,
-asterisk: u8 = '*',
+asterisk: ?u8 = '*',
 bg: u16 = 0,
 bigclock: bool = false,
 blank_box: bool = true,
