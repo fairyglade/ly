@@ -41,6 +41,7 @@ pub fn build(b: *std.Build) !void {
     default_tty_str = try std.fmt.allocPrint(b.allocator, "{d}", .{default_tty});
 
     build_options.addOption([]const u8, "config_directory", bin_directory);
+    build_options.addOption([]const u8, "prefix_directory", prefix_directory);
     build_options.addOption([]const u8, "version", version_str);
     build_options.addOption(u8, "tty", default_tty);
     build_options.addOption(bool, "enable_x11_support", enable_x11_support);
