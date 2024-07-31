@@ -4,7 +4,7 @@ const builtin = @import("builtin");
 const enums = @import("enums.zig");
 const interop = @import("interop.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
-const Desktop = @import("tui/components/Desktop.zig");
+const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
 const Config = @import("config/Config.zig");
 const Allocator = std.mem.Allocator;
@@ -22,7 +22,7 @@ pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(config: Config, current_environment: Desktop.Environment, login: [:0]const u8, password: [:0]const u8) !void {
+pub fn authenticate(config: Config, current_environment: Session.Environment, login: [:0]const u8, password: [:0]const u8) !void {
     var tty_buffer: [3]u8 = undefined;
     const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
 
@@ -125,7 +125,7 @@ fn startSession(
     config: Config,
     pwd: *std.c.passwd,
     handle: ?*interop.pam.pam_handle,
-    current_environment: Desktop.Environment,
+    current_environment: Session.Environment,
 ) !void {
     const status = interop.initgroups(pwd.pw_name.?, pwd.pw_gid);
     if (status != 0) return error.GroupInitializationFailed;

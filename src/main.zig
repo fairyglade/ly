@@ -9,7 +9,7 @@ const interop = @import("interop.zig");
 const Doom = @import("animations/Doom.zig");
 const Matrix = @import("animations/Matrix.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
-const Desktop = @import("tui/components/Desktop.zig");
+const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
 const InfoLine = @import("tui/components/InfoLine.zig");
 const Config = @import("config/Config.zig");
@@ -235,23 +235,23 @@ pub fn main() !void {
     var buffer = TerminalBuffer.init(config, labels_max_length, random);
 
     // Initialize components
-    var desktop = try Desktop.init(allocator, &buffer, config.max_desktop_len, lang);
-    defer desktop.deinit();
+    var session = try Session.init(allocator, &buffer, config.max_desktop_len, lang);
+    defer session.deinit();
 
-    desktop.addEnvironment(.{ .Name = lang.shell }, "", .shell) catch {
+    session.addEnvironment(.{ .Name = lang.shell }, "", .shell) catch {
         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
     };
 
     if (build_options.enable_x11_support) {
         if (config.xinitrc) |xinitrc| {
-            desktop.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, "", .xinitrc) catch {
+            session.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, "", .xinitrc) catch {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
             };
         }
     }
 
-    try desktop.crawl(config.waylandsessions, .wayland);
-    if (build_options.enable_x11_support) try desktop.crawl(config.xsessions, .x11);
+    try session.crawl(config.waylandsessions, .wayland);
+    if (build_options.enable_x11_support) try session.crawl(config.xsessions, .x11);
 
     var login = try Text.init(allocator, &buffer, config.max_login_len, false, null);
     defer login.deinit();
@@ -272,7 +272,7 @@ pub fn main() !void {
         }
 
         if (save.session_index) |session_index| {
-            if (session_index < desktop.environments.items.len) desktop.current = session_index;
+            if (session_index < session.label.list.items.len) session.label.current = session_index;
         }
     }
 
@@ -281,12 +281,12 @@ pub fn main() !void {
         buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
 
         const coordinates = buffer.calculateComponentCoordinates();
-        desktop.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
+        session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
         login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
         password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
 
         switch (active_input) {
-            .session => desktop.handle(null, insert_mode),
+            .session => session.label.handle(null, insert_mode),
             .login => login.handle(null, insert_mode) catch {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
             },
@@ -404,7 +404,7 @@ pub fn main() !void {
 
                 if (resolution_changed) {
                     const coordinates = buffer.calculateComponentCoordinates();
-                    desktop.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
+                    session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
                     login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
                     password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
 
@@ -412,7 +412,7 @@ pub fn main() !void {
                 }
 
                 switch (active_input) {
-                    .session => desktop.handle(null, insert_mode),
+                    .session => session.label.handle(null, insert_mode),
                     .login => login.handle(null, insert_mode) catch {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
@@ -506,7 +506,7 @@ pub fn main() !void {
                     }
                 }
 
-                desktop.draw();
+                session.label.draw();
                 login.draw();
                 password.draw();
             } else {
@@ -631,7 +631,7 @@ pub fn main() !void {
 
                     const save_data = Save{
                         .user = login.text.items,
-                        .session_index = desktop.current,
+                        .session_index = session.label.current,
                     };
                     ini.writeFromStruct(save_data, file.writer(), null, true, .{}) catch break :save_last_settings;
                 }
@@ -652,7 +652,7 @@ pub fn main() !void {
 
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
-                        const current_environment = desktop.environments.items[desktop.current];
+                        const current_environment = session.label.list.items[session.label.current];
                         auth.authenticate(config, current_environment, login_text, password_text) catch |err| {
                             shared_err.writeError(err);
                             std.process.exit(1);
@@ -715,7 +715,7 @@ pub fn main() !void {
                 }
 
                 switch (active_input) {
-                    .session => desktop.handle(&event, insert_mode),
+                    .session => session.label.handle(&event, insert_mode),
                     .login => login.handle(&event, insert_mode) catch {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
