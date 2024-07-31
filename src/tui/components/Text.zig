@@ -22,8 +22,8 @@ y: usize,
 masked: bool,
 maybe_mask: ?u8,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: usize, masked: bool, maybe_mask: ?u8) !Text {
-    const text = try DynamicString.initCapacity(allocator, max_length);
+pub fn init(allocator: Allocator, buffer: *TerminalBuffer, masked: bool, maybe_mask: ?u8) Text {
+    const text = DynamicString.init(allocator);
 
     return .{
         .allocator = allocator,

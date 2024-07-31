@@ -217,14 +217,15 @@ pub fn main() !void {
     var buffer = TerminalBuffer.init(config, labels_max_length, random);
 
     // Initialize components
-    var info_line = try InfoLine.init(allocator, &buffer, 255);
+    var info_line = InfoLine.init(allocator, &buffer);
     defer info_line.deinit();
 
     if (config_load_failed) {
-        try info_line.addMessage(lang.err_config, config.error_bg, config.error_fg);
+        // We can't localize this since the config failed to load so we'd fallback to the default language anyway
+        try info_line.addMessage("unable to parse config file", config.error_bg, config.error_fg);
     }
 
-    var session = try Session.init(allocator, &buffer, config.max_desktop_len, lang);
+    var session = Session.init(allocator, &buffer, lang);
     defer session.deinit();
 
     session.addEnvironment(.{ .Name = lang.shell }, "", .shell) catch {
@@ -256,10 +257,10 @@ pub fn main() !void {
     try session.crawl(config.waylandsessions, .wayland);
     if (build_options.enable_x11_support) try session.crawl(config.xsessions, .x11);
 
-    var login = try Text.init(allocator, &buffer, config.max_login_len, false, null);
+    var login = Text.init(allocator, &buffer, false, null);
     defer login.deinit();
 
-    var password = try Text.init(allocator, &buffer, config.max_password_len, true, config.asterisk);
+    var password = Text.init(allocator, &buffer, true, config.asterisk);
     defer password.deinit();
 
     var active_input = config.default_input;
@@ -496,22 +497,22 @@ pub fn main() !void {
                     buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
                 }
 
-                draw_lock_state: {
-                    const lock_state = interop.getLockState(config.console_dev) catch {
-                        try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
-                        break :draw_lock_state;
-                    };
+                // draw_lock_state: {
+                //     const lock_state = interop.getLockState(config.console_dev) catch {
+                //         try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
+                //         break :draw_lock_state;
+                //     };
 
-                    var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
-                    const lock_state_y: usize = if (config.clock != null) 1 else 0;
+                //     var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
+                //     const lock_state_y: usize = if (config.clock != null) 1 else 0;
 
-                    if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
+                //     if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
 
-                    if (lock_state_x >= lang.capslock.len + 1) {
-                        lock_state_x -= lang.capslock.len + 1;
-                        if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
-                    }
-                }
+                //     if (lock_state_x >= lang.capslock.len + 1) {
+                //         lock_state_x -= lang.capslock.len + 1;
+                //         if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
+                //     }
+                // }
 
                 session.label.draw();
                 login.draw();

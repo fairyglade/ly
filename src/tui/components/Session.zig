@@ -34,9 +34,9 @@ pub const Entry = struct { @"Desktop Entry": DesktopEntry = .{} };
 label: EnvironmentLabel,
 lang: Lang,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: usize, lang: Lang) !Session {
+pub fn init(allocator: Allocator, buffer: *TerminalBuffer, lang: Lang) Session {
     return .{
-        .label = try EnvironmentLabel.init(allocator, buffer, max_length, drawItem),
+        .label = EnvironmentLabel.init(allocator, buffer, drawItem),
         .lang = lang,
     };
 }

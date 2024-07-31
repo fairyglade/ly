@@ -23,11 +23,11 @@ pub fn CyclableLabel(comptime ItemType: type) type {
         first_char_x: usize,
         draw_item_fn: DrawItemFn,
 
-        pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: usize, draw_item_fn: DrawItemFn) !Self {
+        pub fn init(allocator: Allocator, buffer: *TerminalBuffer, draw_item_fn: DrawItemFn) Self {
             return .{
                 .allocator = allocator,
                 .buffer = buffer,
-                .list = try ItemList.initCapacity(allocator, max_length),
+                .list = ItemList.init(allocator),
                 .current = 0,
                 .visible_length = 0,
                 .x = 0,

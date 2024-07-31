@@ -5,14 +5,14 @@ const ini = @import("zigini");
 const Save = @import("Save.zig");
 const enums = @import("../enums.zig");
 
-var animate = false;
+var maybe_animate: ?bool = null;
 
 pub var mapped_config_fields = false;
 
 pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniField {
     if (std.mem.eql(u8, field.key, "animate")) {
         // The option doesn't exist anymore, but we save its value for "animation"
-        animate = std.mem.eql(u8, field.value, "true");
+        maybe_animate = std.mem.eql(u8, field.value, "true");
 
         mapped_config_fields = true;
         return null;
@@ -59,9 +59,12 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         return mapped_field;
     }
 
-    if (std.mem.eql(u8, field.key, "wayland_specifier")) {
-        // The option doesn't exist anymore
-
+    if (std.mem.eql(u8, field.key, "wayland_specifier") or
+        std.mem.eql(u8, field.key, "max_desktop_len") or
+        std.mem.eql(u8, field.key, "max_login_len") or
+        std.mem.eql(u8, field.key, "max_password_len"))
+    {
+        // The options don't exist anymore
         mapped_config_fields = true;
         return null;
     }
@@ -72,9 +75,9 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
 // This is the stuff we only handle after reading the config.
 // For example, the "animate" field could come after "animation"
 pub fn lateConfigFieldHandler(animation: *enums.Animation) void {
-    if (!mapped_config_fields) return;
+    if (maybe_animate == null) return;
 
-    if (!animate) animation.* = .none;
+    if (!maybe_animate.?) animation.* = .none;
 }
 
 pub fn tryMigrateSaveFile(user_buf: *[32]u8, path: []const u8) Save {

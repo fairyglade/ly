@@ -18,9 +18,9 @@ const Message = struct {
 
 label: MessageLabel,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: usize) !InfoLine {
+pub fn init(allocator: Allocator, buffer: *TerminalBuffer) InfoLine {
     return .{
-        .label = try MessageLabel.init(allocator, buffer, max_length, drawItem),
+        .label = MessageLabel.init(allocator, buffer, drawItem),
     };
 }
 
