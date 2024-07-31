@@ -497,22 +497,22 @@ pub fn main() !void {
                     buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
                 }
 
-                // draw_lock_state: {
-                //     const lock_state = interop.getLockState(config.console_dev) catch {
-                //         try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
-                //         break :draw_lock_state;
-                //     };
+                draw_lock_state: {
+                    const lock_state = interop.getLockState(config.console_dev) catch {
+                        try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
+                        break :draw_lock_state;
+                    };
 
-                //     var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
-                //     const lock_state_y: usize = if (config.clock != null) 1 else 0;
+                    var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
+                    const lock_state_y: usize = if (config.clock != null) 1 else 0;
 
-                //     if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
+                    if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
 
-                //     if (lock_state_x >= lang.capslock.len + 1) {
-                //         lock_state_x -= lang.capslock.len + 1;
-                //         if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
-                //     }
-                // }
+                    if (lock_state_x >= lang.capslock.len + 1) {
+                        lock_state_x -= lang.capslock.len + 1;
+                        if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
+                    }
+                }
 
                 session.label.draw();
                 login.draw();
