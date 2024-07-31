@@ -221,7 +221,7 @@ pub fn main() !void {
     defer info_line.deinit();
 
     if (config_load_failed) {
-        try info_line.addMessage("unable to parse config file", config.error_bg, config.error_fg);
+        try info_line.addMessage(lang.err_config, config.error_bg, config.error_fg);
     }
 
     var session = try Session.init(allocator, &buffer, config.max_desktop_len, lang);
