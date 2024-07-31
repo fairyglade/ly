@@ -143,7 +143,7 @@ pub fn crawl(self: *Session, path: []const u8, display_server: DisplayServer) !v
     }
 }
 
-fn drawItem(label: EnvironmentLabel, environment: Environment, x: usize, y: usize) bool {
+fn drawItem(label: *EnvironmentLabel, environment: Environment, x: usize, y: usize) bool {
     const length = @min(environment.name.len, label.visible_length - 3);
     if (length == 0) return false;
 

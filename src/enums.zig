@@ -12,6 +12,7 @@ pub const DisplayServer = enum {
 };
 
 pub const Input = enum {
+    info_line,
     session,
     login,
     password,

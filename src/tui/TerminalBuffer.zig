@@ -142,17 +142,23 @@ pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool)
 }
 
 pub fn calculateComponentCoordinates(self: TerminalBuffer) struct {
+    start_x: usize,
     x: usize,
     y: usize,
+    full_visible_length: usize,
     visible_length: usize,
 } {
-    const x = self.box_x + self.margin_box_h + self.labels_max_length + 1;
+    const start_x = self.box_x + self.margin_box_h;
+    const x = start_x + self.labels_max_length + 1;
     const y = self.box_y + self.margin_box_v;
+    const full_visible_length = self.box_x + self.box_width - self.margin_box_h - start_x;
     const visible_length = self.box_x + self.box_width - self.margin_box_h - x;
 
     return .{
+        .start_x = start_x,
         .x = x,
         .y = y,
+        .full_visible_length = full_visible_length,
         .visible_length = visible_length,
     };
 }

@@ -84,8 +84,7 @@ pub fn main() !void {
     var config: Config = undefined;
     var lang: Lang = undefined;
     var save: Save = undefined;
-    var info_line = InfoLine.init(allocator);
-    defer info_line.deinit();
+    var config_load_failed = false;
 
     if (res.args.help != 0) {
         try clap.help(stderr, clap.Help, &params, .{});
@@ -123,8 +122,7 @@ pub fn main() !void {
         defer allocator.free(config_path);
 
         config = config_ini.readFileToStruct(config_path, comment_characters, migrator.configFieldHandler) catch _config: {
-            // We're using a literal error message here since the language file hasn't yet been loaded
-            try info_line.addMessage("unable to parse config file", @intCast(interop.termbox.TB_DEFAULT), @intCast(interop.termbox.TB_RED | interop.termbox.TB_BOLD));
+            config_load_failed = true;
             break :_config Config{};
         };
 
@@ -156,8 +154,7 @@ pub fn main() !void {
         const config_path = build_options.data_directory ++ "/config.ini";
 
         config = config_ini.readFileToStruct(config_path, comment_characters, migrator.configFieldHandler) catch _config: {
-            // literal error message, due to language file not yet available
-            try info_line.addMessage("unable to parse config file", @intCast(interop.termbox.TB_DEFAULT), @intCast(interop.termbox.TB_RED | interop.termbox.TB_BOLD));
+            config_load_failed = true;
             break :_config Config{};
         };
 
@@ -189,21 +186,7 @@ pub fn main() !void {
     shutdown_cmd = try temporary_allocator.dupe(u8, config.shutdown_cmd);
     restart_cmd = try temporary_allocator.dupe(u8, config.restart_cmd);
 
-    if (!build_options.enable_x11_support) try info_line.addMessage(lang.no_x11_support, config.bg, config.fg);
-
     interop.setNumlock(config.numlock) catch {};
-
-    if (config.initial_info_text) |text| {
-        try info_line.addMessage(text, config.bg, config.fg);
-    } else get_host_name: {
-        // Initialize information line with host name
-        var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
-        const hostname = std.posix.gethostname(&name_buf) catch {
-            try info_line.addMessage(lang.err_hostname, config.error_bg, config.error_fg);
-            break :get_host_name;
-        };
-        try info_line.addMessage(hostname, config.bg, config.fg);
-    }
 
     // Initialize termbox
     _ = termbox.tb_init();
@@ -225,9 +208,8 @@ pub fn main() !void {
     // Initialize terminal buffer
     const labels_max_length = @max(lang.login.len, lang.password.len);
 
-    // Get a random seed for the PRNG (used by animations)
     var seed: u64 = undefined;
-    try std.posix.getrandom(std.mem.asBytes(&seed));
+    try std.posix.getrandom(std.mem.asBytes(&seed)); // Get a random seed for the PRNG (used by animations)
 
     var prng = std.Random.DefaultPrng.init(seed);
     const random = prng.random();
@@ -235,6 +217,13 @@ pub fn main() !void {
     var buffer = TerminalBuffer.init(config, labels_max_length, random);
 
     // Initialize components
+    var info_line = try InfoLine.init(allocator, &buffer, 255);
+    defer info_line.deinit();
+
+    if (config_load_failed) {
+        try info_line.addMessage("unable to parse config file", config.error_bg, config.error_fg);
+    }
+
     var session = try Session.init(allocator, &buffer, config.max_desktop_len, lang);
     defer session.deinit();
 
@@ -248,6 +237,20 @@ pub fn main() !void {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
             };
         }
+    } else {
+        try info_line.addMessage(lang.no_x11_support, config.bg, config.fg);
+    }
+
+    if (config.initial_info_text) |text| {
+        try info_line.addMessage(text, config.bg, config.fg);
+    } else get_host_name: {
+        // Initialize information line with host name
+        var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
+        const hostname = std.posix.gethostname(&name_buf) catch {
+            try info_line.addMessage(lang.err_hostname, config.error_bg, config.error_fg);
+            break :get_host_name;
+        };
+        try info_line.addMessage(hostname, config.bg, config.fg);
     }
 
     try session.crawl(config.waylandsessions, .wayland);
@@ -281,11 +284,13 @@ pub fn main() !void {
         buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
 
         const coordinates = buffer.calculateComponentCoordinates();
+        info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length);
         session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
         login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
         password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
 
         switch (active_input) {
+            .info_line => info_line.label.handle(null, insert_mode),
             .session => session.label.handle(null, insert_mode),
             .login => login.handle(null, insert_mode) catch {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
@@ -404,6 +409,7 @@ pub fn main() !void {
 
                 if (resolution_changed) {
                     const coordinates = buffer.calculateComponentCoordinates();
+                    info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length);
                     session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
                     login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
                     password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
@@ -412,6 +418,7 @@ pub fn main() !void {
                 }
 
                 switch (active_input) {
+                    .info_line => info_line.label.handle(null, insert_mode),
                     .session => session.label.handle(null, insert_mode),
                     .login => login.handle(null, insert_mode) catch {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
@@ -438,7 +445,7 @@ pub fn main() !void {
                 buffer.drawLabel(lang.login, label_x, label_y + 4);
                 buffer.drawLabel(lang.password, label_x, label_y + 6);
 
-                try info_line.draw(buffer);
+                info_line.label.draw();
 
                 if (!config.hide_key_hints) {
                     var length: usize = 0;
@@ -489,22 +496,22 @@ pub fn main() !void {
                     buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
                 }
 
-                draw_lock_state: {
-                    const lock_state = interop.getLockState(config.console_dev) catch {
-                        try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
-                        break :draw_lock_state;
-                    };
+                // draw_lock_state: {
+                //     const lock_state = interop.getLockState(config.console_dev) catch {
+                //         try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
+                //         break :draw_lock_state;
+                //     };
 
-                    var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
-                    const lock_state_y: usize = if (config.clock != null) 1 else 0;
+                //     var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
+                //     const lock_state_y: usize = if (config.clock != null) 1 else 0;
 
-                    if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
+                //     if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
 
-                    if (lock_state_x >= lang.capslock.len + 1) {
-                        lock_state_x -= lang.capslock.len + 1;
-                        if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
-                    }
-                }
+                //     if (lock_state_x >= lang.capslock.len + 1) {
+                //         lock_state_x -= lang.capslock.len + 1;
+                //         if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
+                //     }
+                // }
 
                 session.label.draw();
                 login.draw();
@@ -595,13 +602,15 @@ pub fn main() !void {
             },
             termbox.TB_KEY_CTRL_K, termbox.TB_KEY_ARROW_UP => {
                 active_input = switch (active_input) {
-                    .session, .login => .session,
+                    .session, .info_line => .info_line,
+                    .login => .session,
                     .password => .login,
                 };
                 update = true;
             },
             termbox.TB_KEY_CTRL_J, termbox.TB_KEY_ARROW_DOWN => {
                 active_input = switch (active_input) {
+                    .info_line => .session,
                     .session => .login,
                     .login, .password => .password,
                 };
@@ -609,15 +618,17 @@ pub fn main() !void {
             },
             termbox.TB_KEY_TAB => {
                 active_input = switch (active_input) {
+                    .info_line => .session,
                     .session => .login,
                     .login => .password,
-                    .password => .session,
+                    .password => .info_line,
                 };
                 update = true;
             },
             termbox.TB_KEY_BACK_TAB => {
                 active_input = switch (active_input) {
-                    .session => .password,
+                    .info_line => .password,
+                    .session => .info_line,
                     .login => .session,
                     .password => .login,
                 };
@@ -647,7 +658,7 @@ pub fn main() !void {
 
                     try info_line.addMessage(lang.authenticating, config.bg, config.fg);
                     InfoLine.clearRendered(allocator, buffer) catch {};
-                    try info_line.draw(buffer);
+                    info_line.label.draw();
                     _ = termbox.tb_present();
 
                     session_pid = try std.posix.fork();
@@ -691,7 +702,8 @@ pub fn main() !void {
                     switch (event.ch) {
                         'k' => {
                             active_input = switch (active_input) {
-                                .session, .login => .session,
+                                .session, .info_line => .info_line,
+                                .login => .session,
                                 .password => .login,
                             };
                             update = true;
@@ -699,6 +711,7 @@ pub fn main() !void {
                         },
                         'j' => {
                             active_input = switch (active_input) {
+                                .info_line => .session,
                                 .session => .login,
                                 .login, .password => .password,
                             };
@@ -715,6 +728,7 @@ pub fn main() !void {
                 }
 
                 switch (active_input) {
+                    .info_line => info_line.label.handle(&event, insert_mode),
                     .session => session.label.handle(&event, insert_mode),
                     .login => login.handle(&event, insert_mode) catch {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);

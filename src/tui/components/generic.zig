@@ -7,7 +7,7 @@ pub fn CyclableLabel(comptime ItemType: type) type {
     return struct {
         const Allocator = std.mem.Allocator;
         const ItemList = std.ArrayList(ItemType);
-        const DrawItemFn = *const fn (Self, ItemType, usize, usize) bool;
+        const DrawItemFn = *const fn (*Self, ItemType, usize, usize) bool;
 
         const termbox = interop.termbox;
 
@@ -20,6 +20,7 @@ pub fn CyclableLabel(comptime ItemType: type) type {
         visible_length: usize,
         x: usize,
         y: usize,
+        first_char_x: usize,
         draw_item_fn: DrawItemFn,
 
         pub fn init(allocator: Allocator, buffer: *TerminalBuffer, max_length: usize, draw_item_fn: DrawItemFn) !Self {
@@ -31,6 +32,7 @@ pub fn CyclableLabel(comptime ItemType: type) type {
                 .visible_length = 0,
                 .x = 0,
                 .y = 0,
+                .first_char_x = 0,
                 .draw_item_fn = draw_item_fn,
             };
         }
@@ -43,6 +45,7 @@ pub fn CyclableLabel(comptime ItemType: type) type {
             self.x = x;
             self.y = y;
             self.visible_length = visible_length;
+            self.first_char_x = x + 2;
         }
 
         pub fn addItem(self: *Self, item: ItemType) !void {
@@ -69,10 +72,12 @@ pub fn CyclableLabel(comptime ItemType: type) type {
                 }
             }
 
-            _ = termbox.tb_set_cursor(@intCast(self.x + 2), @intCast(self.y));
+            _ = termbox.tb_set_cursor(@intCast(self.first_char_x), @intCast(self.y));
         }
 
-        pub fn draw(self: Self) void {
+        pub fn draw(self: *Self) void {
+            if (self.list.items.len == 0) return;
+
             const current_item = self.list.items[self.current];
             const x = self.buffer.box_x + self.buffer.margin_box_h;
             const y = self.buffer.box_y + self.buffer.margin_box_v + 2;
