@@ -107,7 +107,7 @@ pub fn main() !void {
     var save_ini = Ini(Save).init(allocator);
     defer save_ini.deinit();
 
-    var save_path: []const u8 = build_options.data_directory ++ "/save.ini";
+    var save_path: []const u8 = build_options.config_directory ++ "/ly/save.ini";
     var save_path_alloc = false;
     defer {
         if (save_path_alloc) allocator.free(save_path);
@@ -151,14 +151,14 @@ pub fn main() !void {
         //     };
         // }
     } else {
-        const config_path = build_options.data_directory ++ "/config.ini";
+        const config_path = build_options.config_directory ++ "/ly/config.ini";
 
         config = config_ini.readFileToStruct(config_path, comment_characters, migrator.configFieldHandler) catch _config: {
             config_load_failed = true;
             break :_config Config{};
         };
 
-        const lang_path = try std.fmt.allocPrint(allocator, "{s}/lang/{s}.ini", .{ build_options.data_directory, config.lang });
+        const lang_path = try std.fmt.allocPrint(allocator, "{s}/ly/lang/{s}.ini", .{ build_options.config_directory, config.lang });
         defer allocator.free(lang_path);
 
         lang = lang_ini.readFileToStruct(lang_path, comment_characters, null) catch Lang{};

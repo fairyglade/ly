@@ -1,8 +1,7 @@
 type            = process
 restart         = true
 smooth-recovery = true
-# note: /usr/bin/ly-dm when installing from pacman on artix, /usr/bin/ly when building from source
-command         = /usr/bin/ly
+command         = $PREFIX_DIRECTORY/bin/$EXE_NAME
 depends-on      = loginready
 termsignal      = HUP
 # ly needs access to the console while loginready already occupies it

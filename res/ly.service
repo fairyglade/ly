@@ -1,14 +1,14 @@
 [Unit]
 Description=TUI display manager
 After=systemd-user-sessions.service plymouth-quit-wait.service
-After=getty@tty2.service
-Conflicts=getty@tty2.service
+After=getty@tty$DEFAULT_TTY.service
+Conflicts=getty@tty$DEFAULT_TTY.service
 
 [Service]
 Type=idle
-ExecStart=/usr/bin/ly
+ExecStart=$PREFIX_DIRECTORY/bin/$EXECUTABLE_NAME
 StandardInput=tty
-TTYPath=/dev/tty2
+TTYPath=/dev/tty$DEFAULT_TTY
 TTYReset=yes
 TTYVHangup=yes
 
