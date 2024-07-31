@@ -3,15 +3,78 @@
 const std = @import("std");
 const ini = @import("zigini");
 const Save = @import("Save.zig");
+const enums = @import("../enums.zig");
+
+var animate = false;
+
+pub var mapped_config_fields = false;
 
 pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniField {
-    var mapped_field = field;
+    if (std.mem.eql(u8, field.key, "animate")) {
+        // The option doesn't exist anymore, but we save its value for "animation"
+        animate = std.mem.eql(u8, field.value, "true");
 
-    if (std.mem.eql(u8, field.key, "blank_password")) {
-        mapped_field.key = "clear_password";
+        mapped_config_fields = true;
+        return null;
     }
 
-    return mapped_field;
+    if (std.mem.eql(u8, field.key, "animation")) {
+        // The option now uses a string (which then gets converted into an enum) instead of an integer
+        // It also combines the previous "animate" and "animation" options
+        const animation = std.fmt.parseInt(u8, field.value, 10) catch return field;
+        var mapped_field = field;
+
+        mapped_field.value = switch (animation) {
+            0 => "doom",
+            1 => "matrix",
+            else => "none",
+        };
+
+        mapped_config_fields = true;
+        return mapped_field;
+    }
+
+    if (std.mem.eql(u8, field.key, "blank_password")) {
+        // The option has simply been renamed
+        var mapped_field = field;
+        mapped_field.key = "clear_password";
+
+        mapped_config_fields = true;
+        return mapped_field;
+    }
+
+    if (std.mem.eql(u8, field.key, "default_input")) {
+        // The option now uses a string (which then gets converted into an enum) instead of an integer
+        const default_input = std.fmt.parseInt(u8, field.value, 10) catch return field;
+        var mapped_field = field;
+
+        mapped_field.value = switch (default_input) {
+            0 => "session",
+            1 => "login",
+            2 => "password",
+            else => "login",
+        };
+
+        mapped_config_fields = true;
+        return mapped_field;
+    }
+
+    if (std.mem.eql(u8, field.key, "wayland_specifier")) {
+        // The option doesn't exist anymore
+
+        mapped_config_fields = true;
+        return null;
+    }
+
+    return field;
+}
+
+// This is the stuff we only handle after reading the config.
+// For example, the "animate" field could come after "animation"
+pub fn lateConfigFieldHandler(animation: *enums.Animation) void {
+    if (!mapped_config_fields) return;
+
+    if (!animate) animation.* = .none;
 }
 
 pub fn tryMigrateSaveFile(user_buf: *[32]u8, path: []const u8) Save {

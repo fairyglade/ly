@@ -140,6 +140,18 @@ pub fn main() !void {
             var user_buf: [32]u8 = undefined;
             save = save_ini.readFileToStruct(save_path, comment_characters, null) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
         }
+
+        migrator.lateConfigFieldHandler(&config.animation);
+
+        // if (migrator.mapped_config_fields) save_migrated_config: {
+        //     var file = try std.fs.cwd().createFile(config_path, .{});
+        //     defer file.close();
+
+        //     const writer = file.writer();
+        //     ini.writeFromStruct(config, writer, null, true, .{}) catch {
+        //         break :save_migrated_config;
+        //     };
+        // }
     } else {
         const config_path = build_options.data_directory ++ "/config.ini";
 
@@ -158,6 +170,18 @@ pub fn main() !void {
             var user_buf: [32]u8 = undefined;
             save = save_ini.readFileToStruct(save_path, comment_characters, null) catch migrator.tryMigrateSaveFile(&user_buf, config.save_file);
         }
+
+        migrator.lateConfigFieldHandler(&config.animation);
+
+        // if (migrator.mapped_config_fields) save_migrated_config: {
+        //     var file = try std.fs.cwd().createFile(config_path, .{});
+        //     defer file.close();
+
+        //     const writer = file.writer();
+        //     ini.writeFromStruct(config, writer, null, true, .{}) catch {
+        //         break :save_migrated_config;
+        //     };
+        // }
     }
 
     // These strings only end up getting freed if the user quits Ly using Ctrl+C, which is fine since in the other cases
