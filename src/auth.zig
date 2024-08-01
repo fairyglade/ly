@@ -334,7 +334,7 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
     return xauthority;
 }
 
-pub fn mcookie(cmd: [:0]const u8) ![32]u8 {
+pub fn mcookie(shell: [*:0]const u8, cmd: [:0]const u8) ![32]u8 {
     const pipe = try std.posix.pipe();
     defer std.posix.close(pipe[1]);
 
@@ -348,8 +348,8 @@ pub fn mcookie(cmd: [:0]const u8) ![32]u8 {
         std.posix.dup2(pipe[1], std.posix.STDOUT_FILENO) catch std.process.exit(1);
         std.posix.close(pipe[1]);
 
-        const args = [_:null]?[*:0]u8{};
-        std.posix.execveZ(cmd.ptr, &args, std.c.environ) catch {};
+        const args = [_:null]?[*:0]const u8{ shell, "-c", cmd };
+        std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
     }
 
@@ -371,7 +371,7 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     _ = interop.setenv("XAUTHORITY", xauthority, 1);
     _ = interop.setenv("DISPLAY", display_name, 1);
 
-    const mcookie_output = try mcookie(mcookie_cmd);
+    const mcookie_output = try mcookie(shell, mcookie_cmd);
 
     const pid = try std.posix.fork();
     if (pid == 0) {
