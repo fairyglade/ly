@@ -477,8 +477,8 @@ fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
     host[0] = 0;
     entry.ut_host = host;
 
-    var tv: std.c.timeval = undefined;
-    _ = std.c.gettimeofday(&tv, null);
+    var tv: interop.system_time.timeval = undefined;
+    _ = interop.system_time.gettimeofday(&tv, null);
 
     entry.ut_tv = .{
         .tv_sec = @intCast(tv.tv_sec),

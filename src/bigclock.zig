@@ -102,8 +102,8 @@ const E = [_]u21{
 pub fn clockCell(animate: bool, char: u8, fg: u16, bg: u16) [SIZE]termbox.tb_cell {
     var cells: [SIZE]termbox.tb_cell = undefined;
 
-    var tv: std.c.timeval = undefined;
-    _ = std.c.gettimeofday(&tv, null);
+    var tv: interop.system_time.timeval = undefined;
+    _ = interop.system_time.gettimeofday(&tv, null);
 
     const clock_chars = toBigNumber(if (animate and char == ':' and @divTrunc(tv.tv_usec, 500000) != 0) ' ' else char);
     for (0..cells.len) |i| cells[i] = utils.initCell(clock_chars[i], fg, bg);

@@ -67,8 +67,8 @@ pub fn main() !void {
 
     // to be able to stop the animation after some time
 
-    var tv_zero: std.c.timeval = undefined;
-    _ = std.c.gettimeofday(&tv_zero, null);
+    var tv_zero: interop.system_time.timeval = undefined;
+    _ = interop.system_time.gettimeofday(&tv_zero, null);
     var animation_timed_out: bool = false;
 
     const allocator = gpa.allocator();
@@ -545,8 +545,8 @@ pub fn main() !void {
             timeout = config.min_refresh_delta;
 
             // check how long we have been running so we can turn off the animation
-            var tv: std.c.timeval = undefined;
-            _ = std.c.gettimeofday(&tv, null);
+            var tv: interop.system_time.timeval = undefined;
+            _ = interop.system_time.gettimeofday(&tv, null);
 
             if (config.animation_timeout_sec > 0 and tv.tv_sec - tv_zero.tv_sec > config.animation_timeout_sec) {
                 animation_timed_out = true;
@@ -557,13 +557,13 @@ pub fn main() !void {
                 }
             }
         } else if (config.bigclock and config.clock == null) {
-            var tv: std.c.timeval = undefined;
-            _ = std.c.gettimeofday(&tv, null);
+            var tv: interop.system_time.timeval = undefined;
+            _ = interop.system_time.gettimeofday(&tv, null);
 
             timeout = @intCast((60 - @rem(tv.tv_sec, 60)) * 1000 - @divTrunc(tv.tv_usec, 1000) + 1);
         } else if (config.clock != null or auth_fails >= 10) {
-            var tv: std.c.timeval = undefined;
-            _ = std.c.gettimeofday(&tv, null);
+            var tv: interop.system_time.timeval = undefined;
+            _ = interop.system_time.gettimeofday(&tv, null);
 
             timeout = @intCast(1000 - @divTrunc(tv.tv_usec, 1000) + 1);
         }

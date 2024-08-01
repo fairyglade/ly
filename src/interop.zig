@@ -25,6 +25,10 @@ pub const time = @cImport({
     @cInclude("time.h");
 });
 
+pub const system_time = @cImport({
+    @cInclude("sys/time.h");
+});
+
 pub const stdlib = @cImport({
     @cInclude("stdlib.h");
 });
