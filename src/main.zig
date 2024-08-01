@@ -215,7 +215,7 @@ pub fn main() !void {
     const labels_max_length = @max(lang.login.len, lang.password.len);
 
     var seed: u64 = undefined;
-    try std.posix.getrandom(std.mem.asBytes(&seed)); // Get a random seed for the PRNG (used by animations)
+    std.crypto.random.bytes(std.mem.asBytes(&seed)); // Get a random seed for the PRNG (used by animations)
 
     var prng = std.Random.DefaultPrng.init(seed);
     const random = prng.random();
@@ -770,7 +770,6 @@ fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
         error.GetPasswordNameFailed => lang.err_pwnam,
         error.GetEnvListFailed => lang.err_envlist,
         error.XauthFailed => lang.err_xauth,
-        error.McookieFailed => lang.err_mcookie,
         error.XcbConnectionFailed => lang.err_xcb_conn,
         error.GroupInitializationFailed => lang.err_user_init,
         error.SetUserGidFailed => lang.err_user_gid,

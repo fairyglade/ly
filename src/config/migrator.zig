@@ -62,7 +62,8 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
     if (std.mem.eql(u8, field.key, "wayland_specifier") or
         std.mem.eql(u8, field.key, "max_desktop_len") or
         std.mem.eql(u8, field.key, "max_login_len") or
-        std.mem.eql(u8, field.key, "max_password_len"))
+        std.mem.eql(u8, field.key, "max_password_len") or
+        std.mem.eql(u8, field.key, "mcookie_cmd"))
     {
         // The options don't exist anymore
         mapped_config_fields = true;

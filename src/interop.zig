@@ -21,6 +21,22 @@ pub const unistd = @cImport({
     @cInclude("unistd.h");
 });
 
+pub const time = @cImport({
+    @cInclude("time.h");
+});
+
+pub const stdlib = @cImport({
+    @cInclude("stdlib.h");
+});
+
+pub const pwd = @cImport({
+    @cInclude("pwd.h");
+});
+
+pub const grp = @cImport({
+    @cInclude("grp.h");
+});
+
 // FreeBSD-specific headers
 pub const logincap = @cImport({
     @cInclude("login_cap.h");
@@ -40,38 +56,18 @@ pub const vt = @cImport({
     @cInclude("sys/vt.h");
 });
 
-pub const c_size = usize;
-pub const c_uid = u32;
-pub const c_gid = u32;
-pub const c_time = c_longlong;
-pub const tm = extern struct {
-    tm_sec: c_int,
-    tm_min: c_int,
-    tm_hour: c_int,
-    tm_mday: c_int,
-    tm_mon: c_int,
-    tm_year: c_int,
-    tm_wday: c_int,
-    tm_yday: c_int,
-    tm_isdst: c_int,
-};
-
-pub extern "c" fn localtime(timer: *const c_time) *tm;
-pub extern "c" fn strftime(str: [*:0]u8, maxsize: c_size, format: [*:0]const u8, timeptr: *const tm) c_size;
-pub extern "c" fn setenv(name: [*:0]const u8, value: ?[*:0]const u8, overwrite: c_int) c_int;
-pub extern "c" fn putenv(name: [*:0]u8) c_int;
-pub extern "c" fn getuid() c_uid;
-pub extern "c" fn endpwent() void;
-pub extern "c" fn setusershell() void;
-pub extern "c" fn getusershell() [*:0]u8;
-pub extern "c" fn endusershell() void;
-pub extern "c" fn initgroups(user: [*:0]const u8, group: c_gid) c_int;
+// Used for getting & setting the lock state
+const LedState = if (builtin.os.tag.isBSD()) c_int else c_char;
+const get_led_state = if (builtin.os.tag.isBSD()) kbio.KDGETLED else kd.KDGKBLED;
+const set_led_state = if (builtin.os.tag.isBSD()) kbio.KDSETLED else kd.KDSKBLED;
+const numlock_led = if (builtin.os.tag.isBSD()) kbio.LED_NUM else kd.K_NUMLOCK;
+const capslock_led = if (builtin.os.tag.isBSD()) kbio.LED_CAP else kd.K_CAPSLOCK;
 
 pub fn timeAsString(buf: [:0]u8, format: [:0]const u8) ![]u8 {
     const timer = std.time.timestamp();
-    const tm_info = localtime(&timer);
+    const tm_info = time.localtime(&timer);
 
-    const len = strftime(buf, buf.len, format, tm_info);
+    const len = time.strftime(buf, buf.len, format, tm_info);
     if (len < 0) return error.CannotGetFormattedTime;
 
     return buf[0..len];
@@ -92,47 +88,22 @@ pub fn getLockState(console_dev: []const u8) !struct {
     const fd = try std.posix.open(console_dev, .{ .ACCMODE = .RDONLY }, 0);
     defer std.posix.close(fd);
 
-    var numlock = false;
-    var capslock = false;
-
-    if (builtin.os.tag.isBSD()) {
-        var led: c_int = undefined;
-        _ = std.c.ioctl(fd, kbio.KDGETLED, &led);
-        numlock = (led & kbio.LED_NUM) != 0;
-        capslock = (led & kbio.LED_CAP) != 0;
-    } else {
-        var led: c_char = undefined;
-        _ = std.c.ioctl(fd, kd.KDGKBLED, &led);
-        numlock = (led & kd.K_NUMLOCK) != 0;
-        capslock = (led & kd.K_CAPSLOCK) != 0;
-    }
+    var led: LedState = undefined;
+    _ = std.c.ioctl(fd, get_led_state, &led);
 
     return .{
-        .numlock = numlock,
-        .capslock = capslock,
+        .numlock = (led & numlock_led) != 0,
+        .capslock = (led & capslock_led) != 0,
     };
 }
 
 pub fn setNumlock(val: bool) !void {
-    if (builtin.os.tag.isBSD()) {
-        var led: c_int = undefined;
-        _ = std.c.ioctl(0, kbio.KDGETLED, &led);
+    var led: LedState = undefined;
+    _ = std.c.ioctl(0, get_led_state, &led);
 
-        const numlock = (led & kbio.LED_NUM) != 0;
-        if (numlock != val) {
-            const status = std.c.ioctl(std.posix.STDIN_FILENO, kbio.KDSETLED, led ^ kbio.LED_NUM);
-            if (status != 0) return error.FailedToSetNumlock;
-        }
-
-        return;
-    }
-
-    var led: c_char = undefined;
-    _ = std.c.ioctl(0, kd.KDGKBLED, &led);
-
-    const numlock = (led & kd.K_NUMLOCK) != 0;
+    const numlock = (led & numlock_led) != 0;
     if (numlock != val) {
-        const status = std.c.ioctl(std.posix.STDIN_FILENO, kd.KDSKBLED, led ^ kd.K_NUMLOCK);
+        const status = std.c.ioctl(std.posix.STDIN_FILENO, set_led_state, led ^ numlock_led);
         if (status != 0) return error.FailedToSetNumlock;
     }
 }
