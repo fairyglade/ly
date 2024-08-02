@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const ly_version = std.SemanticVersion{ .major = 1, .minor = 0, .patch = 2 };
+const ly_version = std.SemanticVersion{ .major = 1, .minor = 0, .patch = 3 };
 var dest_directory: []const u8 = undefined;
 var data_directory: []const u8 = undefined;
 var exe_name: []const u8 = undefined;
