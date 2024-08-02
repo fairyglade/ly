@@ -4,6 +4,8 @@ const utils = @import("tui/utils.zig");
 const enums = @import("enums.zig");
 const Lang  = @import("bigclock/Lang.zig");
 const en    = @import("bigclock/en.zig");
+const fa    = @import("bigclock/fa.zig");
+
 const termbox    = interop.termbox;
 const Bigclock   = enums.Bigclock;
 pub const WIDTH  = Lang.WIDTH;
@@ -35,6 +37,7 @@ pub fn alphaBlit(x: usize, y: usize, tb_width: usize, tb_height: usize, cells: [
 
 fn toBigNumber(char: u8, bigclock: Bigclock) []const u21 {
     const locale_chars = switch (bigclock) {
+        .fa  => fa.locale_chars,
         else => en.locale_chars,
     };
     return switch (char) {

@@ -26,4 +26,5 @@ pub const ViMode = enum {
 pub const Bigclock = enum {
     none,
     en,
+    fa,
 };
