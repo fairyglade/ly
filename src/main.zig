@@ -396,7 +396,7 @@ pub fn main() !void {
                     };
 
                     for (clock_str, 0..) |c, i| {
-                        const clock_cell = bigclock.clockCell(animate, c, buffer.fg, buffer.bg);
+                        const clock_cell = bigclock.clockCell(animate, c, buffer.fg, buffer.bg, config.bigclock);
                         bigclock.alphaBlit(xo + i * (bigclock.WIDTH + 1), yo, buffer.width, buffer.height, clock_cell);
                     }
                 }
