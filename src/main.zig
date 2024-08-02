@@ -387,7 +387,7 @@ pub fn main() !void {
 
         if (update) {
             // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
-            if (auth_fails < 10) {
+            if (auth_fails < config.auth_fails) {
                 _ = termbox.tb_clear();
 
                 if (!animation_timed_out) {
@@ -561,7 +561,7 @@ pub fn main() !void {
             _ = interop.system_time.gettimeofday(&tv, null);
 
             timeout = @intCast((60 - @rem(tv.tv_sec, 60)) * 1000 - @divTrunc(tv.tv_usec, 1000) + 1);
-        } else if (config.clock != null or auth_fails >= 10) {
+        } else if (config.clock != null or auth_fails >= config.auth_fails) {
             var tv: interop.system_time.timeval = undefined;
             _ = interop.system_time.gettimeofday(&tv, null);
 
@@ -709,7 +709,7 @@ pub fn main() !void {
                 }
 
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
-                if (auth_fails < 10) {
+                if (auth_fails < config.auth_fails) {
                     _ = termbox.tb_clear();
                     _ = termbox.tb_present();
                 }

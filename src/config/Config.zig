@@ -5,6 +5,7 @@ const Animation = enums.Animation;
 const Input = enums.Input;
 const ViMode = enums.ViMode;
 
+auth_fails: u64 = 10,
 animation: Animation = .none,
 asterisk: ?u8 = '*',
 bg: u16 = 0,
