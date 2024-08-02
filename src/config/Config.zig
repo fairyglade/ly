@@ -4,13 +4,14 @@ const enums = @import("../enums.zig");
 const Animation = enums.Animation;
 const Input = enums.Input;
 const ViMode = enums.ViMode;
+const Bigclock = enums.Bigclock;
 
 animation: Animation = .none,
 animation_timeout_sec: u12 = 0,
 asterisk: ?u8 = '*',
 auth_fails: u64 = 10,
 bg: u16 = 0,
-bigclock: bool = false,
+bigclock: Bigclock = .none,
 blank_box: bool = true,
 border_fg: u16 = 8,
 box_title: ?[]const u8 = null,
