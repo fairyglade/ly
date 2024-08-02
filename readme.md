@@ -6,7 +6,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 ## Dependencies
 - Compile-time:
-  - zig 0.12.0
+  - zig 0.12.0 or 0.13.0
   - a C standard library
   - pam
   - xcb
