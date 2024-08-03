@@ -667,6 +667,9 @@ pub fn main() !void {
                         .session_index = session.label.current,
                     };
                     ini.writeFromStruct(save_data, file.writer(), null, true, .{}) catch break :save_last_settings;
+
+                    // Delete previous save file if it exists
+                    std.fs.cwd().deleteFile(config.save_file) catch {};
                 }
 
                 var shared_err = try SharedError.init();
