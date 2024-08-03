@@ -32,7 +32,7 @@ pub fn authenticate(config: Config, current_environment: Session.Environment, lo
 
     // Set the XDG environment variables
     setXdgSessionEnv(current_environment.display_server);
-    try setXdgEnv(tty_str, current_environment.xdg_session_desktop, current_environment.xdg_desktop_names orelse "");
+    try setXdgEnv(tty_str, current_environment.xdg_session_desktop orelse "", current_environment.xdg_desktop_names orelse "");
 
     // Open the PAM session
     var credentials = [_:null]?[*:0]const u8{ login, password };

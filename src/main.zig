@@ -234,13 +234,13 @@ pub fn main() !void {
     var session = Session.init(allocator, &buffer, lang);
     defer session.deinit();
 
-    session.addEnvironment(.{ .Name = lang.shell }, "", .shell) catch {
+    session.addEnvironment(.{ .Name = lang.shell }, null, .shell) catch {
         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
     };
 
     if (build_options.enable_x11_support) {
         if (config.xinitrc) |xinitrc| {
-            session.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, "", .xinitrc) catch {
+            session.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, null, .xinitrc) catch {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
             };
         }

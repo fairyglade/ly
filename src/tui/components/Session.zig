@@ -16,8 +16,8 @@ const Session = @This();
 pub const Environment = struct {
     entry_ini: ?Ini(Entry) = null,
     name: [:0]const u8 = "",
-    xdg_session_desktop: [:0]const u8 = "",
-    xdg_desktop_names: ?[:0]const u8 = "",
+    xdg_session_desktop: ?[:0]const u8 = null,
+    xdg_desktop_names: ?[:0]const u8 = null,
     cmd: []const u8 = "",
     specifier: []const u8 = "",
     display_server: DisplayServer = .wayland,
@@ -26,7 +26,7 @@ pub const Environment = struct {
 const DesktopEntry = struct {
     Exec: []const u8 = "",
     Name: [:0]const u8 = "",
-    DesktopNames: ?[]const u8 = null,
+    DesktopNames: ?[:0]u8 = null,
 };
 
 pub const Entry = struct { @"Desktop Entry": DesktopEntry = .{} };
@@ -44,34 +44,25 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer, lang: Lang) Session {
 pub fn deinit(self: Session) void {
     for (self.label.list.items) |*environment| {
         if (environment.entry_ini) |*entry_ini| entry_ini.deinit();
-        if (environment.xdg_desktop_names) |desktop_name| self.label.allocator.free(desktop_name);
-        self.label.allocator.free(environment.xdg_session_desktop);
+        if (environment.xdg_session_desktop) |session_desktop| self.label.allocator.free(session_desktop);
     }
 
     self.label.deinit();
 }
 
-pub fn addEnvironment(self: *Session, entry: DesktopEntry, xdg_session_desktop: []const u8, display_server: DisplayServer) !void {
+pub fn addEnvironment(self: *Session, entry: DesktopEntry, xdg_session_desktop: ?[:0]const u8, display_server: DisplayServer) !void {
     var xdg_desktop_names: ?[:0]const u8 = null;
     if (entry.DesktopNames) |desktop_names| {
-        const desktop_names_z = try self.label.allocator.dupeZ(u8, desktop_names);
-        for (desktop_names_z) |*c| {
+        for (desktop_names) |*c| {
             if (c.* == ';') c.* = ':';
         }
-        xdg_desktop_names = desktop_names_z;
+        xdg_desktop_names = desktop_names;
     }
-
-    errdefer {
-        if (xdg_desktop_names) |desktop_names| self.label.allocator.free(desktop_names);
-    }
-
-    const session_desktop = try self.label.allocator.dupeZ(u8, xdg_session_desktop);
-    errdefer self.label.allocator.free(session_desktop);
 
     try self.label.addItem(.{
         .entry_ini = null,
         .name = entry.Name,
-        .xdg_session_desktop = session_desktop,
+        .xdg_session_desktop = xdg_session_desktop,
         .xdg_desktop_names = xdg_desktop_names,
         .cmd = entry.Exec,
         .specifier = switch (display_server) {
@@ -83,28 +74,20 @@ pub fn addEnvironment(self: *Session, entry: DesktopEntry, xdg_session_desktop: 
     });
 }
 
-pub fn addEnvironmentWithIni(self: *Session, entry_ini: Ini(Entry), xdg_session_desktop: []const u8, display_server: DisplayServer) !void {
+pub fn addEnvironmentWithIni(self: *Session, entry_ini: Ini(Entry), xdg_session_desktop: ?[:0]const u8, display_server: DisplayServer) !void {
     const entry = entry_ini.data.@"Desktop Entry";
     var xdg_desktop_names: ?[:0]const u8 = null;
     if (entry.DesktopNames) |desktop_names| {
-        const desktop_names_z = try self.label.allocator.dupeZ(u8, desktop_names);
-        for (desktop_names_z) |*c| {
+        for (desktop_names) |*c| {
             if (c.* == ';') c.* = ':';
         }
-        xdg_desktop_names = desktop_names_z;
+        xdg_desktop_names = desktop_names;
     }
-
-    errdefer {
-        if (xdg_desktop_names) |desktop_names| self.label.allocator.free(desktop_names);
-    }
-
-    const session_desktop = try self.label.allocator.dupeZ(u8, xdg_session_desktop);
-    errdefer self.label.allocator.free(session_desktop);
 
     try self.label.addItem(.{
         .entry_ini = entry_ini,
         .name = entry.Name,
-        .xdg_session_desktop = session_desktop,
+        .xdg_session_desktop = xdg_session_desktop,
         .xdg_desktop_names = xdg_desktop_names,
         .cmd = entry.Exec,
         .specifier = switch (display_server) {
@@ -139,7 +122,10 @@ pub fn crawl(self: *Session, path: []const u8, display_server: DisplayServer) !v
             xdg_session_desktop = std.fs.path.stem(item.name);
         }
 
-        try self.addEnvironmentWithIni(entry_ini, xdg_session_desktop, display_server);
+        const session_desktop = try self.label.allocator.dupeZ(u8, xdg_session_desktop);
+        errdefer self.label.allocator.free(session_desktop);
+
+        try self.addEnvironmentWithIni(entry_ini, session_desktop, display_server);
     }
 }
 
