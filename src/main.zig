@@ -712,15 +712,13 @@ pub fn main() !void {
                 }
 
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
-                if (auth_fails < config.auth_fails) {
-                    _ = termbox.tb_clear();
-                    _ = termbox.tb_present();
-                }
+                if (auth_fails < config.auth_fails) _ = termbox.tb_clear();
 
                 update = true;
 
-                var restore_cursor = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
-                _ = restore_cursor.spawnAndWait() catch .{};
+                // Restore the cursor
+                _ = termbox.tb_set_cursor(0, 0);
+                _ = termbox.tb_present();
             },
             else => {
                 if (!insert_mode) {

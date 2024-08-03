@@ -117,7 +117,9 @@ pub fn authenticate(config: Config, current_environment: Session.Environment, lo
 
     removeUtmpEntry(&entry);
 
-    try resetTerminal(pwd.pw_shell.?, config.term_reset_cmd);
+    // Take back control of the TTY
+    _ = interop.termbox.tb_init();
+    _ = interop.termbox.tb_set_output_mode(interop.termbox.TB_OUTPUT_NORMAL);
 
     if (shared_err.readError()) |err| return err;
 }
@@ -157,7 +159,8 @@ fn startSession(
     // Execute what the user requested
     std.posix.chdirZ(pwd.pw_dir.?) catch return error.ChangeDirectoryFailed;
 
-    try resetTerminal(pwd.pw_shell.?, config.term_reset_cmd);
+    // Give up control on the TTY
+    _ = interop.termbox.tb_shutdown();
 
     switch (current_environment.display_server) {
         .wayland => try executeWaylandCmd(pwd.pw_shell.?, config.wayland_cmd, current_environment.cmd),
@@ -268,17 +271,6 @@ fn loginConv(
     }
 
     return status;
-}
-
-fn resetTerminal(shell: [*:0]const u8, term_reset_cmd: [:0]const u8) !void {
-    const pid = try std.posix.fork();
-    if (pid == 0) {
-        const args = [_:null]?[*:0]const u8{ shell, "-c", term_reset_cmd };
-        std.posix.execveZ(shell, &args, std.c.environ) catch {};
-        std.process.exit(1);
-    }
-
-    _ = std.posix.waitpid(pid, 0);
 }
 
 fn getFreeDisplay() !u8 {

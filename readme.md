@@ -13,8 +13,6 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 - Runtime (with default config):
   - xorg
   - xorg-xauth
-  - mcookie
-  - tput
   - shutdown
 
 ### Debian
