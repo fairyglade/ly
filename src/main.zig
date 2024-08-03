@@ -95,7 +95,7 @@ pub fn main() !void {
     if (res.args.help != 0) {
         try clap.help(stderr, clap.Help, &params, .{});
 
-        _ = try stderr.write("Note: if you want to configure Ly, please check the config file, which is usually located at /etc/ly/config.ini.\n");
+        _ = try stderr.write("Note: if you want to configure Ly, please check the config file, which is located at " ++ build_options.config_directory ++ "/ly/config.ini.\n");
         std.process.exit(0);
     }
     if (res.args.version != 0) {

@@ -20,7 +20,7 @@ then
 fi
 
 ## Get the tty from the conf file
-CONFTTY=$(cat /etc/ly/config.ini | sed -n 's/^tty.*=[^1-9]*// p')
+CONFTTY=$(cat $CONFIG_DIRECTORY/ly/config.ini | sed -n 's/^tty.*=[^1-9]*// p')
 
 ## The execution vars
 # If CONFTTY is empty then default to $DEFAULT_TTY
