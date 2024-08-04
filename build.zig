@@ -269,11 +269,8 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
 
             try patch_map.put("$CONFIG_DIRECTORY", config_directory);
 
-            const patched_xsetup = try patchFile(allocator, "res/xsetup.sh", patch_map);
-            const patched_wsetup = try patchFile(allocator, "res/wsetup.sh", patch_map);
-
-            try installText(patched_xsetup, config_dir, ly_config_directory, "xsetup.sh", .{ .mode = 0o755 });
-            try installText(patched_wsetup, config_dir, ly_config_directory, "wsetup.sh", .{ .mode = 0o755 });
+            const patched_setup = try patchFile(allocator, "res/setup.sh", patch_map);
+            try installText(patched_setup, config_dir, ly_config_directory, "setup.sh", .{ .mode = 0o755 });
         }
     }
 
@@ -317,7 +314,7 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
 pub fn uninstallall(step: *std.Build.Step, _: ProgressNode) !void {
     const allocator = step.owner.allocator;
 
-    try deleteTree(allocator, config_directory, "/ly", "ly data directory not found");
+    try deleteTree(allocator, config_directory, "/ly", "ly config directory not found");
 
     const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, prefix_directory, "/bin/", executable_name });
     var success = true;

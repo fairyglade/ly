@@ -156,7 +156,7 @@ fn startSession(
     std.posix.chdirZ(pwd.pw_dir.?) catch return error.ChangeDirectoryFailed;
 
     switch (current_environment.display_server) {
-        .wayland => try executeWaylandCmd(pwd.pw_shell.?, config.wayland_cmd, current_environment.cmd),
+        .wayland => try executeWaylandCmd(pwd.pw_shell.?, config.setup_cmd, current_environment.cmd),
         .shell => try executeShellCmd(pwd.pw_shell.?),
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
@@ -377,9 +377,9 @@ fn executeShellCmd(shell: [*:0]const u8) !void {
     return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
-fn executeWaylandCmd(shell: [*:0]const u8, wayland_cmd: []const u8, desktop_cmd: []const u8) !void {
+fn executeWaylandCmd(shell: [*:0]const u8, setup_cmd: []const u8, desktop_cmd: []const u8) !void {
     var cmd_buffer: [1024]u8 = undefined;
-    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ wayland_cmd, desktop_cmd });
+    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ setup_cmd, desktop_cmd });
     const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
     return std.posix.execveZ(shell, &args, std.c.environ);
 }
@@ -416,7 +416,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     xorg_pid = try std.posix.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.x_cmd_setup, desktop_cmd }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.setup_cmd, desktop_cmd }) catch std.process.exit(1);
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);

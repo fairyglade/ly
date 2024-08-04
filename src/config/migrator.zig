@@ -76,7 +76,9 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         std.mem.eql(u8, field.key, "max_password_len") or
         std.mem.eql(u8, field.key, "mcookie_cmd") or
         std.mem.eql(u8, field.key, "term_reset_cmd") or
-        std.mem.eql(u8, field.key, "term_restore_cursor_cmd"))
+        std.mem.eql(u8, field.key, "term_restore_cursor_cmd") or
+        std.mem.eql(u8, field.key, "x_cmd_setup") or
+        std.mem.eql(u8, field.key, "wayland_cmd"))
     {
         // The options don't exist anymore
         mapped_config_fields = true;
