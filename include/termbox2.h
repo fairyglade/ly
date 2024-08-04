@@ -23,8 +23,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef __TERMBOX_H
-#define __TERMBOX_H
+#ifndef TERMBOX_H_INCL
+#define TERMBOX_H_INCL
 
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE
@@ -105,7 +105,7 @@ extern "C" {
 #elif defined TB_OPT_ATTR_W && TB_OPT_ATTR_W == 64
 #else
 #undef TB_OPT_ATTR_W
-#if defined TB_OPT_TRUECOLOR // Back-compat for old flag
+#if defined TB_OPT_TRUECOLOR // Deprecated. Back-compat for old flag.
 #define TB_OPT_ATTR_W 32
 #else
 #define TB_OPT_ATTR_W 16
@@ -347,7 +347,7 @@ extern "C" {
 #define TB_ERR_SELECT           TB_ERR_POLL
 #define TB_ERR_RESIZE_SELECT    TB_ERR_RESIZE_POLL
 
-/* Function types to be used with tb_set_func() */
+/* Deprecated. Function types to be used with tb_set_func(). */
 #define TB_FUNC_EXTRACT_PRE     0
 #define TB_FUNC_EXTRACT_POST    1
 
@@ -646,8 +646,8 @@ int tb_printf_ex(int x, int y, uintattr_t fg, uintattr_t bg, size_t *out_w,
 int tb_send(const char *buf, size_t nbuf);
 int tb_sendf(const char *fmt, ...);
 
-/* Set custom functions. fn_type is one of TB_FUNC_* constants, fn is a
- * compatible function pointer, or NULL to clear.
+/* Deprecated. Set custom functions. fn_type is one of TB_FUNC_* constants, fn
+ * is a compatible function pointer, or NULL to clear.
  *
  * TB_FUNC_EXTRACT_PRE:
  *   If specified, invoke this function BEFORE termbox tries to extract any
@@ -683,17 +683,35 @@ int tb_utf8_unicode_to_char(char *out, uint32_t c);
 /* Library utility functions */
 int tb_last_errno(void);
 const char *tb_strerror(int err);
-struct tb_cell *tb_cell_buffer(void);
+struct tb_cell *tb_cell_buffer(void); // Deprecated
 int tb_has_truecolor(void);
 int tb_has_egc(void);
 int tb_attr_width(void);
 const char *tb_version(void);
 
+/* Deprecation notice!
+ *
+ * The following will be removed in version 3.x (ABI version 3):
+ *
+ *   TB_256_BLACK           (use TB_HI_BLACK)
+ *   TB_OPT_TRUECOLOR       (use TB_OPT_ATTR_W)
+ *   TB_TRUECOLOR_BOLD      (use TB_BOLD)
+ *   TB_TRUECOLOR_UNDERLINE (use TB_UNDERLINE)
+ *   TB_TRUECOLOR_REVERSE   (use TB_REVERSE)
+ *   TB_TRUECOLOR_ITALIC    (use TB_ITALICe)
+ *   TB_TRUECOLOR_BLINK     (use TB_BLINK)
+ *   TB_TRUECOLOR_BLACK     (use TB_HI_BLACK)
+ *   tb_cell_buffer
+ *   tb_set_func
+ *   TB_FUNC_EXTRACT_PRE
+ *   TB_FUNC_EXTRACT_POST
+ */
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __TERMBOX_H */
+#endif /* TERMBOX_H_INCL */
 
 #ifdef TB_IMPL
 
@@ -1648,6 +1666,7 @@ int tb_present(void) {
 
                 send_attr(back->fg, back->bg);
                 if (w > 1 && x >= global.front.width - (w - 1)) {
+                    // Not enough room for wide char, send spaces
                     for (i = x; i < global.front.width; i++) {
                         send_char(i, y, ' ');
                     }
@@ -1660,12 +1679,20 @@ int tb_present(void) {
 #endif
                             send_char(x, y, back->ch);
                     }
+
+                    // When wcwidth>1, we need to advance the cursor by more
+                    // than 1, thereby skipping some cells. Set these skipped
+                    // cells to an invalid codepoint in the front buffer, so
+                    // that if this cell is later replaced by a wcwidth==1 char,
+                    // we'll get a cell_cmp diff for the skipped cells and
+                    // properly re-render.
                     for (i = 1; i < w; i++) {
                         struct tb_cell *front_wide;
+                        uint32_t invalid = -1;
                         if_err_return(rv,
                             cellbuf_get(&global.front, x + i, y, &front_wide));
                         if_err_return(rv,
-                            cell_set(front_wide, 0, 1, back->fg, back->bg));
+                            cell_set(front_wide, &invalid, 1, -1, -1));
                     }
                 }
             }

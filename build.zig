@@ -69,19 +69,14 @@ pub fn build(b: *std.Build) !void {
     if (enable_x11_support) exe.linkSystemLibrary("xcb");
     exe.linkLibC();
 
-    // HACK: Only fails with ReleaseSafe, so we'll override it.
     const translate_c = b.addTranslateC(.{
         .root_source_file = b.path("include/termbox2.h"),
         .target = target,
-        .optimize = if (optimize == .ReleaseSafe) .ReleaseFast else optimize,
+        .optimize = optimize,
     });
     translate_c.defineCMacroRaw("TB_IMPL");
     const termbox2 = translate_c.addModule("termbox2");
     exe.root_module.addImport("termbox2", termbox2);
-
-    if (optimize == .ReleaseSafe) {
-        std.debug.print("warn: termbox2 module is being built in ReleaseFast due to a bug.\n", .{});
-    }
 
     b.installArtifact(exe);
 
