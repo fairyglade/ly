@@ -5,7 +5,10 @@ const ini = @import("zigini");
 const Save = @import("Save.zig");
 const enums = @import("../enums.zig");
 
-var maybe_animate: ?bool = null;
+var temporary_allocator = std.heap.page_allocator;
+
+pub var maybe_animate: ?bool = null;
+pub var maybe_save_file: ?[]const u8 = null;
 
 pub var mapped_config_fields = false;
 
@@ -59,6 +62,14 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         return mapped_field;
     }
 
+    if (std.mem.eql(u8, field.key, "save_file")) {
+        // The option doesn't exist anymore, but we save its value for migration later on
+        maybe_save_file = temporary_allocator.dupe(u8, field.value) catch return null;
+
+        mapped_config_fields = true;
+        return null;
+    }
+
     if (std.mem.eql(u8, field.key, "wayland_specifier") or
         std.mem.eql(u8, field.key, "max_desktop_len") or
         std.mem.eql(u8, field.key, "max_login_len") or
@@ -78,34 +89,38 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
 // This is the stuff we only handle after reading the config.
 // For example, the "animate" field could come after "animation"
 pub fn lateConfigFieldHandler(animation: *enums.Animation) void {
-    if (maybe_animate == null) return;
-
-    if (!maybe_animate.?) animation.* = .none;
+    if (maybe_animate) |animate| {
+        if (!animate) animation.* = .none;
+    }
 }
 
-pub fn tryMigrateSaveFile(user_buf: *[32]u8, path: []const u8) Save {
+pub fn tryMigrateSaveFile(user_buf: *[32]u8) Save {
     var save = Save{};
 
-    var file = std.fs.openFileAbsolute(path, .{}) catch return save;
-    defer file.close();
+    if (maybe_save_file) |path| {
+        defer temporary_allocator.free(path);
 
-    const reader = file.reader();
+        var file = std.fs.openFileAbsolute(path, .{}) catch return save;
+        defer file.close();
 
-    var user_fbs = std.io.fixedBufferStream(user_buf);
-    reader.streamUntilDelimiter(user_fbs.writer(), '\n', 32) catch return save;
-    const user = user_fbs.getWritten();
-    if (user.len > 0) save.user = user;
+        const reader = file.reader();
 
-    var session_buf: [20]u8 = undefined;
-    var session_fbs = std.io.fixedBufferStream(&session_buf);
-    reader.streamUntilDelimiter(session_fbs.writer(), '\n', 20) catch {};
+        var user_fbs = std.io.fixedBufferStream(user_buf);
+        reader.streamUntilDelimiter(user_fbs.writer(), '\n', 32) catch return save;
+        const user = user_fbs.getWritten();
+        if (user.len > 0) save.user = user;
 
-    const session_index_str = session_fbs.getWritten();
-    var session_index: ?usize = null;
-    if (session_index_str.len > 0) {
-        session_index = std.fmt.parseUnsigned(usize, session_index_str, 10) catch return save;
+        var session_buf: [20]u8 = undefined;
+        var session_fbs = std.io.fixedBufferStream(&session_buf);
+        reader.streamUntilDelimiter(session_fbs.writer(), '\n', 20) catch {};
+
+        const session_index_str = session_fbs.getWritten();
+        var session_index: ?usize = null;
+        if (session_index_str.len > 0) {
+            session_index = std.fmt.parseUnsigned(usize, session_index_str, 10) catch return save;
+        }
+        save.session_index = session_index;
     }
-    save.session_index = session_index;
 
     return save;
 }

@@ -35,7 +35,6 @@ path: ?[:0]const u8 = "/sbin:/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/
 restart_cmd: []const u8 = "/sbin/shutdown -r now",
 restart_key: []const u8 = "F2",
 save: bool = true,
-save_file: []const u8 = build_options.config_directory ++ "/ly/save",
 service_name: [:0]const u8 = "ly",
 shutdown_cmd: []const u8 = "/sbin/shutdown -a now",
 shutdown_key: []const u8 = "F1",
