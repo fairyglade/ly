@@ -41,8 +41,9 @@ pub const grp = @cImport({
     @cInclude("grp.h");
 });
 
-// FreeBSD-specific headers
+// FreeBSD-specific headers (except for pwd.h)
 pub const logincap = @cImport({
+    @cInclude("pwd.h");
     @cInclude("login_cap.h");
 });
 
@@ -59,6 +60,11 @@ pub const kd = @cImport({
 pub const vt = @cImport({
     @cInclude("sys/vt.h");
 });
+
+// On FreeBSD, login_cap.h references the passwd struct directly, so we must use logincap.passwd instead
+pub const passwd = if (builtin.os.tag == .freebsd) logincap.passwd else pwd.passwd;
+pub const endpwent = if (builtin.os.tag == .freebsd) logincap.endpwent else pwd.endpwent;
+pub const getpwnam = if (builtin.os.tag == .freebsd) logincap.getpwnam else pwd.getpwnam;
 
 // Used for getting & setting the lock state
 const LedState = if (builtin.os.tag.isBSD()) c_int else c_char;

@@ -66,12 +66,12 @@ pub fn authenticate(config: Config, current_environment: Session.Environment, lo
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer status = interop.pam.pam_close_session(handle, 0);
 
-    var pwd: *interop.pwd.passwd = undefined;
+    var pwd: *interop.passwd = undefined;
     {
-        defer interop.pwd.endpwent();
+        defer interop.endpwent();
 
         // Get password structure from username
-        pwd = interop.pwd.getpwnam(login) orelse return error.GetPasswordNameFailed;
+        pwd = interop.getpwnam(login) orelse return error.GetPasswordNameFailed;
     }
 
     // Set user shell if it hasn't already been set
@@ -126,7 +126,7 @@ pub fn authenticate(config: Config, current_environment: Session.Environment, lo
 
 fn startSession(
     config: Config,
-    pwd: *interop.pwd.passwd,
+    pwd: *interop.passwd,
     handle: ?*interop.pam.pam_handle,
     current_environment: Session.Environment,
 ) !void {
@@ -136,7 +136,7 @@ fn startSession(
         if (status != 0) return error.GroupInitializationFailed;
 
         // FreeBSD sets the GID and UID with setusercontext()
-        const result = std.c.setusercontext(null, pwd, pwd.pw_uid, interop.logincap.LOGIN_SETALL);
+        const result = interop.logincap.setusercontext(null, pwd, pwd.pw_uid, interop.logincap.LOGIN_SETALL);
         if (result != 0) return error.SetUserUidFailed;
     } else {
         const status = interop.grp.initgroups(pwd.pw_name, pwd.pw_gid);
@@ -173,7 +173,7 @@ fn startSession(
     }
 }
 
-fn initEnv(pwd: *interop.pwd.passwd, path_env: ?[:0]const u8) !void {
+fn initEnv(pwd: *interop.passwd, path_env: ?[:0]const u8) !void {
     _ = interop.stdlib.setenv("HOME", pwd.pw_dir, 1);
     _ = interop.stdlib.setenv("PWD", pwd.pw_dir, 1);
     _ = interop.stdlib.setenv("SHELL", pwd.pw_shell, 1);
