@@ -117,10 +117,6 @@ pub fn authenticate(config: Config, current_environment: Session.Environment, lo
 
     removeUtmpEntry(&entry);
 
-    // Take back control of the TTY
-    _ = interop.termbox.tb_init();
-    _ = interop.termbox.tb_set_output_mode(interop.termbox.TB_OUTPUT_NORMAL);
-
     if (shared_err.readError()) |err| return err;
 }
 
@@ -158,9 +154,6 @@ fn startSession(
 
     // Execute what the user requested
     std.posix.chdirZ(pwd.pw_dir.?) catch return error.ChangeDirectoryFailed;
-
-    // Give up control on the TTY
-    _ = interop.termbox.tb_shutdown();
 
     switch (current_environment.display_server) {
         .wayland => try executeWaylandCmd(pwd.pw_shell.?, config.wayland_cmd, current_environment.cmd),

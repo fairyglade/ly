@@ -648,6 +648,11 @@ pub fn main() !void {
                 update = true;
             },
             termbox.TB_KEY_ENTER => {
+                try info_line.addMessage(lang.authenticating, config.bg, config.fg);
+                InfoLine.clearRendered(allocator, buffer) catch {};
+                info_line.label.draw();
+                _ = termbox.tb_present();
+
                 if (config.save) save_last_settings: {
                     var file = std.fs.cwd().createFile(save_path, .{}) catch break :save_last_settings;
                     defer file.close();
@@ -671,10 +676,8 @@ pub fn main() !void {
                     const password_text = try allocator.dupeZ(u8, password.text.items);
                     defer allocator.free(password_text);
 
-                    try info_line.addMessage(lang.authenticating, config.bg, config.fg);
-                    InfoLine.clearRendered(allocator, buffer) catch {};
-                    info_line.label.draw();
-                    _ = termbox.tb_present();
+                    // Give up control on the TTY
+                    _ = termbox.tb_shutdown();
 
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
@@ -689,6 +692,10 @@ pub fn main() !void {
                     _ = std.posix.waitpid(session_pid, 0);
                     session_pid = -1;
                 }
+
+                // Take back control of the TTY
+                _ = termbox.tb_init();
+                _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_NORMAL);
 
                 const auth_err = shared_err.readError();
                 if (auth_err) |err| {
