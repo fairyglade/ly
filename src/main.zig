@@ -347,18 +347,11 @@ pub fn main() !void {
             const width: usize = @intCast(termbox.tb_width());
             const height: usize = @intCast(termbox.tb_height());
 
-            if (width != buffer.width) {
+            if (width != buffer.width or height != buffer.height) {
+                // If it did change, then update the cell buffer, reallocate the current animation's buffers, and force a draw update
+
                 buffer.width = width;
-                resolution_changed = true;
-            }
-
-            if (height != buffer.height) {
                 buffer.height = height;
-                resolution_changed = true;
-            }
-
-            // If it did change, then update the cell buffer, reallocate the current animation's buffers, and force a draw update
-            if (resolution_changed) {
                 buffer.buffer = termbox.tb_cell_buffer();
 
                 switch (config.animation) {
@@ -372,6 +365,7 @@ pub fn main() !void {
                 }
 
                 update = true;
+                resolution_changed = true;
             }
         }
 
