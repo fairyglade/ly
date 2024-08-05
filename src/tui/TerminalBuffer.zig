@@ -74,27 +74,30 @@ pub fn init(config: Config, labels_max_length: usize, random: Random) TerminalBu
 }
 
 pub fn cascade(self: TerminalBuffer) bool {
-    var changes = false;
-
+    var changed = false;
     var y = self.height - 2;
+
     while (y > 0) : (y -= 1) {
         for (0..self.width) |x| {
-            const c: u8 = @truncate(self.buffer[(y - 1) * self.width + x].ch);
-            if (std.ascii.isWhitespace(c)) continue;
+            const cell = self.buffer[(y - 1) * self.width + x];
+            const cell_under = self.buffer[y * self.width + x];
 
-            const c_under: u8 = @truncate(self.buffer[y * self.width + x].ch);
-            if (!std.ascii.isWhitespace(c_under)) continue;
+            const char: u8 = @truncate(cell.ch);
+            if (std.ascii.isWhitespace(char)) continue;
 
-            changes = true;
+            const char_under: u8 = @truncate(cell_under.ch);
+            if (!std.ascii.isWhitespace(char_under)) continue;
+
+            changed = true;
 
             if ((self.random.int(u16) % 10) > 7) continue;
 
-            self.buffer[y * self.width + x] = self.buffer[(y - 1) * self.width + x];
-            self.buffer[(y - 1) * self.width + x].ch = ' ';
+            _ = termbox.tb_set_cell(@intCast(x), @intCast(y), cell.ch, cell.fg, cell.bg);
+            _ = termbox.tb_set_cell(@intCast(x), @intCast(y - 1), ' ', cell_under.fg, cell_under.bg);
         }
     }
 
-    return changes;
+    return changed;
 }
 
 pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool) void {
@@ -117,16 +120,16 @@ pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool)
         var c2 = utils.initCell(self.box_chars.bottom, self.border_fg, self.bg);
 
         for (0..self.box_width) |i| {
-            _ = utils.putCell(@intCast(x1 + i), @intCast(y1 - 1), &c1);
-            _ = utils.putCell(@intCast(x1 + i), @intCast(y2), &c2);
+            utils.putCell(x1 + i, y1 - 1, c1);
+            utils.putCell(x1 + i, y2, c2);
         }
 
         c1.ch = self.box_chars.left;
         c2.ch = self.box_chars.right;
 
         for (0..self.box_height) |i| {
-            _ = utils.putCell(@intCast(x1 - 1), @intCast(y1 + i), &c1);
-            _ = utils.putCell(@intCast(x2), @intCast(y1 + i), &c2);
+            utils.putCell(x1 - 1, y1 + i, c1);
+            utils.putCell(x2, y1 + i, c2);
         }
     }
 
@@ -135,7 +138,7 @@ pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool)
 
         for (0..self.box_height) |y| {
             for (0..self.box_width) |x| {
-                _ = utils.putCell(@intCast(x1 + x), @intCast(y1 + y), &blank);
+                utils.putCell(x1 + x, y1 + y, blank);
             }
         }
     }
@@ -191,8 +194,6 @@ pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: usize, y: us
 }
 
 pub fn drawCharMultiple(self: TerminalBuffer, char: u8, x: usize, y: usize, length: usize) void {
-    const yc: c_int = @intCast(y);
     const cell = utils.initCell(char, self.fg, self.bg);
-
-    for (0..length) |xx| _ = utils.putCell(@intCast(x + xx), yc, &cell);
+    for (0..length) |xx| utils.putCell(x + xx, y, cell);
 }

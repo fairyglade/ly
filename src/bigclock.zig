@@ -99,8 +99,8 @@ const E = [_]u21{
 };
 // zig fmt: on
 
-pub fn clockCell(animate: bool, char: u8, fg: u16, bg: u16) [SIZE]termbox.tb_cell {
-    var cells: [SIZE]termbox.tb_cell = undefined;
+pub fn clockCell(animate: bool, char: u8, fg: u16, bg: u16) [SIZE]utils.Cell {
+    var cells: [SIZE]utils.Cell = undefined;
 
     var tv: interop.system_time.timeval = undefined;
     _ = interop.system_time.gettimeofday(&tv, null);
@@ -111,13 +111,13 @@ pub fn clockCell(animate: bool, char: u8, fg: u16, bg: u16) [SIZE]termbox.tb_cel
     return cells;
 }
 
-pub fn alphaBlit(buffer: [*]termbox.tb_cell, x: usize, y: usize, tb_width: usize, tb_height: usize, cells: [SIZE]termbox.tb_cell) void {
+pub fn alphaBlit(x: usize, y: usize, tb_width: usize, tb_height: usize, cells: [SIZE]utils.Cell) void {
     if (x + WIDTH >= tb_width or y + HEIGHT >= tb_height) return;
 
     for (0..HEIGHT) |yy| {
         for (0..WIDTH) |xx| {
             const cell = cells[yy * WIDTH + xx];
-            if (cell.ch != 0) buffer[(y + yy) * tb_width + (x + xx)] = cell;
+            if (cell.ch != 0) utils.putCell(x + xx, y + yy, cell);
         }
     }
 }

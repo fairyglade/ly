@@ -9,7 +9,7 @@ const termbox = interop.termbox;
 const Doom = @This();
 
 pub const STEPS = 13;
-pub const FIRE = [_]termbox.tb_cell{
+pub const FIRE = [_]utils.Cell{
     utils.initCell(' ', 9, 0),
     utils.initCell(0x2591, 2, 0), // Red
     utils.initCell(0x2592, 2, 0), // Red
@@ -68,8 +68,8 @@ pub fn draw(self: Doom) void {
             if (buffer_dest > 12) buffer_dest = 0;
             self.buffer[dest] = @intCast(buffer_dest);
 
-            self.terminal_buffer.buffer[dest] = FIRE[buffer_dest];
-            self.terminal_buffer.buffer[source] = FIRE[buffer_source];
+            self.terminal_buffer.buffer[dest] = toTermboxCell(FIRE[buffer_dest]);
+            self.terminal_buffer.buffer[source] = toTermboxCell(FIRE[buffer_source]);
         }
     }
 }
@@ -81,4 +81,12 @@ fn initBuffer(buffer: []u8, width: usize) void {
 
     @memset(slice_start, 0);
     @memset(slice_end, STEPS - 1);
+}
+
+fn toTermboxCell(cell: utils.Cell) termbox.tb_cell {
+    return .{
+        .ch = cell.ch,
+        .fg = cell.fg,
+        .bg = cell.bg,
+    };
 }

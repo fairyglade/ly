@@ -3,7 +3,13 @@ const interop = @import("../interop.zig");
 
 const termbox = interop.termbox;
 
-pub fn initCell(ch: u32, fg: u16, bg: u16) termbox.tb_cell {
+pub const Cell = struct {
+    ch: u32,
+    fg: u16,
+    bg: u16,
+};
+
+pub fn initCell(ch: u32, fg: u16, bg: u16) Cell {
     return .{
         .ch = ch,
         .fg = fg,
@@ -11,8 +17,8 @@ pub fn initCell(ch: u32, fg: u16, bg: u16) termbox.tb_cell {
     };
 }
 
-pub fn putCell(x: i32, y: i32, cell: *const termbox.tb_cell) c_int {
-    return termbox.tb_set_cell(x, y, cell.ch, cell.fg, cell.bg);
+pub fn putCell(x: usize, y: usize, cell: Cell) void {
+    _ = termbox.tb_set_cell(@intCast(x), @intCast(y), cell.ch, cell.fg, cell.bg);
 }
 
 // Every codepoint is assumed to have a width of 1.
