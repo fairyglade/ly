@@ -16,7 +16,7 @@ height: usize,
 buffer: [*]termbox.tb_cell,
 fg: u16,
 bg: u16,
-border_fg: u8,
+border_fg: u16,
 box_chars: struct {
     left_up: u32,
     left_down: u32,
