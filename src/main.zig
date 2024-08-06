@@ -321,6 +321,7 @@ pub fn main() !void {
     const restart_key = try std.fmt.parseInt(u8, config.restart_key[1..], 10);
     const restart_len = try utils.strWidth(lang.restart);
     const sleep_key = try std.fmt.parseInt(u8, config.sleep_key[1..], 10);
+    const sleep_len = try utils.strWidth(lang.sleep);
     const brightness_down_key = try std.fmt.parseInt(u8, config.brightness_down_key[1..], 10);
     const brightness_down_len = try utils.strWidth(lang.brightness_down);
     const brightness_up_key = try std.fmt.parseInt(u8, config.brightness_up_key[1..], 10);
@@ -457,6 +458,15 @@ pub fn main() !void {
                     buffer.drawLabel(lang.restart, length, 0);
                     length += restart_len + 1;
 
+                    if (config.sleep_cmd != null) {
+                        buffer.drawLabel(config.sleep_key, length, 0);
+                        length += config.sleep_key.len + 1;
+                        buffer.drawLabel(" ", length - 1, 0);
+
+                        buffer.drawLabel(lang.sleep, length, 0);
+                        length += sleep_len + 1;
+                    }
+
                     buffer.drawLabel(config.brightness_down_key, length, 0);
                     length += config.brightness_down_key.len + 1;
                     buffer.drawLabel(" ", length - 1, 0);
@@ -470,14 +480,6 @@ pub fn main() !void {
 
                     buffer.drawLabel(lang.brightness_up, length, 0);
                     length += brightness_up_len + 1;
-
-                    if (config.sleep_cmd != null) {
-                        buffer.drawLabel(config.sleep_key, length, 0);
-                        length += config.sleep_key.len + 1;
-                        buffer.drawLabel(" ", length - 1, 0);
-
-                        buffer.drawLabel(lang.sleep, length, 0);
-                    }
                 }
 
                 if (config.box_title) |title| {
