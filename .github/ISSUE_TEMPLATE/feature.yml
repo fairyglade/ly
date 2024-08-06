@@ -1,4 +1,4 @@
-name: Feature Request
+name: Feature request
 description: Request a new feature or enhancement.
 title: "[Feature] "
 labels: ["feature"]
@@ -11,8 +11,10 @@ body:
       options:
         - label: I have looked for any other duplicate issues
           required: true
+        - label: I have confirmed the requested feature doesn't exist in the latest version in development
+          required: true
   - type: textarea
-    id: observed
+    id: wanted
     attributes:
       label: Wanted behavior
       description: What do you want to be added? Describe the behavior clearly.
