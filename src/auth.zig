@@ -156,8 +156,8 @@ fn startSession(
     std.posix.chdirZ(pwd.pw_dir.?) catch return error.ChangeDirectoryFailed;
 
     switch (current_environment.display_server) {
-        .wayland => try executeWaylandCmd(pwd.pw_shell.?, config.setup_cmd, current_environment.cmd),
-        .shell => try executeShellCmd(pwd.pw_shell.?, config.setup_cmd),
+        .wayland => try executeWaylandCmd(pwd.pw_shell.?, config.setup_cmd, config.login_cmd orelse "", current_environment.cmd),
+        .shell => try executeShellCmd(pwd.pw_shell.?, config.setup_cmd, config.login_cmd orelse ""),
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{config.tty});
@@ -372,16 +372,16 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     if (status.status != 0) return error.XauthFailed;
 }
 
-fn executeShellCmd(shell: [*:0]const u8, setup_cmd: []const u8) !void {
+fn executeShellCmd(shell: [*:0]const u8, setup_cmd: []const u8, login_cmd: []const u8) !void {
     var cmd_buffer: [1024]u8 = undefined;
-    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ setup_cmd, shell });
+    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ setup_cmd, login_cmd, shell });
     const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
     return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
-fn executeWaylandCmd(shell: [*:0]const u8, setup_cmd: []const u8, desktop_cmd: []const u8) !void {
+fn executeWaylandCmd(shell: [*:0]const u8, setup_cmd: []const u8, login_cmd: []const u8, desktop_cmd: []const u8) !void {
     var cmd_buffer: [1024]u8 = undefined;
-    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ setup_cmd, desktop_cmd });
+    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ setup_cmd, login_cmd, desktop_cmd });
     const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
     return std.posix.execveZ(shell, &args, std.c.environ);
 }
@@ -418,7 +418,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
     xorg_pid = try std.posix.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s}", .{ config.setup_cmd, desktop_cmd }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.setup_cmd, config.login_cmd orelse "", desktop_cmd }) catch std.process.exit(1);
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);

@@ -698,6 +698,11 @@ pub fn main() !void {
                     try info_line.addMessage(getAuthErrorMsg(err, lang), config.error_bg, config.error_fg);
                     if (config.clear_password or err != error.PamAuthError) password.clear();
                 } else {
+                    if (config.logout_cmd) |logout_cmd| {
+                        var logout_process = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", logout_cmd }, allocator);
+                        _ = logout_process.spawnAndWait() catch .{};
+                    }
+
                     password.clear();
                     try info_line.addMessage(lang.logout, config.bg, config.fg);
                 }
