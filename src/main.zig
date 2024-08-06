@@ -182,8 +182,6 @@ pub fn main() !void {
     shutdown_cmd = try temporary_allocator.dupe(u8, config.shutdown_cmd);
     restart_cmd = try temporary_allocator.dupe(u8, config.restart_cmd);
 
-    interop.setNumlock(config.numlock) catch {};
-
     // Initialize termbox
     _ = termbox.tb_init();
     defer _ = termbox.tb_shutdown();
@@ -220,6 +218,10 @@ pub fn main() !void {
         // We can't localize this since the config failed to load so we'd fallback to the default language anyway
         try info_line.addMessage("unable to parse config file", config.error_bg, config.error_fg);
     }
+
+    interop.setNumlock(config.numlock) catch {
+        try info_line.addMessage(lang.err_numlock, config.error_bg, config.error_fg);
+    };
 
     var session = Session.init(allocator, &buffer, lang);
     defer session.deinit();
@@ -645,7 +647,9 @@ pub fn main() !void {
             },
             termbox.TB_KEY_ENTER => {
                 try info_line.addMessage(lang.authenticating, config.bg, config.fg);
-                InfoLine.clearRendered(allocator, buffer) catch {};
+                InfoLine.clearRendered(allocator, buffer) catch {
+                    try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                };
                 info_line.label.draw();
                 _ = termbox.tb_present();
 

@@ -108,13 +108,13 @@ pub fn tryMigrateSaveFile(user_buf: *[32]u8) Save {
         const reader = file.reader();
 
         var user_fbs = std.io.fixedBufferStream(user_buf);
-        reader.streamUntilDelimiter(user_fbs.writer(), '\n', 32) catch return save;
+        reader.streamUntilDelimiter(user_fbs.writer(), '\n', user_buf.len) catch return save;
         const user = user_fbs.getWritten();
         if (user.len > 0) save.user = user;
 
         var session_buf: [20]u8 = undefined;
         var session_fbs = std.io.fixedBufferStream(&session_buf);
-        reader.streamUntilDelimiter(session_fbs.writer(), '\n', 20) catch {};
+        reader.streamUntilDelimiter(session_fbs.writer(), '\n', session_buf.len) catch return save;
 
         const session_index_str = session_fbs.getWritten();
         var session_index: ?usize = null;
