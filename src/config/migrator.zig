@@ -85,6 +85,21 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         return null;
     }
 
+    if (std.mem.eql(u8, field.key, "bigclock")) {
+        // The option now uses a string (which then gets converted into an enum) instead of an boolean
+        // It also includes the ability to change active bigclock's language
+        var mapped_field = field;
+
+        if (std.mem.eql(u8, field.value, "true"))
+            mapped_field.value = "en";
+        if (std.mem.eql(u8, field.value, "false"))
+            mapped_field.value = "none";
+            
+
+        mapped_config_fields = true;
+        return mapped_field;
+    }
+
     return field;
 }
 

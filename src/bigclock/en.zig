@@ -4,6 +4,7 @@ const LocaleChars = Lang.LocaleChars;
 const X = Lang.X;
 const O = Lang.O;
 
+// zig fmt: off
 pub const locale_chars = LocaleChars{
     .ZERO = [_]u21{
         X,X,X,X,X,
@@ -90,3 +91,4 @@ pub const locale_chars = LocaleChars{
         O,O,O,O,O,
     },
 };
+// zig fmt: on
