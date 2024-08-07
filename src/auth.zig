@@ -350,7 +350,7 @@ fn mcookie() [Md5.digest_length * 2]u8 {
     return std.fmt.bytesToHex(&out, .lower);
 }
 
-fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xauth_cmd: []const u8) !void {
+fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config) !void {
     var pwd_buf: [100]u8 = undefined;
     const pwd = try std.fmt.bufPrintZ(&pwd_buf, "{s}", .{pw_dir});
 
@@ -362,8 +362,11 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
 
     const pid = try std.posix.fork();
     if (pid == 0) {
+        const log_file = try redirectStandardStreams(config.session_log, true);
+        defer log_file.close();
+
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . {s}", .{ xauth_cmd, display_name, magic_cookie }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . {s}", .{ config.xauth_cmd, display_name, magic_cookie }) catch std.process.exit(1);
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
@@ -383,11 +386,8 @@ fn executeShellCmd(shell: [*:0]const u8, config: Config) !void {
 }
 
 fn executeWaylandCmd(shell: [*:0]const u8, config: Config, desktop_cmd: []const u8) !void {
-    const log_file = try std.fs.cwd().createFile(config.session_log, .{ .mode = 0o666 });
+    const log_file = try redirectStandardStreams(config.session_log, true);
     defer log_file.close();
-
-    try std.posix.dup2(std.posix.STDOUT_FILENO, std.posix.STDERR_FILENO);
-    try std.posix.dup2(log_file.handle, std.posix.STDOUT_FILENO);
 
     var cmd_buffer: [1024]u8 = undefined;
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.setup_cmd, config.login_cmd orelse "", desktop_cmd });
@@ -396,21 +396,15 @@ fn executeWaylandCmd(shell: [*:0]const u8, config: Config, desktop_cmd: []const 
 }
 
 fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, desktop_cmd: []const u8, vt: []const u8) !void {
-    const log_file = try std.fs.cwd().createFile(config.session_log, .{ .mode = 0o666 });
-    defer log_file.close();
-
-    try std.posix.dup2(std.posix.STDOUT_FILENO, std.posix.STDERR_FILENO);
-    try std.posix.dup2(log_file.handle, std.posix.STDOUT_FILENO);
-
     const display_num = try getFreeDisplay();
     var buf: [5]u8 = undefined;
     const display_name = try std.fmt.bufPrintZ(&buf, ":{d}", .{display_num});
-    try xauth(display_name, shell, pw_dir, config.xauth_cmd);
+    try xauth(display_name, shell, pw_dir, config);
 
     const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.x_cmd, display_name, vt }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s} -quiet -logfile {s}", .{ config.x_cmd, display_name, vt, config.session_log }) catch std.process.exit(1);
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
@@ -432,6 +426,9 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
 
     xorg_pid = try std.posix.fork();
     if (xorg_pid == 0) {
+        const log_file = try redirectStandardStreams(config.session_log, false);
+        defer log_file.close();
+
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.setup_cmd, config.login_cmd orelse "", desktop_cmd }) catch std.process.exit(1);
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
@@ -455,6 +452,15 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
 
     var status: c_int = 0;
     _ = std.c.waitpid(x_pid, &status, 0);
+}
+
+fn redirectStandardStreams(session_log: []const u8, create: bool) !std.fs.File {
+    const log_file = if (create) (try std.fs.cwd().createFile(session_log, .{ .mode = 0o666 })) else (try std.fs.cwd().openFile(session_log, .{ .mode = .read_write }));
+
+    try std.posix.dup2(std.posix.STDOUT_FILENO, std.posix.STDERR_FILENO);
+    try std.posix.dup2(log_file.handle, std.posix.STDOUT_FILENO);
+
+    return log_file;
 }
 
 fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
