@@ -385,7 +385,7 @@ pub fn main() !void {
                     }
                 }
 
-                if (config.bigclock and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) draw_big_clock: {
+                if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) draw_big_clock: {
                     const format = "%H:%M";
                     const xo = buffer.width / 2 - @min(buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
                     const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
@@ -396,7 +396,7 @@ pub fn main() !void {
                     };
 
                     for (clock_str, 0..) |c, i| {
-                        const clock_cell = bigclock.clockCell(animate, c, buffer.fg, buffer.bg);
+                        const clock_cell = bigclock.clockCell(animate, c, buffer.fg, buffer.bg, config.bigclock);
                         bigclock.alphaBlit(xo + i * (bigclock.WIDTH + 1), yo, buffer.width, buffer.height, clock_cell);
                     }
                 }
@@ -544,7 +544,7 @@ pub fn main() !void {
                     .matrix => matrix.deinit(),
                 }
             }
-        } else if (config.bigclock and config.clock == null) {
+        } else if (config.bigclock != .none and config.clock == null) {
             var tv: interop.system_time.timeval = undefined;
             _ = interop.system_time.gettimeofday(&tv, null);
 

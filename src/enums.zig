@@ -22,3 +22,9 @@ pub const ViMode = enum {
     normal,
     insert,
 };
+
+pub const Bigclock = enum {
+    none,
+    en,
+    fa,
+};
