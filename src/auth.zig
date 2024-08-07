@@ -152,12 +152,13 @@ fn startSession(
     const env_list = std.mem.span(pam_env_vars.?);
     for (env_list) |env_var| _ = interop.stdlib.putenv(env_var);
 
-    // Execute what the user requested
+    // Change to the user's home directory
     std.posix.chdirZ(pwd.pw_dir.?) catch return error.ChangeDirectoryFailed;
 
+    // Execute what the user requested
     switch (current_environment.display_server) {
-        .wayland => try executeWaylandCmd(pwd.pw_shell.?, config.setup_cmd, config.login_cmd orelse "", current_environment.cmd),
-        .shell => try executeShellCmd(pwd.pw_shell.?, config.setup_cmd, config.login_cmd orelse ""),
+        .wayland => try executeWaylandCmd(pwd.pw_shell.?, config, current_environment.cmd),
+        .shell => try executeShellCmd(pwd.pw_shell.?, config),
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{config.tty});
@@ -372,21 +373,35 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, xaut
     if (status.status != 0) return error.XauthFailed;
 }
 
-fn executeShellCmd(shell: [*:0]const u8, setup_cmd: []const u8, login_cmd: []const u8) !void {
+fn executeShellCmd(shell: [*:0]const u8, config: Config) !void {
+    // We don't want to redirect stdout and stderr in a shell session
+
     var cmd_buffer: [1024]u8 = undefined;
-    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ setup_cmd, login_cmd, shell });
+    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.setup_cmd, config.login_cmd orelse "", shell });
     const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
     return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
-fn executeWaylandCmd(shell: [*:0]const u8, setup_cmd: []const u8, login_cmd: []const u8, desktop_cmd: []const u8) !void {
+fn executeWaylandCmd(shell: [*:0]const u8, config: Config, desktop_cmd: []const u8) !void {
+    const log_file = try std.fs.cwd().createFile(config.session_log, .{ .mode = 0o666 });
+    defer log_file.close();
+
+    try std.posix.dup2(std.posix.STDOUT_FILENO, std.posix.STDERR_FILENO);
+    try std.posix.dup2(log_file.handle, std.posix.STDOUT_FILENO);
+
     var cmd_buffer: [1024]u8 = undefined;
-    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ setup_cmd, login_cmd, desktop_cmd });
+    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ config.setup_cmd, config.login_cmd orelse "", desktop_cmd });
     const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
     return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
 fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, desktop_cmd: []const u8, vt: []const u8) !void {
+    const log_file = try std.fs.cwd().createFile(config.session_log, .{ .mode = 0o666 });
+    defer log_file.close();
+
+    try std.posix.dup2(std.posix.STDOUT_FILENO, std.posix.STDERR_FILENO);
+    try std.posix.dup2(log_file.handle, std.posix.STDOUT_FILENO);
+
     const display_num = try getFreeDisplay();
     var buf: [5]u8 = undefined;
     const display_name = try std.fmt.bufPrintZ(&buf, ":{d}", .{display_num});

@@ -50,5 +50,8 @@ body:
     id: logs
     attributes:
       label: Relevant logs
-      description: Please copy and paste any relevant logs, error messages or any other output. This will be automatically formatted into code, so no need for backticks. Screenshots are accepted if they make life easier for you.
+      description: |
+        Please copy and paste any relevant logs, error messages or any other output. This will be automatically formatted into code, so no need for backticks.
+        Screenshots are accepted if they make life easier for you.
+        Generally, including your session log (found at /var/log/ly-session.log unless modified) is a good idea. (But make sure it's relevant!)
       render: shell
