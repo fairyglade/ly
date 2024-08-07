@@ -37,8 +37,9 @@ pub fn alphaBlit(x: usize, y: usize, tb_width: usize, tb_height: usize, cells: [
 
 fn toBigNumber(char: u8, bigclock: Bigclock) []const u21 {
     const locale_chars = switch (bigclock) {
-        .fa  => fa.locale_chars,
-        else => en.locale_chars,
+        .fa     => fa.locale_chars,
+        .en     => en.locale_chars,
+        .none   => unreachable,
     };
     return switch (char) {
         '0' => &locale_chars.ZERO,

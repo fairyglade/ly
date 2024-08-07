@@ -90,13 +90,14 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         // It also includes the ability to change active bigclock's language
         var mapped_field = field;
 
-        if (std.mem.eql(u8, field.value, "true"))
+        if (std.mem.eql(u8, field.value, "true")){
             mapped_field.value = "en";
-        if (std.mem.eql(u8, field.value, "false"))
+            mapped_config_fields = true;
+        }else if (std.mem.eql(u8, field.value, "false")){
             mapped_field.value = "none";
-            
-
-        mapped_config_fields = true;
+            mapped_config_fields = true;
+        }
+        
         return mapped_field;
     }
 
