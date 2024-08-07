@@ -27,6 +27,7 @@ CONFTTY=$(cat $CONFIG_DIRECTORY/ly/config.ini | sed -n 's/^tty.*=[^1-9]*// p')
 TTY="tty${CONFTTY:-$DEFAULT_TTY}"
 TERM=linux
 BAUD=38400
+EXE_NAME=ly
 # If we don't have getty then we should have agetty
 command=${commandB:-$commandUL}
 command_args_foreground="-nl $PREFIX_DIRECTORY/bin/$EXE_NAME $TTY $BAUD $TERM"
