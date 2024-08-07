@@ -29,7 +29,7 @@ TERM=linux
 BAUD=38400
 # If we don't have getty then we should have agetty
 command=${commandB:-$commandUL}
-command_args_foreground="-nl $PREFIX_DIRECTORY/bin/$EXE_NAME $TTY $BAUD $TERM"
+command_args_foreground="-nl $PREFIX_DIRECTORY/bin/$EXECUTABLE_NAME $TTY $BAUD $TERM"
 
 depend() {
          after agetty
