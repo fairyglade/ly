@@ -54,7 +54,7 @@ fn drawItem(label: *MessageLabel, message: Message, _: usize, _: usize) bool {
     if (message.width == 0 or label.buffer.box_width <= message.width) return false;
 
     const x = label.buffer.box_x + ((label.buffer.box_width - message.width) / 2);
-    label.first_char_x = x;
+    label.first_char_x = x + message.width;
 
     TerminalBuffer.drawColorLabel(message.text, x, label.y, message.fg, message.bg);
     return true;

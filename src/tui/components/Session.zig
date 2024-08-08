@@ -133,7 +133,10 @@ fn drawItem(label: *EnvironmentLabel, environment: Environment, x: usize, y: usi
     const length = @min(environment.name.len, label.visible_length - 3);
     if (length == 0) return false;
 
+    const nx = if (label.text_in_center) (label.x + (label.visible_length - environment.name.len) / 2) else (label.x + 2);
+    label.first_char_x = nx + environment.name.len;
+
     label.buffer.drawLabel(environment.specifier, x, y);
-    label.buffer.drawLabel(environment.name, label.x + 2, label.y);
+    label.buffer.drawLabel(environment.name, nx, label.y);
     return true;
 }
