@@ -21,6 +21,7 @@ pub fn CyclableLabel(comptime ItemType: type) type {
         x: usize,
         y: usize,
         first_char_x: usize,
+        text_in_center: bool,
         draw_item_fn: DrawItemFn,
 
         pub fn init(allocator: Allocator, buffer: *TerminalBuffer, draw_item_fn: DrawItemFn) Self {
@@ -33,6 +34,7 @@ pub fn CyclableLabel(comptime ItemType: type) type {
                 .x = 0,
                 .y = 0,
                 .first_char_x = 0,
+                .text_in_center = false,
                 .draw_item_fn = draw_item_fn,
             };
         }
@@ -41,11 +43,14 @@ pub fn CyclableLabel(comptime ItemType: type) type {
             self.list.deinit();
         }
 
-        pub fn position(self: *Self, x: usize, y: usize, visible_length: usize) void {
+        pub fn position(self: *Self, x: usize, y: usize, visible_length: usize, text_in_center: ?bool) void {
             self.x = x;
             self.y = y;
             self.visible_length = visible_length;
             self.first_char_x = x + 2;
+            if (text_in_center) |value| {
+                self.text_in_center = value;
+            }
         }
 
         pub fn addItem(self: *Self, item: ItemType) !void {

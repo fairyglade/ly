@@ -283,8 +283,8 @@ pub fn main() !void {
         buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
 
         const coordinates = buffer.calculateComponentCoordinates();
-        info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length);
-        session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
+        info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length, null);
+        session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length, config.text_in_center);
         login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
         password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
 
@@ -405,8 +405,8 @@ pub fn main() !void {
 
                 if (resolution_changed) {
                     const coordinates = buffer.calculateComponentCoordinates();
-                    info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length);
-                    session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length);
+                    info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length, null);
+                    session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length, config.text_in_center);
                     login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
                     password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
 
