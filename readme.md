@@ -199,22 +199,22 @@ You can install ly from the GURU repository:
 
 Note: If the package is masked, you may need to unmask it using ~amd64 keyword:
 ```bash
-$ sudo echo 'x11-misc/ly ~amd64' >> /etc/portage/package.accept_keywords
+# echo 'x11-misc/ly ~amd64' >> /etc/portage/package.accept_keywords
 ```
 
 1. Enable the GURU repository:
 ```bash
-$ sudo eselect repository enable guru
+# eselect repository enable guru
 ```
 
 2. Sync the GURU repository:
 ```bash
-$ sudo emaint sync -r guru
+# emaint sync -r guru
 ```
 
 3. Install ly from source:
 ```bash
-$ sudo emerge --ask x11-misc/ly
+# emerge --ask x11-misc/ly
 ```
 
 ## Configuration
