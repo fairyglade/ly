@@ -194,6 +194,29 @@ You can install ly from the [`[extra]` repos](https://archlinux.org/packages/ext
 $ sudo pacman -S ly
 ```
 
+## Gentoo Installation
+You can install ly from the GURU repository:
+
+Note: If the package is masked, you may need to unmask it using ~amd64 keyword:
+```bash
+# echo 'x11-misc/ly ~amd64' >> /etc/portage/package.accept_keywords
+```
+
+1. Enable the GURU repository:
+```bash
+# eselect repository enable guru
+```
+
+2. Sync the GURU repository:
+```bash
+# emaint sync -r guru
+```
+
+3. Install ly from source:
+```bash
+# emerge --ask x11-misc/ly
+```
+
 ## Configuration
 You can find all the configuration in `/etc/ly/config.ini`.
 The file is commented, and includes the default values.
@@ -228,3 +251,4 @@ disable the main box borders with `hide_borders = true`.
 ## Additional Information
 The name "Ly" is a tribute to the fairy from the game Rayman.
 Ly was tested by oxodao, who is some seriously awesome dude.
+
