@@ -39,31 +39,14 @@ pub fn signalHandler(i: c_int) callconv(.C) void {
     std.c.exit(i);
 }
 
-// When setting the currentLogin you must deallocate the previous currentLogin first
-var currentLogin: ?[:0]const u8 = null;
-var asyncPamHandle: ?*interop.pam.pam_handle = null;
-
-fn fingerprintLogin(config: Config, login: [:0]const u8) !void {
-    // TODO: loop if there was an error
-    const pamHandle = try auth.authenticate(config, login, "");
-    if (currentLogin != null and !std.mem.eql(u8, std.mem.span(@as([*:0]const u8, currentLogin.?)), login)) {
-        return;
+fn eventThreadMain(event: *?termbox.tb_event, event_error: *c_int, timeout: *c_int, wake: *std.Thread.Semaphore, cont: *std.Thread.Semaphore) void {
+    while (true) {
+        cont.wait();
+        var e: termbox.tb_event = undefined;
+        event_error.* = termbox.tb_peek_event(&e, timeout.*);
+        event.* = e;
+        wake.post();
     }
-    asyncPamHandle = pamHandle;
-}
-
-fn startFingerPrintLogin(allocator: std.mem.Allocator, config: Config, login: Text) !void {
-    if (currentLogin) |clogin| {
-        allocator.free(clogin);
-        currentLogin = null;
-    }
-    const login_text = try allocator.dupeZ(u8, login.text.items);
-    currentLogin = login_text;
-    var handle = try std.Thread.spawn(.{}, fingerprintLogin, .{
-        config,
-        login_text,
-    });
-    handle.detach();
 }
 
 pub fn main() !void {
@@ -305,9 +288,6 @@ pub fn main() !void {
         }
     }
 
-    try startFingerPrintLogin(allocator, config, login);
-    defer allocator.free(currentLogin.?);
-
     // Place components on the screen
     {
         buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
@@ -359,7 +339,11 @@ pub fn main() !void {
     const brightness_up_key = try std.fmt.parseInt(u8, config.brightness_up_key[1..], 10);
     const brightness_up_len = try utils.strWidth(lang.brightness_up);
 
-    var event: termbox.tb_event = undefined;
+    var event_timeout: c_int = std.math.maxInt(c_int);
+    var event_error: c_int = undefined;
+    var event: ?termbox.tb_event = null;
+    var wake: std.Thread.Semaphore = .{};
+    var doneEvent: std.Thread.Semaphore = .{};
     var run = true;
     var update = true;
     var resolution_changed = false;
@@ -370,6 +354,16 @@ pub fn main() !void {
         try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
     };
 
+    doneEvent.post();
+    const thandle = try std.Thread.spawn(.{}, eventThreadMain, .{ &event, &event_error, &event_timeout, &wake, &doneEvent });
+
+    thandle.detach();
+
+    {
+        const current_environment = session.label.list.items[session.label.current];
+        try auth.startAutomaticLogin(allocator, config, login, current_environment, &wake);
+    }
+    defer allocator.free(auth.currentLogin.?);
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
         if (!update or config.animation != .none) {
@@ -556,7 +550,7 @@ pub fn main() !void {
             _ = termbox.tb_present();
         }
 
-        var timeout: i32 = -1;
+        var timeout: u64 = std.math.maxInt(u64);
 
         // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for 100ms instead
         if (animate and !animation_timed_out) {
@@ -586,273 +580,280 @@ pub fn main() !void {
             timeout = @intCast(1000 - @divTrunc(tv.tv_usec, 1000) + 1);
         }
 
-        const timeoutEnd: i64 = if (timeout == -1) std.math.maxInt(i64) else std.time.milliTimestamp() + timeout;
-
-        const maxtimeout = 100;
         var skipEvent: bool = false;
-        while (timeoutEnd - std.time.milliTimestamp() > 0) {
-            const event_error = termbox.tb_peek_event(&event, @intCast(@min(timeoutEnd - std.time.milliTimestamp(), maxtimeout)));
+        _ = wake.timedWait(timeout) catch .{};
+        if (auth.asyncPamHandle) |handle| {
+            var shared_err = try SharedError.init();
+            defer shared_err.deinit();
 
-            if (asyncPamHandle) |handle| {
-                var shared_err = try SharedError.init();
-                defer shared_err.deinit();
+            {
+                const login_text = try allocator.dupeZ(u8, login.text.items);
+                defer allocator.free(login_text);
 
-                {
-                    const login_text = try allocator.dupeZ(u8, login.text.items);
-                    defer allocator.free(login_text);
-
-                    InfoLine.clearRendered(allocator, buffer) catch {};
-                    info_line.draw(buffer);
-                    _ = termbox.tb_present();
-
-                    session_pid = try std.posix.fork();
-                    if (session_pid == 0) {
-                        const current_environment = session.environments.items[session.current];
-                        auth.finaliseAuth(config, current_environment, handle, login_text) catch |err| {
-                            shared_err.writeError(err);
-                            std.process.exit(1);
-                        };
-
-                        std.process.exit(0);
-                    }
-                    _ = std.posix.waitpid(session_pid, 0);
-
-                    session_pid = -1;
-                }
-
-                const auth_err = shared_err.readError();
-                if (auth_err) |err| {
-                    try info_line.setText(getAuthErrorMsg(err, lang));
-                } else {
-                    try info_line.setText(lang.logout);
-                }
-                asyncPamHandle = null;
-                try startFingerPrintLogin(allocator, config, login);
-
-                try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
-                _ = termbox.tb_clear();
-                _ = termbox.tb_present();
-
-                update = true;
-
-                var restore_cursor = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.term_restore_cursor_cmd }, allocator);
-                _ = restore_cursor.spawnAndWait() catch .{};
-            }
-            skipEvent = event_error < 0;
-            if ((event_error < 0 and event_error != -6) or event.type == termbox.TB_EVENT_KEY) break;
-        }
-        update = timeout != -1;
-        if (skipEvent or event.type != termbox.TB_EVENT_KEY) continue;
-
-        switch (event.key) {
-            termbox.TB_KEY_ESC => {
-                if (config.vi_mode and insert_mode) {
-                    insert_mode = false;
-                    update = true;
-                }
-            },
-            termbox.TB_KEY_F12...termbox.TB_KEY_F1 => {
-                const pressed_key = 0xFFFF - event.key + 1;
-                if (pressed_key == shutdown_key) {
-                    shutdown = true;
-                    run = false;
-                } else if (pressed_key == restart_key) {
-                    restart = true;
-                    run = false;
-                } else if (pressed_key == sleep_key) {
-                    if (config.sleep_cmd) |sleep_cmd| {
-                        var sleep = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
-                        _ = sleep.spawnAndWait() catch .{};
-                    }
-                } else if (pressed_key == brightness_down_key) {
-                    var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.brightness_down_cmd }, allocator);
-                    _ = brightness.spawnAndWait() catch .{};
-                } else if (pressed_key == brightness_up_key) {
-                    var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.brightness_up_cmd }, allocator);
-                    _ = brightness.spawnAndWait() catch .{};
-                }
-            },
-            termbox.TB_KEY_CTRL_C => run = false,
-            termbox.TB_KEY_CTRL_U => {
-                if (active_input == .login) {
-                    login.clear();
-                    update = true;
-                } else if (active_input == .password) {
-                    password.clear();
-                    update = true;
-                }
-            },
-            termbox.TB_KEY_CTRL_K, termbox.TB_KEY_ARROW_UP => {
-                active_input = switch (active_input) {
-                    .session, .info_line => .info_line,
-                    .login => .session,
-                    .password => .login,
-                };
-                update = true;
-            },
-            termbox.TB_KEY_CTRL_J, termbox.TB_KEY_ARROW_DOWN => {
-                active_input = switch (active_input) {
-                    .info_line => .session,
-                    .session => .login,
-                    .login, .password => .password,
-                };
-                update = true;
-            },
-            termbox.TB_KEY_TAB => {
-                active_input = switch (active_input) {
-                    .info_line => .session,
-                    .session => .login,
-                    .login => .password,
-                    .password => .info_line,
-                };
-                update = true;
-            },
-            termbox.TB_KEY_BACK_TAB => {
-                active_input = switch (active_input) {
-                    .info_line => .password,
-                    .session => .info_line,
-                    .login => .session,
-                    .password => .login,
-                };
-
-                update = true;
-            },
-            termbox.TB_KEY_ENTER => {
-                try info_line.addMessage(lang.authenticating, config.bg, config.fg);
+                try info_line.addMessage(lang.authenticating, config.error_bg, config.error_fg);
                 InfoLine.clearRendered(allocator, buffer) catch {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                 };
                 info_line.label.draw();
                 _ = termbox.tb_present();
 
-                if (config.save) save_last_settings: {
-                    var file = std.fs.cwd().createFile(save_path, .{}) catch break :save_last_settings;
-                    defer file.close();
-
-                    const save_data = Save{
-                        .user = login.text.items,
-                        .session_index = session.label.current,
-                    };
-                    ini.writeFromStruct(save_data, file.writer(), null, true, .{}) catch break :save_last_settings;
-
-                    // Delete previous save file if it exists
-                    if (migrator.maybe_save_file) |path| std.fs.cwd().deleteFile(path) catch {};
-                }
-
-                var shared_err = try SharedError.init();
-                defer shared_err.deinit();
-
-                {
-                    const login_text = try allocator.dupeZ(u8, login.text.items);
-                    defer allocator.free(login_text);
-                    const password_text = try allocator.dupeZ(u8, password.text.items);
-                    defer allocator.free(password_text);
-
-                    // Give up control on the TTY
-                    _ = termbox.tb_shutdown();
-
-                    session_pid = try std.posix.fork();
-                    const current_environment = session.environments.items[session.current];
-                    if (auth.authenticate(config, login_text, password_text)) |handle| {
-                        if (session_pid == 0) {
-                            auth.finaliseAuth(config, current_environment, handle, login_text) catch |err| {
-                                shared_err.writeError(err);
-                                std.process.exit(1);
-                            };
-
-                            std.process.exit(0);
-                        }
-                        _ = std.posix.waitpid(session_pid, 0);
-                    } else |err| {
+                session_pid = try std.posix.fork();
+                if (session_pid == 0) {
+                    const current_environment = session.label.list.items[session.label.current];
+                    auth.finaliseAuth(config, current_environment, handle, login_text) catch |err| {
                         shared_err.writeError(err);
-                    }
+                        std.process.exit(1);
+                    };
 
-                    session_pid = -1;
+                    std.process.exit(0);
                 }
+                _ = std.posix.waitpid(session_pid, 0);
 
-                // Take back control of the TTY
-                _ = termbox.tb_init();
-                _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_NORMAL);
+                session_pid = -1;
+            }
 
-                const auth_err = shared_err.readError();
-                if (auth_err) |err| {
-                    auth_fails += 1;
-                    active_input = .password;
-                    try info_line.addMessage(getAuthErrorMsg(err, lang), config.error_bg, config.error_fg);
-                    if (config.clear_password or err != error.PamAuthError) password.clear();
-                } else {
-                    if (config.logout_cmd) |logout_cmd| {
-                        var logout_process = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", logout_cmd }, allocator);
-                        _ = logout_process.spawnAndWait() catch .{};
+            auth.asyncPamHandle = null;
+
+            const auth_err = shared_err.readError();
+            if (auth_err) |err| {
+                try info_line.addMessage(getAuthErrorMsg(err, lang), config.error_bg, config.error_fg);
+                // We don't want to start login back in instantly. The user must first edit
+                // the login/desktop in order to login. Only in case of a failed login (so not a logout)
+                // should we automatically restart it.
+                const current_environment = session.label.list.items[session.label.current];
+                try auth.startAutomaticLogin(allocator, config, login, current_environment, &wake);
+            } else {
+                try info_line.addMessage(lang.logout, config.error_bg, config.error_fg);
+            }
+
+            try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
+            _ = termbox.tb_clear();
+            _ = termbox.tb_present();
+
+            update = true;
+
+            _ = termbox.tb_set_cursor(0, 0);
+            _ = termbox.tb_present();
+        } else if (event) |e| {
+            defer doneEvent.post();
+            update = timeout != -1;
+            skipEvent = event_error < 0;
+            if (skipEvent or e.type != termbox.TB_EVENT_KEY) continue;
+
+            switch (e.key) {
+                termbox.TB_KEY_ESC => {
+                    if (config.vi_mode and insert_mode) {
+                        insert_mode = false;
+                        update = true;
                     }
-
-                    password.clear();
-                    try info_line.addMessage(lang.logout, config.bg, config.fg);
-                }
-
-                try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
-                if (auth_fails < config.auth_fails) _ = termbox.tb_clear();
-
-                update = true;
-
-                // Restore the cursor
-                _ = termbox.tb_set_cursor(0, 0);
-                _ = termbox.tb_present();
-            },
-            else => {
-                if (!insert_mode) {
-                    switch (event.ch) {
-                        'k' => {
-                            active_input = switch (active_input) {
-                                .session, .info_line => .info_line,
-                                .login => .session,
-                                .password => .login,
-                            };
-                            update = true;
-                            continue;
-                        },
-                        'j' => {
-                            active_input = switch (active_input) {
-                                .info_line => .session,
-                                .session => .login,
-                                .login, .password => .password,
-                            };
-                            update = true;
-                            continue;
-                        },
-                        'i' => {
-                            insert_mode = true;
-                            update = true;
-                            continue;
-                        },
-                        else => {},
+                },
+                termbox.TB_KEY_F12...termbox.TB_KEY_F1 => {
+                    const pressed_key = 0xFFFF - e.key + 1;
+                    if (pressed_key == shutdown_key) {
+                        shutdown = true;
+                        run = false;
+                    } else if (pressed_key == restart_key) {
+                        restart = true;
+                        run = false;
+                    } else if (pressed_key == sleep_key) {
+                        if (config.sleep_cmd) |sleep_cmd| {
+                            var sleep = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
+                            _ = sleep.spawnAndWait() catch .{};
+                        }
+                    } else if (pressed_key == brightness_down_key) {
+                        var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.brightness_down_cmd }, allocator);
+                        _ = brightness.spawnAndWait() catch .{};
+                    } else if (pressed_key == brightness_up_key) {
+                        var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.brightness_up_cmd }, allocator);
+                        _ = brightness.spawnAndWait() catch .{};
                     }
-                }
+                },
+                termbox.TB_KEY_CTRL_C => run = false,
+                termbox.TB_KEY_CTRL_U => {
+                    if (active_input == .login) {
+                        login.clear();
+                        update = true;
+                    } else if (active_input == .password) {
+                        password.clear();
+                        update = true;
+                    }
+                },
+                termbox.TB_KEY_CTRL_K, termbox.TB_KEY_ARROW_UP => {
+                    active_input = switch (active_input) {
+                        .session, .info_line => .info_line,
+                        .login => .session,
+                        .password => .login,
+                    };
+                    update = true;
+                },
+                termbox.TB_KEY_CTRL_J, termbox.TB_KEY_ARROW_DOWN => {
+                    if (active_input == .login) {
+                        const current_environment = session.label.list.items[session.label.current];
+                        try auth.startAutomaticLogin(allocator, config, login, current_environment, &wake);
+                    }
+                    active_input = switch (active_input) {
+                        .info_line => .session,
+                        .session => .login,
+                        .login, .password => .password,
+                    };
+                    update = true;
+                },
+                termbox.TB_KEY_TAB => {
+                    if (active_input == .login) {
+                        const current_environment = session.label.list.items[session.label.current];
+                        try auth.startAutomaticLogin(allocator, config, login, current_environment, &wake);
+                    }
+                    active_input = switch (active_input) {
+                        .info_line => .session,
+                        .session => .login,
+                        .login => .password,
+                        .password => .info_line,
+                    };
+                    update = true;
+                },
+                termbox.TB_KEY_BACK_TAB => {
+                    if (active_input == .info_line) {
+                        const current_environment = session.label.list.items[session.label.current];
+                        try auth.startAutomaticLogin(allocator, config, login, current_environment, &wake);
+                    }
+                    active_input = switch (active_input) {
+                        .info_line => .password,
+                        .session => .info_line,
+                        .login => .session,
+                        .password => .login,
+                    };
 
-                switch (active_input) {
-                    .info_line => info_line.label.handle(&event, insert_mode),
-                    .session => session.label.handle(&event, insert_mode),
-                    .login => {
-                        const shouldFingerprint = switch (event.key) {
-                            termbox.TB_KEY_DELETE => true,
-                            termbox.TB_KEY_BACKSPACE, termbox.TB_KEY_BACKSPACE2 => true,
-                            else => event.ch > 31 and event.ch < 127,
+                    update = true;
+                },
+                termbox.TB_KEY_ENTER => {
+                    try info_line.addMessage(lang.authenticating, config.bg, config.fg);
+                    InfoLine.clearRendered(allocator, buffer) catch {
+                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                    };
+                    info_line.label.draw();
+                    _ = termbox.tb_present();
+
+                    if (config.save) save_last_settings: {
+                        var file = std.fs.cwd().createFile(save_path, .{}) catch break :save_last_settings;
+                        defer file.close();
+
+                        const save_data = Save{
+                            .user = login.text.items,
+                            .session_index = session.label.current,
                         };
+                        ini.writeFromStruct(save_data, file.writer(), null, true, .{}) catch break :save_last_settings;
 
-                        if (shouldFingerprint) {
-                            try startFingerPrintLogin(allocator, config, login);
+                        // Delete previous save file if it exists
+                        if (migrator.maybe_save_file) |path| std.fs.cwd().deleteFile(path) catch {};
+                    }
+
+                    var shared_err = try SharedError.init();
+                    defer shared_err.deinit();
+
+                    {
+                        const login_text = try allocator.dupeZ(u8, login.text.items);
+                        defer allocator.free(login_text);
+                        const password_text = try allocator.dupeZ(u8, password.text.items);
+                        defer allocator.free(password_text);
+
+                        // Give up control on the TTY
+                        _ = termbox.tb_shutdown();
+
+                        session_pid = try std.posix.fork();
+                        const current_environment = session.label.list.items[session.label.current];
+                        if (auth.authenticate(config, login_text, password_text, current_environment)) |handle| {
+                            if (session_pid == 0) {
+                                auth.finaliseAuth(config, current_environment, handle, login_text) catch |err| {
+                                    shared_err.writeError(err);
+                                    std.process.exit(1);
+                                };
+
+                                std.process.exit(0);
+                            }
+                            _ = std.posix.waitpid(session_pid, 0);
+                        } else |err| {
+                            shared_err.writeError(err);
                         }
 
-                        login.handle(&event, insert_mode) catch {
+                        session_pid = -1;
+                    }
+
+                    // Take back control of the TTY
+                    _ = termbox.tb_init();
+                    _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_NORMAL);
+
+                    const auth_err = shared_err.readError();
+                    if (auth_err) |err| {
+                        auth_fails += 1;
+                        active_input = .password;
+                        try info_line.addMessage(getAuthErrorMsg(err, lang), config.error_bg, config.error_fg);
+                        if (config.clear_password or err != error.PamAuthError) password.clear();
+                    } else {
+                        if (config.logout_cmd) |logout_cmd| {
+                            var logout_process = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", logout_cmd }, allocator);
+                            _ = logout_process.spawnAndWait() catch .{};
+                        }
+
+                        password.clear();
+                        try info_line.addMessage(lang.logout, config.bg, config.fg);
+                    }
+
+                    try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
+                    if (auth_fails < config.auth_fails) _ = termbox.tb_clear();
+
+                    update = true;
+
+                    // Restore the cursor
+                    _ = termbox.tb_set_cursor(0, 0);
+                    _ = termbox.tb_present();
+                },
+                else => {
+                    if (!insert_mode) {
+                        switch (e.ch) {
+                            'k' => {
+                                active_input = switch (active_input) {
+                                    .session, .info_line => .info_line,
+                                    .login => .session,
+                                    .password => .login,
+                                };
+                                update = true;
+                                continue;
+                            },
+                            'j' => {
+                                if (active_input == .login) {
+                                    const current_environment = session.label.list.items[session.label.current];
+                                    try auth.startAutomaticLogin(allocator, config, login, current_environment, &wake);
+                                }
+                                active_input = switch (active_input) {
+                                    .info_line => .session,
+                                    .session => .login,
+                                    .login, .password => .password,
+                                };
+                                update = true;
+                                continue;
+                            },
+                            'i' => {
+                                insert_mode = true;
+                                update = true;
+                                continue;
+                            },
+                            else => {},
+                        }
+                    }
+
+                    switch (active_input) {
+                        .info_line => info_line.label.handle(&event.?, insert_mode),
+                        .session => session.label.handle(&event.?, insert_mode),
+                        .login => login.handle(&event.?, insert_mode) catch {
                             try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                        };
-                    },
-                    .password => password.handle(&event, insert_mode) catch {
-                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    },
-                }
-                update = true;
-            },
+                        },
+                        .password => password.handle(&event.?, insert_mode) catch {
+                            try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                        },
+                    }
+                    update = true;
+                },
+            }
         }
     }
 }

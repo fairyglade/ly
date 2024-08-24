@@ -13,6 +13,66 @@ const utmp = interop.utmp;
 const Utmp = utmp.utmpx;
 const SharedError = @import("SharedError.zig");
 
+// When setting the currentLogin you must deallocate the previous currentLogin first
+pub var currentLogin: ?[:0]const u8 = null;
+pub var asyncPamHandle: ?*interop.pam.pam_handle = null;
+pub var current_environment: ?Session.Environment = null;
+
+fn environment_equals(e0: Session.Environment, e1: Session.Environment) bool {
+    if (!std.mem.eql(u8, e0.cmd, e1.cmd)) {
+        return false;
+    }
+    if (!std.mem.eql(u8, e0.name, e1.name)) {
+        return false;
+    }
+    if (!std.mem.eql(u8, e0.specifier, e1.specifier)) {
+        return false;
+    }
+    if (!(e0.xdg_desktop_names == null and e1.xdg_desktop_names == null) or
+        (e0.xdg_desktop_names != null and e1.xdg_desktop_names != null and !std.mem.eql(u8, e0.xdg_desktop_names.?, e1.xdg_desktop_names.?)))
+    {
+        return false;
+    }
+    if (!(e0.xdg_session_desktop == null and e1.xdg_session_desktop == null) or
+        (e0.xdg_session_desktop != null and e1.xdg_session_desktop != null and !std.mem.eql(u8, e0.xdg_session_desktop.?, e1.xdg_session_desktop.?)))
+    {
+        return false;
+    }
+    if (e0.display_server != e1.display_server) {
+        return false;
+    }
+    return true;
+}
+
+pub fn automaticLogin(config: Config, login: [:0]const u8, environment: Session.Environment, wakesem: *std.Thread.Semaphore) !void {
+    while (asyncPamHandle == null and currentLogin != null and std.mem.eql(u8, currentLogin.?, login)) {
+        if (authenticate(config, login, "", environment)) |handle| {
+            if (currentLogin != null and !std.mem.eql(u8, currentLogin.?, login) and environment_equals(current_environment.?, environment)) {
+                return;
+            }
+            asyncPamHandle = handle;
+            wakesem.post();
+            return;
+        } else |_| {}
+    }
+}
+
+pub fn startAutomaticLogin(allocator: std.mem.Allocator, config: Config, login: Text, environment: Session.Environment, wakesem: *std.Thread.Semaphore) !void {
+    if (currentLogin) |clogin| {
+        allocator.free(clogin);
+        currentLogin = null;
+    }
+    const login_text = try allocator.dupeZ(u8, login.text.items);
+    currentLogin = login_text;
+    var handle = try std.Thread.spawn(.{}, automaticLogin, .{
+        config,
+        login_text,
+        environment,
+        wakesem,
+    });
+    handle.detach();
+}
+
 var xorg_pid: std.posix.pid_t = 0;
 pub fn xorgSignalHandler(i: c_int) callconv(.C) void {
     if (xorg_pid > 0) _ = std.c.kill(xorg_pid, i);
@@ -23,9 +83,20 @@ pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(config: Config, login: [:0]const u8, password: [:0]const u8) !*interop.pam.pam_handle {
+pub fn authenticate(
+    config: Config,
+    login: [:0]const u8,
+    password: [:0]const u8,
+    environment: Session.Environment,
+) !*interop.pam.pam_handle {
     var pam_tty_buffer: [6]u8 = undefined;
     const pam_tty_str = try std.fmt.bufPrintZ(&pam_tty_buffer, "tty{d}", .{config.tty});
+    var tty_buffer: [2]u8 = undefined;
+    const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
+
+    // Set the XDG environment variables
+    setXdgSessionEnv(environment.display_server);
+    try setXdgEnv(tty_str, environment.xdg_session_desktop orelse "", environment.xdg_desktop_names orelse "");
 
     // Open the PAM session
     var credentials = [_:null]?[*:0]const u8{ login, password };
@@ -39,7 +110,7 @@ pub fn authenticate(config: Config, login: [:0]const u8, password: [:0]const u8)
     // Do the PAM routine
     var status = interop.pam.pam_start(config.service_name, null, &conv, &handle);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
-    errdefer interop.pam.pam_end(handle, status);
+    errdefer _ = interop.pam.pam_end(handle, status);
 
     // Set PAM_TTY as the current TTY. This is required in case it isn't being set by another PAM module
     status = interop.pam.pam_set_item(handle, interop.pam.PAM_TTY, pam_tty_str.ptr);
@@ -52,27 +123,21 @@ pub fn authenticate(config: Config, login: [:0]const u8, password: [:0]const u8)
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     status = interop.pam.pam_setcred(handle, interop.pam.PAM_ESTABLISH_CRED);
-    defer {
-        if (status != interop.pam.PAM_SUCCESS) _ = interop.pam.pam_end(handle, status);
-    }
+    errdefer _ = interop.pam.pam_end(handle, status);
+
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     return handle.?;
 }
 
-pub fn finaliseAuth(config: Config, current_environment: Session.Environment, handle: ?*interop.pam.pam_handle, login: [:0]const u8) !void {
-    var tty_buffer: [2]u8 = undefined;
-    const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{config.tty});
-
-    // Close the PAM session
-    var status = interop.pam.pam_open_session(handle, 0);
-    defer status = interop.pam.pam_close_session(handle, status);
-    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
-    defer status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
+pub fn finaliseAuth(config: Config, environment: Session.Environment, handle: ?*interop.pam.pam_handle, login: [:0]const u8) !void {
+    var status: c_int = undefined;
     defer status = interop.pam.pam_end(handle, status);
+    defer status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
 
-    // Set the XDG environment variables
-    setXdgSessionEnv(current_environment.display_server);
-    try setXdgEnv(tty_str, current_environment.xdg_session_desktop orelse "", current_environment.xdg_desktop_names orelse "");
+    // Open the PAM session
+    status = interop.pam.pam_open_session(handle, 0);
+    if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
+    defer status = interop.pam.pam_close_session(handle, status);
 
     var pwd: *interop.pwd.passwd = undefined;
     {
@@ -94,7 +159,7 @@ pub fn finaliseAuth(config: Config, current_environment: Session.Environment, ha
 
     child_pid = try std.posix.fork();
     if (child_pid == 0) {
-        startSession(config, pwd, handle, current_environment) catch |e| {
+        startSession(config, pwd, handle, environment) catch |e| {
             shared_err.writeError(e);
             std.process.exit(1);
         };
@@ -132,7 +197,7 @@ fn startSession(
     config: Config,
     pwd: *interop.pwd.passwd,
     handle: ?*interop.pam.pam_handle,
-    current_environment: Session.Environment,
+    environment: Session.Environment,
 ) !void {
     if (builtin.os.tag == .freebsd) {
         // FreeBSD has initgroups() in unistd
@@ -164,13 +229,13 @@ fn startSession(
     std.posix.chdirZ(pwd.pw_dir.?) catch return error.ChangeDirectoryFailed;
 
     // Execute what the user requested
-    switch (current_environment.display_server) {
-        .wayland => try executeWaylandCmd(pwd.pw_shell.?, config, current_environment.cmd),
+    switch (environment.display_server) {
+        .wayland => try executeWaylandCmd(pwd.pw_shell.?, config, environment.cmd),
         .shell => try executeShellCmd(pwd.pw_shell.?, config),
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{config.tty});
-            try executeX11Cmd(pwd.pw_shell.?, pwd.pw_dir.?, config, current_environment.cmd, vt);
+            try executeX11Cmd(pwd.pw_shell.?, pwd.pw_dir.?, config, environment.cmd, vt);
         },
     }
 }
