@@ -17,7 +17,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 ### Debian
 ```
-# apt install build-essential libpam0g-dev libxcb-xkb-dev
+apt install build-essential libpam0g-dev libxcb-xkb-dev
 ```
 
 ### Fedora
@@ -25,7 +25,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 It is recommended to add a rule for Ly as it currently does not ship one.
 
 ```
-# dnf install kernel-devel pam-devel libxcb-devel
+dnf install kernel-devel pam-devel libxcb-devel
 ```
 
 ## Support
@@ -67,39 +67,39 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-$ git clone https://github.com/fairyglade/ly
+git clone https://github.com/fairyglade/ly
 ```
 
 Change the directory to ly
 ```
-$ cd ly
+cd ly
 ```
 
 Compile
 ```
-$ zig build
+zig build
 ```
 
 Test in the configured tty (tty2 by default)
 or a terminal emulator (but desktop environments won't start)
 ```
-# zig build run
+zig build run
 ```
 
 Install Ly and the provided systemd service file
 ```
-# zig build installsystemd
+zig build installsystemd
 ```
 
 Enable the service
 ```
-# systemctl enable ly.service
+systemctl enable ly.service
 ```
 
 If you need to switch between ttys after Ly's start you also have to
 disable getty on Ly's tty to prevent "login" from spawning on top of it
 ```
-# systemctl disable getty@tty2.service
+systemctl disable getty@tty2.service
 ```
 
 ### OpenRC
@@ -109,12 +109,12 @@ Clone, compile and test.
 
 Install Ly and the provided OpenRC service
 ```
-# zig build installopenrc
+zig build installopenrc
 ```
 
 Enable the service
 ```
-# rc-update add ly
+rc-update add ly
 ```
 
 You can edit which tty Ly will start on by editing the `tty` option in the configuration file.
@@ -122,15 +122,15 @@ You can edit which tty Ly will start on by editing the `tty` option in the confi
 If you choose a tty that already has a login/getty running (has a basic login prompt),
 then you have to disable getty, so it doesn't respawn on top of ly
 ```
-# rc-update del agetty.tty2
+rc-update del agetty.tty2
 ```
 
 **NOTE 2**: To avoid a console spawning on top on Ly, comment out the appropriate line from /etc/inittab (default is 2).
 
 ### runit
 ```
-# zig build installrunit
-# ln -s /etc/sv/ly /var/service/
+zig build installrunit
+ln -s /etc/sv/ly /var/service/
 ```
 
 By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini`
@@ -138,7 +138,7 @@ By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/co
 You should as well disable your existing display manager service if needed, e.g.:
 
 ```
-# rm /var/service/lxdm
+rm /var/service/lxdm
 ```
 
 The agetty service for the tty console where you are running ly should be disabled.
@@ -146,12 +146,12 @@ For instance, if you are running ly on tty2 (that's the default, check your `/et
 you should disable the agetty-tty2 service like this:
 
 ```
-# rm /var/service/agetty-tty2
+rm /var/service/agetty-tty2
 ```
 
 ### s6
 ```
-# zig build installs6
+zig build installs6
 ```
 
 Then, edit `/etc/s6/config/ttyX.conf` and set `SPAWN="no"`, where X is the TTY ID (e.g. `2`).
@@ -159,15 +159,15 @@ Then, edit `/etc/s6/config/ttyX.conf` and set `SPAWN="no"`, where X is the TTY I
 Finally, enable the service:
 
 ```
-# s6-service add default ly-srv
-# s6-db-reload
-# s6-rc -u change ly-srv
+s6-service add default ly-srv
+s6-db-reload
+s6-rc -u change ly-srv
 ```
 
 ### dinit
 ```
-# zig build installdinit
-# dinitctl enable ly
+zig build installdinit
+dinitctl enable ly
 ```
 
 In addition to the steps above, you will also have to keep a TTY free within `/etc/dinit.d/config/console.conf`.
@@ -179,19 +179,19 @@ You can also install Ly without copying the system service and the configuration
 called *updating*. To update, simply run:
 
 ```
-# zig build installnoconf
+zig build installnoconf
 ```
 
 If you want to also copy the default config file (but still not the system service), run:
 
 ```
-# zig build installexe
+zig build installexe
 ```
 
 ## Arch Linux Installation
 You can install ly from the [`[extra]` repos](https://archlinux.org/packages/extra/x86_64/ly/):
 ```
-$ sudo pacman -S ly
+sudo pacman -S ly
 ```
 
 ## Gentoo Installation
@@ -199,22 +199,22 @@ You can install ly from the GURU repository:
 
 Note: If the package is masked, you may need to unmask it using ~amd64 keyword:
 ```bash
-# echo 'x11-misc/ly ~amd64' >> /etc/portage/package.accept_keywords
+echo 'x11-misc/ly ~amd64' >> /etc/portage/package.accept_keywords
 ```
 
 1. Enable the GURU repository:
 ```bash
-# eselect repository enable guru
+eselect repository enable guru
 ```
 
 2. Sync the GURU repository:
 ```bash
-# emaint sync -r guru
+emaint sync -r guru
 ```
 
 3. Install ly from source:
 ```bash
-# emerge --ask x11-misc/ly
+emerge --ask x11-misc/ly
 ```
 
 ## Configuration
