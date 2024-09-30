@@ -25,7 +25,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 It is recommended to add a rule for Ly as it currently does not ship one.
 
 ```
-# dnf install kernel-devel pam-devel libxcb-devel
+# dnf install kernel-devel pam-devel libxcb-devel zig
 ```
 
 ## Support
