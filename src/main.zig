@@ -580,7 +580,10 @@ pub fn main() !void {
                 } else if (pressed_key == sleep_key) {
                     if (config.sleep_cmd) |sleep_cmd| {
                         var sleep = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
-                        _ = sleep.spawnAndWait() catch .{};
+                        sleep.stdout_behavior = .Ignore;
+                        sleep.stderr_behavior = .Ignore;
+
+                        _ = sleep.spawnAndWait() catch {};
                     }
                 } else if (pressed_key == brightness_down_key or pressed_key == brightness_up_key) {
                     const cmd = if (pressed_key == brightness_down_key) config.brightness_down_cmd else config.brightness_up_cmd;
