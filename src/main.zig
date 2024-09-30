@@ -582,12 +582,21 @@ pub fn main() !void {
                         var sleep = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
                         _ = sleep.spawnAndWait() catch .{};
                     }
-                } else if (pressed_key == brightness_down_key) {
-                    var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.brightness_down_cmd }, allocator);
-                    _ = brightness.spawnAndWait() catch .{};
-                } else if (pressed_key == brightness_up_key) {
-                    var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", config.brightness_up_cmd }, allocator);
-                    _ = brightness.spawnAndWait() catch .{};
+                } else if (pressed_key == brightness_down_key or pressed_key == brightness_up_key) {
+                    const cmd = if (pressed_key == brightness_down_key) config.brightness_down_cmd else config.brightness_up_cmd;
+
+                    var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", cmd }, allocator);
+                    brightness.stdout_behavior = .Ignore;
+                    brightness.stderr_behavior = .Ignore;
+
+                    handle_brightness_cmd: {
+                        const process_result = brightness.spawnAndWait() catch {
+                            break :handle_brightness_cmd;
+                        };
+                        if (process_result.Exited != 0) {
+                            try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
+                        }
+                    }
                 }
             },
             termbox.TB_KEY_CTRL_C => run = false,
