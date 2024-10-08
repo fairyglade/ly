@@ -40,6 +40,7 @@ The following desktop environments were tested with success:
  - dwm
  - enlightenment
  - gnome
+ - hyprland
  - i3
  - kde
  - labwc
