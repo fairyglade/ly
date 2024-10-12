@@ -583,7 +583,14 @@ pub fn main() !void {
                         sleep.stdout_behavior = .Ignore;
                         sleep.stderr_behavior = .Ignore;
 
-                        _ = sleep.spawnAndWait() catch {};
+                        handle_sleep_cmd: {
+                            const process_result = sleep.spawnAndWait() catch {
+                                break :handle_sleep_cmd;
+                            };
+                            if (process_result.Exited != 0) {
+                                try info_line.addMessage(lang.err_sleep, config.error_bg, config.error_fg);
+                            }
+                        }
                     }
                 } else if (pressed_key == brightness_down_key or pressed_key == brightness_up_key) {
                     const cmd = if (pressed_key == brightness_down_key) config.brightness_down_cmd else config.brightness_up_cmd;
