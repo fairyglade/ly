@@ -40,7 +40,9 @@ fi
 declare -a LANG_STRINGS
 
 while read -r line; do
-    if [[ "$line" =~ ^([^:]*): ]]; then
+    if [[ -z "$line" || "$line" =~ ^\/\/ ]]; then
+        :
+    elif [[ "$line" =~ ^([^:]*): ]]; then
         LANG_STRINGS+=("${BASH_REMATCH[1]}")
     else
         echo "ERROR: Line '$line' in file '$ZIG_LANG_FILE' does not contain an entry of the pattern '<lang_item>: ...'." >&2

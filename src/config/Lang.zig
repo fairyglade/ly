@@ -1,3 +1,8 @@
+//
+// NOTE: After editing this file, please run `/res/lang/fix_missing_entries.sh`
+//       to update all the language files accordingly.
+//
+
 authenticating: []const u8 = "authenticating...",
 brightness_down: []const u8 = "decrease brightness",
 brightness_up: []const u8 = "increase brightness",
