@@ -4,7 +4,6 @@ set -eu
 
 function process_lang_file() {
     local input_file=$1
-    local tmp_file=$(mktemp)
     local -A lang_strings_in_file
 
     while read -r line; do
@@ -26,9 +25,7 @@ function process_lang_file() {
                 printf "\n"
             fi
         done
-    } > $tmp_file
-
-    mv "$tmp_file" "$input_file"
+    } > "$input_file"
 }
 
 LANG_DIR=$(dirname "$(realpath $0)")
