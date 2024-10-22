@@ -53,21 +53,28 @@ pub fn realloc(self: *Doom) !void {
 pub fn draw_with_update(self: Doom) void {
     for (0..self.terminal_buffer.width) |x| {
         for (1..self.terminal_buffer.height) |y| {
+            // get source index
             const source = y * self.terminal_buffer.width + x;
+
+            // random number between 0 and 3 inclusive
             const random = (self.terminal_buffer.random.int(u16) % 7) & 3;
 
+            // adjust destination index based on random value
             var dest = (source - @min(source, random)) + 1;
             if (self.terminal_buffer.width > dest) dest = 0 else dest -= self.terminal_buffer.width;
 
+            // get source intensity and destination offset
             const buffer_source = self.buffer[source];
             const buffer_dest_offset = random & 1;
 
             if (buffer_source < buffer_dest_offset) continue;
 
+            // calculate  the destination intensity
             var buffer_dest = buffer_source - buffer_dest_offset;
             if (buffer_dest > 12) buffer_dest = 0;
             self.buffer[dest] = @intCast(buffer_dest);
 
+            // update terminal
             self.terminal_buffer.buffer[dest] = toTermboxCell(FIRE[buffer_dest]);
             self.terminal_buffer.buffer[source] = toTermboxCell(FIRE[buffer_source]);
         }
@@ -77,10 +84,13 @@ pub fn draw_with_update(self: Doom) void {
 pub fn draw(self: Doom) void {
     for (0..self.terminal_buffer.width) |x| {
         for (1..self.terminal_buffer.height) |y| {
+            // get source index
             const source = y * self.terminal_buffer.width + x;
 
+            // get intensity from buffer
             const buffer_source = self.buffer[source];
 
+            // set cell to correct fire char
             self.terminal_buffer.buffer[source] = toTermboxCell(FIRE[buffer_source]);
         }
     }
