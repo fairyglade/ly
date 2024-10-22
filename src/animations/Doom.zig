@@ -97,9 +97,9 @@ pub fn draw(self: Doom) void {
 }
 
 fn initBuffer(buffer: []u8, width: usize) void {
-    const length = buffer.len - width;
+    const length = buffer.len;
     const slice_start = buffer[0..length];
-    const slice_end = buffer[length..];
+    const slice_end = buffer[length - width .. length];
 
     @memset(slice_start, 0);
     @memset(slice_end, STEPS - 1);

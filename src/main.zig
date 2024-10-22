@@ -317,9 +317,9 @@ pub fn main() !void {
         }
     }
 
-    var animation_timer = switch(config.animation) {
+    var animation_timer = switch (config.animation) {
         .none => undefined,
-        else => try std.time.Timer.start()
+        else => try std.time.Timer.start(),
     };
 
     const animate = config.animation != .none;
@@ -344,7 +344,6 @@ pub fn main() !void {
     interop.switchTty(config.console_dev, config.tty) catch {
         try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
     };
-
 
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
@@ -706,7 +705,7 @@ pub fn main() !void {
                     defer allocator.free(password_text);
 
                     // Give up control on the TTY
-                    _ = termbox.tb_shutdown();
+                    // _ = termbox.tb_shutdown();
 
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
