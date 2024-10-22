@@ -704,9 +704,6 @@ pub fn main() !void {
                     const password_text = try allocator.dupeZ(u8, password.text.items);
                     defer allocator.free(password_text);
 
-                    // Give up control on the TTY
-                    // _ = termbox.tb_shutdown();
-
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
                         const current_environment = session.label.list.items[session.label.current];
@@ -720,10 +717,6 @@ pub fn main() !void {
                     _ = std.posix.waitpid(session_pid, 0);
                     session_pid = -1;
                 }
-
-                // Take back control of the TTY
-                _ = termbox.tb_init();
-                _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_NORMAL);
 
                 const auth_err = shared_err.readError();
                 if (auth_err) |err| {
