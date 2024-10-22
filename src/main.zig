@@ -317,6 +317,11 @@ pub fn main() !void {
         }
     }
 
+    var animation_timer = switch(config.animation) {
+        .none => undefined,
+        else => try std.time.Timer.start()
+    };
+
     const animate = config.animation != .none;
     const shutdown_key = try std.fmt.parseInt(u8, config.shutdown_key[1..], 10);
     const shutdown_len = try utils.strWidth(lang.shutdown);
@@ -339,6 +344,7 @@ pub fn main() !void {
     interop.switchTty(config.console_dev, config.tty) catch {
         try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
     };
+
 
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
@@ -380,8 +386,22 @@ pub fn main() !void {
                 if (!animation_timed_out) {
                     switch (config.animation) {
                         .none => {},
-                        .doom => doom.draw(),
-                        .matrix => matrix.draw(),
+                        .doom => {
+                            if (animation_timer.read() / std.time.ns_per_ms > config.animation_refresh_ms) {
+                                animation_timer.reset();
+                                doom.draw_with_update();
+                            } else {
+                                doom.draw();
+                            }
+                        },
+                        .matrix => {
+                            if (animation_timer.read() / std.time.ns_per_ms > config.animation_refresh_ms) {
+                                animation_timer.reset();
+                                matrix.draw_with_update();
+                            } else {
+                                matrix.draw();
+                            }
+                        },
                     }
                 }
 

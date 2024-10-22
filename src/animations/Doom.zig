@@ -50,7 +50,7 @@ pub fn realloc(self: *Doom) !void {
     self.buffer = buffer;
 }
 
-pub fn draw(self: Doom) void {
+pub fn draw_with_update(self: Doom) void {
     for (0..self.terminal_buffer.width) |x| {
         for (1..self.terminal_buffer.height) |y| {
             const source = y * self.terminal_buffer.width + x;
@@ -69,6 +69,18 @@ pub fn draw(self: Doom) void {
             self.buffer[dest] = @intCast(buffer_dest);
 
             self.terminal_buffer.buffer[dest] = toTermboxCell(FIRE[buffer_dest]);
+            self.terminal_buffer.buffer[source] = toTermboxCell(FIRE[buffer_source]);
+        }
+    }
+}
+
+pub fn draw(self: Doom) void {
+    for (0..self.terminal_buffer.width) |x| {
+        for (1..self.terminal_buffer.height) |y| {
+            const source = y * self.terminal_buffer.width + x;
+
+            const buffer_source = self.buffer[source];
+
             self.terminal_buffer.buffer[source] = toTermboxCell(FIRE[buffer_source]);
         }
     }
