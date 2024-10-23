@@ -388,7 +388,7 @@ pub fn main() !void {
                         .doom => {
                             if (animation_timer.read() / std.time.ns_per_ms > config.animation_refresh_ms) {
                                 animation_timer.reset();
-                                doom.draw_with_update();
+                                doom.drawWithUpdate();
                             } else {
                                 doom.draw();
                             }
@@ -396,7 +396,7 @@ pub fn main() !void {
                         .matrix => {
                             if (animation_timer.read() / std.time.ns_per_ms > config.animation_refresh_ms) {
                                 animation_timer.reset();
-                                matrix.draw_with_update();
+                                matrix.drawWithUpdate();
                             } else {
                                 matrix.draw();
                             }

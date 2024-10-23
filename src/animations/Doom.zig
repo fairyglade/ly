@@ -50,7 +50,7 @@ pub fn realloc(self: *Doom) !void {
     self.buffer = buffer;
 }
 
-pub fn draw_with_update(self: Doom) void {
+pub fn drawWithUpdate(self: Doom) void {
     for (0..self.terminal_buffer.width) |x| {
         for (1..self.terminal_buffer.height) |y| {
             // get source index

@@ -68,7 +68,7 @@ pub fn realloc(self: *Matrix) !void {
     self.lines = lines;
 }
 
-pub fn draw_with_update(self: *Matrix) void {
+pub fn drawWithUpdate(self: *Matrix) void {
     const buf_height = self.terminal_buffer.height;
     const buf_width = self.terminal_buffer.width;
 
