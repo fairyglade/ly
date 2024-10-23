@@ -97,10 +97,10 @@ pub fn draw(self: Doom) void {
 }
 
 fn initBuffer(buffer: []u8, width: usize) void {
-    const length = buffer.len;
-    const slice_start = buffer[0..length];
-    const slice_end = buffer[length - width .. length];
+    const slice_start = buffer[0..buffer.len];
+    const slice_end = buffer[buffer.len - width .. buffer.len];
 
+    // set cell initial values to 0, set bottom row to be fire sources
     @memset(slice_start, 0);
     @memset(slice_end, STEPS - 1);
 }
