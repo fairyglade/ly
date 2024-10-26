@@ -1,5 +1,5 @@
 //
-// NOTE: After editing this file, please run `/res/lang/fix_missing_entries.sh`
+// NOTE: After editing this file, please run `/res/lang/normalize_lang_files.py`
 //       to update all the language files accordingly.
 //
 
