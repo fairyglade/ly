@@ -297,7 +297,7 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
     }
 
     {
-        const pam_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/pam.d" });
+        const pam_path = try std.fs.path.join(allocator, &[_][]const u8{ config_directory, "/pam.d" });
         if (!std.mem.eql(u8, dest_directory, "")) {
             std.fs.cwd().makePath(pam_path) catch {
                 std.debug.print("warn: {s} already exists as a directory.\n", .{pam_path});
