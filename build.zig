@@ -31,7 +31,6 @@ pub fn build(b: *std.Build) !void {
     executable_name = b.option([]const u8, "name", "Specify installed executable file name (default is ly)") orelse "ly";
 
     const bin_directory = try b.allocator.dupe(u8, config_directory);
-    config_directory = try std.fs.path.join(b.allocator, &[_][]const u8{ dest_directory, config_directory });
 
     const build_options = b.addOptions();
     const version_str = try getVersionStr(b, "ly", ly_version);
@@ -222,22 +221,22 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
 }
 
 fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
-    const ly_config_directory = try std.fs.path.join(allocator, &[_][]const u8{ config_directory, "/ly" });
+    const ly_config_directory = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/ly" });
 
     std.fs.cwd().makePath(ly_config_directory) catch {
         std.debug.print("warn: {s} already exists as a directory.\n", .{ly_config_directory});
     };
 
-    const ly_lang_path = try std.fs.path.join(allocator, &[_][]const u8{ config_directory, "/ly/lang" });
+    const ly_lang_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/ly/lang" });
     std.fs.cwd().makePath(ly_lang_path) catch {
-        std.debug.print("warn: {s} already exists as a directory.\n", .{config_directory});
+        std.debug.print("warn: {s} already exists as a directory.\n", .{ ly_lang_path });
     };
 
     {
         const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, prefix_directory, "/bin" });
         if (!std.mem.eql(u8, dest_directory, "")) {
             std.fs.cwd().makePath(exe_path) catch {
-                std.debug.print("warn: {s} already exists as a directory.\n", .{exe_path});
+                std.debug.print("warn: {s} already exists as a directory.\n", .{ exe_path });
             };
         }
 
