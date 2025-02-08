@@ -33,6 +33,7 @@ case $SHELL in
     [ -f "$zhome"/.zprofile ] && . "$zhome"/.zprofile
     [ -f "$zdir"/zlogin ] && . "$zdir"/zlogin
     [ -f "$zhome"/.zlogin ] && . "$zhome"/.zlogin
+    [ -f "$zhome"/.zshrc ] && . "$zhome"/.zshrc
     emulate -R sh
     ;;
 */csh|*/tcsh)

@@ -8,6 +8,7 @@ const bigclock = @import("bigclock.zig");
 const interop = @import("interop.zig");
 const Doom = @import("animations/Doom.zig");
 const Matrix = @import("animations/Matrix.zig");
+const Image = @import("animations/Image.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
@@ -303,17 +304,21 @@ pub fn main() !void {
     // Initialize the animation, if any
     var doom: Doom = undefined;
     var matrix: Matrix = undefined;
+    var image: Image = undefined;
 
     switch (config.animation) {
         .none => {},
         .doom => doom = try Doom.init(allocator, &buffer),
         .matrix => matrix = try Matrix.init(allocator, &buffer, config.cmatrix_fg),
+        .image => image = try Image.init(allocator, &buffer, config.image_path),
+        
     }
     defer {
         switch (config.animation) {
             .none => {},
             .doom => doom.deinit(),
             .matrix => matrix.deinit(),
+            .image => {},
         }
     }
 
@@ -365,6 +370,7 @@ pub fn main() !void {
                     .matrix => matrix.realloc() catch {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
+                    .image => {},
                 }
 
                 update = true;
@@ -378,11 +384,14 @@ pub fn main() !void {
                 _ = termbox.tb_clear();
 
                 if (!animation_timed_out) {
+                   
                     switch (config.animation) {
                         .none => {},
                         .doom => doom.draw(),
                         .matrix => matrix.draw(),
+                        .image => try image.draw(),
                     }
+
                 }
 
                 if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) draw_big_clock: {
@@ -542,6 +551,7 @@ pub fn main() !void {
                     .none => {},
                     .doom => doom.deinit(),
                     .matrix => matrix.deinit(),
+                    .image => {},
                 }
             }
         } else if (config.bigclock != .none and config.clock == null) {

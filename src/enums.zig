@@ -2,6 +2,7 @@ pub const Animation = enum {
     none,
     doom,
     matrix,
+    image,
 };
 
 pub const DisplayServer = enum {

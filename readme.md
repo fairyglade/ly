@@ -1,8 +1,12 @@
 
-# Ly - a TUI display manager
+# Ly with image support - a TUI display manager with image support
 ![Ly screenshot](.github/screenshot.png "Ly screenshot")
 
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
+
+## Create your Custom Image
+Use [**LyArt**](https://augusto-p.github.io/ly-Image-maker/) To Create Your Image Here
+
 
 ## Dependencies
 - Compile-time:

@@ -30,6 +30,7 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         mapped_field.value = switch (animation) {
             0 => "doom",
             1 => "matrix",
+            2 => "image",
             else => "none",
         };
 
