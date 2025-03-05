@@ -1,6 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const Random = std.rand.Random;
+const Random = std.Random;
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 
 const interop = @import("../interop.zig");

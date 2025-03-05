@@ -1,3 +1,8 @@
+//
+// NOTE: After editing this file, please run `/res/lang/normalize_lang_files.py`
+//       to update all the language files accordingly.
+//
+
 authenticating: []const u8 = "authenticating...",
 brightness_down: []const u8 = "decrease brightness",
 brightness_up: []const u8 = "increase brightness",
@@ -48,8 +53,8 @@ err_xsessions_open: []const u8 = "failed to open sessions folder",
 insert: []const u8 = "insert",
 login: []const u8 = "login:",
 logout: []const u8 = "logged out",
-normal: []const u8 = "normal",
 no_x11_support: []const u8 = "x11 support disabled at compile-time",
+normal: []const u8 = "normal",
 numlock: []const u8 = "numlock",
 other: []const u8 = "other",
 password: []const u8 = "password:",
@@ -58,5 +63,5 @@ shell: [:0]const u8 = "shell",
 shutdown: []const u8 = "shutdown",
 sleep: []const u8 = "sleep",
 wayland: []const u8 = "wayland",
-xinitrc: [:0]const u8 = "xinitrc",
 x11: []const u8 = "x11",
+xinitrc: [:0]const u8 = "xinitrc",

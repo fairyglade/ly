@@ -1,15 +1,16 @@
 .{
-    .name = "ly",
-    .version = "1.0.0",
-    .minimum_zig_version = "0.12.0",
+    .name = .ly,
+    .version = "1.1.0",
+    .fingerprint = 0xa148ffcc5dc2cb59,
+    .minimum_zig_version = "0.14.0",
     .dependencies = .{
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.9.1.tar.gz",
-            .hash = "122062d301a203d003547b414237229b09a7980095061697349f8bef41be9c30266b",
+            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.10.0.tar.gz",
+            .hash = "clap-0.10.0-oBajB434AQBDh-Ei3YtoKIRxZacVPF1iSwp3IX_ZB8f0",
         },
         .zigini = .{
-            .url = "https://github.com/Kawaii-Ash/zigini/archive/0bba97a12582928e097f4074cc746c43351ba4c8.tar.gz",
-            .hash = "12209b971367b4066d40ecad4728e6fdffc4cc4f19356d424c2de57f5b69ac7a619a",
+            .url = "https://github.com/AnErrupTion/zigini/archive/e61d31b2b7db3365993a20cc90e491d0cb0b7282.tar.gz",
+            .hash = "zigini-0.3.1-BSkB7XJGAAB2E-sKyzhTaQCBlYBL8yqzE4E_jmSY99sC",
         },
     },
     .paths = .{""},
