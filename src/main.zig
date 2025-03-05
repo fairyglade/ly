@@ -8,6 +8,7 @@ const bigclock = @import("bigclock.zig");
 const interop = @import("interop.zig");
 const Doom = @import("animations/Doom.zig");
 const Matrix = @import("animations/Matrix.zig");
+const ColorMix = @import("animations/ColorMix.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
@@ -321,17 +322,20 @@ pub fn main() !void {
     // Initialize the animation, if any
     var doom: Doom = undefined;
     var matrix: Matrix = undefined;
+    var color_mix: ColorMix = undefined;
 
     switch (config.animation) {
         .none => {},
         .doom => doom = try Doom.init(allocator, &buffer),
         .matrix => matrix = try Matrix.init(allocator, &buffer, config.cmatrix_fg),
+        .colormix => color_mix = ColorMix.init(&buffer, config.colormix_col1, config.colormix_col2, config.colormix_col3),
     }
     defer {
         switch (config.animation) {
             .none => {},
             .doom => doom.deinit(),
             .matrix => matrix.deinit(),
+            .colormix => {},
         }
     }
 
@@ -383,6 +387,7 @@ pub fn main() !void {
                     .matrix => matrix.realloc() catch {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
+                    .colormix => {},
                 }
 
                 update = true;
@@ -400,6 +405,7 @@ pub fn main() !void {
                         .none => {},
                         .doom => doom.draw(),
                         .matrix => matrix.draw(),
+                        .colormix => color_mix.draw(),
                     }
                 }
 
@@ -560,6 +566,7 @@ pub fn main() !void {
                     .none => {},
                     .doom => doom.deinit(),
                     .matrix => matrix.deinit(),
+                    .colormix => {},
                 }
             }
         } else if (config.bigclock != .none and config.clock == null) {
