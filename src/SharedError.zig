@@ -9,7 +9,7 @@ const ErrorHandler = packed struct {
 
 const SharedError = @This();
 
-data: []align(std.mem.page_size) u8,
+data: []align(std.heap.page_size_min) u8,
 
 pub fn init() !SharedError {
     const data = try std.posix.mmap(null, @sizeOf(ErrorHandler), std.posix.PROT.READ | std.posix.PROT.WRITE, .{ .TYPE = .SHARED, .ANONYMOUS = true }, -1, 0);
