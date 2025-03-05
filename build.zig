@@ -174,11 +174,11 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
 
     {
         const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/usr/bin" });
-        if (!std.mem.eql(u8, dest_directory, "")) {
-            std.fs.cwd().makePath(exe_path) catch {
+        std.fs.cwd().makePath(exe_path) catch {
+            if (!std.mem.eql(u8, dest_directory, "")) {
                 std.debug.print("warn: {s} already exists as a directory.\n", .{exe_path});
-            };
-        }
+            }
+        };
 
         var executable_dir = std.fs.cwd().openDir(exe_path, .{}) catch unreachable;
         defer executable_dir.close();
@@ -221,11 +221,12 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
 
     {
         const pam_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, "/etc/pam.d" });
-        if (!std.mem.eql(u8, dest_directory, "")) {
-            std.fs.cwd().makePath(pam_path) catch {
+
+        std.fs.cwd().makePath(pam_path) catch {
+            if (!std.mem.eql(u8, dest_directory, "")) {
                 std.debug.print("warn: {s} already exists as a directory.\n", .{pam_path});
-            };
-        }
+            }
+        };
 
         var pam_dir = std.fs.cwd().openDir(pam_path, .{}) catch unreachable;
         defer pam_dir.close();
