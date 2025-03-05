@@ -32,7 +32,7 @@ pub fn authenticate(config: Config, current_environment: Session.Environment, lo
 
     // Set the XDG environment variables
     setXdgSessionEnv(current_environment.display_server);
-    try setXdgEnv(tty_str, current_environment.xdg_session_desktop orelse "", current_environment.xdg_desktop_names orelse "");
+    try setXdgEnv(tty_str, current_environment.xdg_session_desktop, current_environment.xdg_desktop_names);
 
     // Open the PAM session
     var credentials = [_:null]?[*:0]const u8{ login, password };
@@ -188,7 +188,7 @@ fn setXdgSessionEnv(display_server: enums.DisplayServer) void {
     }, 0);
 }
 
-fn setXdgEnv(tty_str: [:0]u8, desktop_name: [:0]const u8, xdg_desktop_names: [:0]const u8) !void {
+fn setXdgEnv(tty_str: [:0]u8, maybe_desktop_name: ?[:0]const u8, maybe_xdg_desktop_names: ?[:0]const u8) !void {
     // The "/run/user/%d" directory is not available on FreeBSD. It is much
     // better to stick to the defaults and let applications using
     // XDG_RUNTIME_DIR to fall back to directories inside user's home
@@ -201,10 +201,10 @@ fn setXdgEnv(tty_str: [:0]u8, desktop_name: [:0]const u8, xdg_desktop_names: [:0
         _ = interop.stdlib.setenv("XDG_RUNTIME_DIR", uid_str, 0);
     }
 
-    _ = interop.stdlib.setenv("XDG_CURRENT_DESKTOP", xdg_desktop_names, 0);
+    if (maybe_xdg_desktop_names) |xdg_desktop_names| _ = interop.stdlib.setenv("XDG_CURRENT_DESKTOP", xdg_desktop_names, 0);
     _ = interop.stdlib.setenv("XDG_SESSION_CLASS", "user", 0);
     _ = interop.stdlib.setenv("XDG_SESSION_ID", "1", 0);
-    _ = interop.stdlib.setenv("XDG_SESSION_DESKTOP", desktop_name, 0);
+    if (maybe_desktop_name) |desktop_name| _ = interop.stdlib.setenv("XDG_SESSION_DESKTOP", desktop_name, 0);
     _ = interop.stdlib.setenv("XDG_SEAT", "seat0", 0);
     _ = interop.stdlib.setenv("XDG_VTNR", tty_str, 0);
 }
