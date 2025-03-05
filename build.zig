@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 
 const PatchMap = std.StringHashMap([]const u8);
 
-const min_zig_string = "0.12.0";
+const min_zig_string = "0.14.0";
 const current_zig = builtin.zig_version;
 
 // Implementing zig version detection through compile time
@@ -22,8 +22,6 @@ var prefix_directory: []const u8 = undefined;
 var executable_name: []const u8 = undefined;
 var default_tty_str: []const u8 = undefined;
 
-const ProgressNode = if (current_zig.minor == 12) *std.Progress.Node else std.Progress.Node;
-
 pub fn build(b: *std.Build) !void {
     dest_directory = b.option([]const u8, "dest_directory", "Specify a destination directory for installation") orelse "";
     config_directory = b.option([]const u8, "config_directory", "Specify a default config directory (default is /etc). This path gets embedded into the binary") orelse "/etc";
@@ -31,7 +29,6 @@ pub fn build(b: *std.Build) !void {
     executable_name = b.option([]const u8, "name", "Specify installed executable file name (default is ly)") orelse "ly";
 
     const bin_directory = try b.allocator.dupe(u8, config_directory);
-    config_directory = try std.fs.path.join(b.allocator, &[_][]const u8{ dest_directory, config_directory });
 
     const build_options = b.addOptions();
     const version_str = try getVersionStr(b, "ly", ly_version);
@@ -123,7 +120,7 @@ pub fn build(b: *std.Build) !void {
 
 pub fn ExeInstaller(install_conf: bool) type {
     return struct {
-        pub fn make(step: *std.Build.Step, _: ProgressNode) !void {
+        pub fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
             try install_ly(step.owner.allocator, install_conf);
         }
     };
@@ -139,7 +136,7 @@ const InitSystem = enum {
 
 pub fn ServiceInstaller(comptime init_system: InitSystem) type {
     return struct {
-        pub fn make(step: *std.Build.Step, _: ProgressNode) !void {
+        pub fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
             const allocator = step.owner.allocator;
 
             var patch_map = PatchMap.init(allocator);
@@ -222,22 +219,22 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
 }
 
 fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
-    const ly_config_directory = try std.fs.path.join(allocator, &[_][]const u8{ config_directory, "/ly" });
+    const ly_config_directory = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/ly" });
 
     std.fs.cwd().makePath(ly_config_directory) catch {
         std.debug.print("warn: {s} already exists as a directory.\n", .{ly_config_directory});
     };
 
-    const ly_lang_path = try std.fs.path.join(allocator, &[_][]const u8{ config_directory, "/ly/lang" });
+    const ly_lang_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/ly/lang" });
     std.fs.cwd().makePath(ly_lang_path) catch {
-        std.debug.print("warn: {s} already exists as a directory.\n", .{config_directory});
+        std.debug.print("warn: {s} already exists as a directory.\n", .{ ly_lang_path });
     };
 
     {
         const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, prefix_directory, "/bin" });
         if (!std.mem.eql(u8, dest_directory, "")) {
             std.fs.cwd().makePath(exe_path) catch {
-                std.debug.print("warn: {s} already exists as a directory.\n", .{exe_path});
+                std.debug.print("warn: {s} already exists as a directory.\n", .{ exe_path });
             };
         }
 
@@ -311,7 +308,7 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
     }
 }
 
-pub fn uninstallall(step: *std.Build.Step, _: ProgressNode) !void {
+pub fn uninstallall(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
     const allocator = step.owner.allocator;
 
     try deleteTree(allocator, config_directory, "/ly", "ly config directory not found");

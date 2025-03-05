@@ -110,7 +110,10 @@ pub fn crawl(self: *Session, path: []const u8, display_server: DisplayServer) !v
         const entry_path = try std.fmt.allocPrint(self.label.allocator, "{s}/{s}", .{ path, item.name });
         defer self.label.allocator.free(entry_path);
         var entry_ini = Ini(Entry).init(self.label.allocator);
-        _ = try entry_ini.readFileToStruct(entry_path, "#", null);
+        _ = try entry_ini.readFileToStruct(entry_path, .{
+            .fieldHandler = null,
+            .comment_characters = "#",
+        });
         errdefer entry_ini.deinit();
 
         var xdg_session_desktop: []const u8 = undefined;

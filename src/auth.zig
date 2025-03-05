@@ -108,7 +108,7 @@ pub fn authenticate(config: Config, current_environment: Session.Environment, lo
             .mask = std.posix.empty_sigset,
             .flags = 0,
         };
-        try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
+        std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
         try addUtmpEntry(&entry, pwd.pw_name.?, child_pid);
     }
@@ -439,7 +439,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, config: Config, de
         .mask = std.posix.empty_sigset,
         .flags = 0,
     };
-    try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
+    std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     _ = std.posix.waitpid(xorg_pid, 0);
     interop.xcb.xcb_disconnect(xcb);

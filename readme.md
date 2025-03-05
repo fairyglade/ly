@@ -1,12 +1,14 @@
-
 # Ly - a TUI display manager
+
+## Development is now continuing on [Codeberg](https://codeberg.org/AnErrupTion/ly), with the [GitHub](https://github.com/fairyglade/ly) repository becoming a mirror. Issues & pull requests on GitHub will be ignored from now on.
+
 ![Ly screenshot](.github/screenshot.png "Ly screenshot")
 
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 ## Dependencies
 - Compile-time:
-  - zig >=0.12.0
+  - zig 0.14.0
   - libc
   - pam
   - xcb (optional, required by default; needed for X11 support)
@@ -252,4 +254,3 @@ disable the main box borders with `hide_borders = true`.
 ## Additional Information
 The name "Ly" is a tribute to the fairy from the game Rayman.
 Ly was tested by oxodao, who is some seriously awesome dude.
-
