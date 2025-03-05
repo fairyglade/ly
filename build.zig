@@ -227,14 +227,14 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
 
     const ly_lang_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/ly/lang" });
     std.fs.cwd().makePath(ly_lang_path) catch {
-        std.debug.print("warn: {s} already exists as a directory.\n", .{ ly_lang_path });
+        std.debug.print("warn: {s} already exists as a directory.\n", .{ly_lang_path});
     };
 
     {
         const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, prefix_directory, "/bin" });
         if (!std.mem.eql(u8, dest_directory, "")) {
             std.fs.cwd().makePath(exe_path) catch {
-                std.debug.print("warn: {s} already exists as a directory.\n", .{ exe_path });
+                std.debug.print("warn: {s} already exists as a directory.\n", .{exe_path});
             };
         }
 
