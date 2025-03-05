@@ -8,7 +8,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
 ## Dependencies
 - Compile-time:
-  - zig >=0.12.0
+  - zig 0.14.0
   - libc
   - pam
   - xcb (optional, required by default; needed for X11 support)
@@ -254,4 +254,3 @@ disable the main box borders with `hide_borders = true`.
 ## Additional Information
 The name "Ly" is a tribute to the fairy from the game Rayman.
 Ly was tested by oxodao, who is some seriously awesome dude.
-
