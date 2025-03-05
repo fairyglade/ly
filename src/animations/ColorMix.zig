@@ -1,9 +1,10 @@
-const math = @import("std").math;
+const std = @import("std");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const utils = @import("../tui/utils.zig");
 
 const ColorMix = @This();
 
+const math = std.math;
 const Vec2 = @Vector(2, f32);
 
 const time_scale: f32 = 0.01;
@@ -48,9 +49,14 @@ pub fn draw(self: *ColorMix) void {
 
     for (0..self.terminal_buffer.width) |x| {
         for (0..self.terminal_buffer.height) |y| {
+            const xi: i32 = @intCast(x);
+            const yi: i32 = @intCast(y);
+            const wi: i32 = @intCast(self.terminal_buffer.width);
+            const hi: i32 = @intCast(self.terminal_buffer.height);
+
             var uv: Vec2 = .{
-                @as(f32, @floatFromInt(@as(i32, @intCast(x)) * 2 - @as(i32, @intCast(self.terminal_buffer.width)))) / @as(f32, @floatFromInt(self.terminal_buffer.height * 2)),
-                @as(f32, @floatFromInt(@as(i32, @intCast(y)) * 2 - @as(i32, @intCast(self.terminal_buffer.height)))) / @as(f32, @floatFromInt(self.terminal_buffer.height)),
+                @as(f32, @floatFromInt(xi * 2 - wi)) / @as(f32, @floatFromInt(self.terminal_buffer.height * 2)),
+                @as(f32, @floatFromInt(yi * 2 - hi)) / @as(f32, @floatFromInt(self.terminal_buffer.height)),
             };
 
             var uv2: Vec2 = @splat(uv[0] + uv[1]);
