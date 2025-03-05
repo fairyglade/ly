@@ -8,6 +8,7 @@ const Bigclock = enums.Bigclock;
 
 animation: Animation = .none,
 animation_timeout_sec: u12 = 0,
+animation_refresh_ms: u16 = 16,
 asterisk: ?u8 = '*',
 auth_fails: u64 = 10,
 bg: u16 = 0,

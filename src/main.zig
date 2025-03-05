@@ -317,6 +317,11 @@ pub fn main() !void {
         }
     }
 
+    var animation_timer = switch (config.animation) {
+        .none => undefined,
+        else => try std.time.Timer.start(),
+    };
+
     const animate = config.animation != .none;
     const shutdown_key = try std.fmt.parseInt(u8, config.shutdown_key[1..], 10);
     const shutdown_len = try utils.strWidth(lang.shutdown);
@@ -380,8 +385,22 @@ pub fn main() !void {
                 if (!animation_timed_out) {
                     switch (config.animation) {
                         .none => {},
-                        .doom => doom.draw(),
-                        .matrix => matrix.draw(),
+                        .doom => {
+                            if (animation_timer.read() / std.time.ns_per_ms > config.animation_refresh_ms) {
+                                animation_timer.reset();
+                                doom.drawWithUpdate();
+                            } else {
+                                doom.draw();
+                            }
+                        },
+                        .matrix => {
+                            if (animation_timer.read() / std.time.ns_per_ms > config.animation_refresh_ms) {
+                                animation_timer.reset();
+                                matrix.drawWithUpdate();
+                            } else {
+                                matrix.draw();
+                            }
+                        },
                     }
                 }
 
@@ -685,7 +704,7 @@ pub fn main() !void {
                     const password_text = try allocator.dupeZ(u8, password.text.items);
                     defer allocator.free(password_text);
 
-                    // Give up control on the TTY
+                    // Give up TTY
                     _ = termbox.tb_shutdown();
 
                     session_pid = try std.posix.fork();
@@ -702,9 +721,12 @@ pub fn main() !void {
                     session_pid = -1;
                 }
 
-                // Take back control of the TTY
+                // Take back TTY
                 _ = termbox.tb_init();
                 _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_NORMAL);
+
+                // Reinitialise buffer to avoid use after free
+                buffer = TerminalBuffer.init(config, labels_max_length, random);
 
                 const auth_err = shared_err.readError();
                 if (auth_err) |err| {
