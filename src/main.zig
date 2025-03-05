@@ -127,7 +127,10 @@ pub fn main() !void {
         const config_path = try std.fmt.allocPrint(allocator, "{s}{s}config.ini", .{ s, trailing_slash });
         defer allocator.free(config_path);
 
-        config = config_ini.readFileToStruct(config_path, comment_characters, migrator.configFieldHandler) catch _config: {
+        config = config_ini.readFileToStruct(config_path, .{
+            .fieldHandler = migrator.configFieldHandler,
+            .comment_characters = comment_characters,
+        }) catch _config: {
             config_load_failed = true;
             break :_config Config{};
         };
@@ -135,21 +138,30 @@ pub fn main() !void {
         const lang_path = try std.fmt.allocPrint(allocator, "{s}{s}lang/{s}.ini", .{ s, trailing_slash, config.lang });
         defer allocator.free(lang_path);
 
-        lang = lang_ini.readFileToStruct(lang_path, comment_characters, null) catch Lang{};
+        lang = lang_ini.readFileToStruct(lang_path, .{
+            .fieldHandler = null,
+            .comment_characters = comment_characters,
+        }) catch Lang{};
 
         if (config.load) {
             save_path = try std.fmt.allocPrint(allocator, "{s}{s}save.ini", .{ s, trailing_slash });
             save_path_alloc = true;
 
             var user_buf: [32]u8 = undefined;
-            save = save_ini.readFileToStruct(save_path, comment_characters, null) catch migrator.tryMigrateSaveFile(&user_buf);
+            save = save_ini.readFileToStruct(save_path, .{
+                .fieldHandler = null,
+                .comment_characters = comment_characters,
+            }) catch migrator.tryMigrateSaveFile(&user_buf);
         }
 
         migrator.lateConfigFieldHandler(&config.animation);
     } else {
         const config_path = build_options.config_directory ++ "/ly/config.ini";
 
-        config = config_ini.readFileToStruct(config_path, comment_characters, migrator.configFieldHandler) catch _config: {
+        config = config_ini.readFileToStruct(config_path, .{
+            .fieldHandler = migrator.configFieldHandler,
+            .comment_characters = comment_characters,
+        }) catch _config: {
             config_load_failed = true;
             break :_config Config{};
         };
@@ -157,11 +169,17 @@ pub fn main() !void {
         const lang_path = try std.fmt.allocPrint(allocator, "{s}/ly/lang/{s}.ini", .{ build_options.config_directory, config.lang });
         defer allocator.free(lang_path);
 
-        lang = lang_ini.readFileToStruct(lang_path, comment_characters, null) catch Lang{};
+        lang = lang_ini.readFileToStruct(lang_path, .{
+            .fieldHandler = null,
+            .comment_characters = comment_characters,
+        }) catch Lang{};
 
         if (config.load) {
             var user_buf: [32]u8 = undefined;
-            save = save_ini.readFileToStruct(save_path, comment_characters, null) catch migrator.tryMigrateSaveFile(&user_buf);
+            save = save_ini.readFileToStruct(save_path, .{
+                .fieldHandler = null,
+                .comment_characters = comment_characters,
+            }) catch migrator.tryMigrateSaveFile(&user_buf);
         }
 
         migrator.lateConfigFieldHandler(&config.animation);
@@ -191,7 +209,7 @@ pub fn main() !void {
         .mask = std.posix.empty_sigset,
         .flags = 0,
     };
-    try std.posix.sigaction(std.posix.SIG.TERM, &act, null);
+    std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_NORMAL);
     _ = termbox.tb_clear();
@@ -670,7 +688,7 @@ pub fn main() !void {
                         .user = login.text.items,
                         .session_index = session.label.current,
                     };
-                    ini.writeFromStruct(save_data, file.writer(), null, true, .{}) catch break :save_last_settings;
+                    ini.writeFromStruct(save_data, file.writer(), null, .{}) catch break :save_last_settings;
 
                     // Delete previous save file if it exists
                     if (migrator.maybe_save_file) |path| std.fs.cwd().deleteFile(path) catch {};
