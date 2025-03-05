@@ -183,11 +183,11 @@ fn setXdgEnv(tty_str: [:0]u8, desktop_name: [:0]const u8, xdg_desktop_names: [:0
     var uid_buffer: [10 + @sizeOf(u32) + 1]u8 = undefined;
     const uid_str = try std.fmt.bufPrintZ(&uid_buffer, "/run/user/{d}", .{uid});
 
-    _ = interop.setenv("XDG_CURRENT_DESKTOP", xdg_desktop_names.ptr, 0);
+    if (!std.mem.eql(u8, xdg_desktop_names, "")) _ = interop.setenv("XDG_CURRENT_DESKTOP", xdg_desktop_names.ptr, 0);
     _ = interop.setenv("XDG_RUNTIME_DIR", uid_str.ptr, 0);
     _ = interop.setenv("XDG_SESSION_CLASS", "user", 0);
     _ = interop.setenv("XDG_SESSION_ID", "1", 0);
-    _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name.ptr, 0);
+    if (!std.mem.eql(u8, desktop_name, "")) _ = interop.setenv("XDG_SESSION_DESKTOP", desktop_name.ptr, 0);
     _ = interop.setenv("XDG_SEAT", "seat0", 0);
     _ = interop.setenv("XDG_VTNR", tty_str.ptr, 0);
 }
