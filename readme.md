@@ -1,5 +1,7 @@
-
 # Ly - a TUI display manager
+
+## Development is now continuing on [Codeberg](https://codeberg.org/AnErrupTion/ly), with the [GitHub](https://github.com/fairyglade/ly) repository becoming a mirror. Issues & pull requests on GitHub will be ignored from now on.
+
 ![Ly screenshot](.github/screenshot.png "Ly screenshot")
 
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
