@@ -34,7 +34,7 @@ body:
     validations:
       required: true
   - type: textarea
-    id: expected
+    id: desktop
     attributes:
       label: Desktop environment/Window manager
       description: Which DE or WM did you use when observing the problem?
