@@ -6,6 +6,7 @@ const Input = enums.Input;
 const ViMode = enums.ViMode;
 const Bigclock = enums.Bigclock;
 
+allow_empty_password: bool = true,
 animation: Animation = .none,
 animation_timeout_sec: u12 = 0,
 asterisk: ?u32 = '*',

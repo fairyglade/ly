@@ -686,7 +686,17 @@ pub fn main() !void {
 
                 update = true;
             },
-            termbox.TB_KEY_ENTER => {
+            termbox.TB_KEY_ENTER => authenticate: {
+                if (!config.allow_empty_password and password.text.items.len == 0) {
+                    try info_line.addMessage(lang.err_empty_password, config.error_bg, config.error_fg);
+                    InfoLine.clearRendered(allocator, buffer) catch {
+                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                    };
+                    info_line.label.draw();
+                    _ = termbox.tb_present();
+                    break :authenticate;
+                }
+
                 try info_line.addMessage(lang.authenticating, config.bg, config.fg);
                 InfoLine.clearRendered(allocator, buffer) catch {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
