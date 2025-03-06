@@ -337,7 +337,7 @@ pub fn main() !void {
 
     switch (config.animation) {
         .none => {},
-        .doom => doom = try Doom.init(allocator, &buffer),
+        .doom => doom = try Doom.init(allocator, &buffer, config.doom_top_color, config.doom_middle_color, config.doom_bottom_color),
         .matrix => matrix = try Matrix.init(allocator, &buffer, config.cmatrix_fg, config.cmatrix_min_codepoint, config.cmatrix_max_codepoint),
         .colormix => color_mix = ColorMix.init(&buffer, config.colormix_col1, config.colormix_col2, config.colormix_col3),
     }

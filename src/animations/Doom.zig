@@ -5,28 +5,14 @@ const utils = @import("../tui/utils.zig");
 
 const Doom = @This();
 
-pub const STEPS = 13;
-pub const FIRE = [_]utils.Cell{
-    utils.initCell(' ', 9, 0),
-    utils.initCell(0x2591, 0x00FF0000, 0), // Red
-    utils.initCell(0x2592, 0x00FF0000, 0), // Red
-    utils.initCell(0x2593, 0x00FF0000, 0), // Red
-    utils.initCell(0x2588, 0x00FF0000, 0), // Red
-    utils.initCell(0x2591, 0x00FFFF00, 2), // Yellow
-    utils.initCell(0x2592, 0x00FFFF00, 2), // Yellow
-    utils.initCell(0x2593, 0x00FFFF00, 2), // Yellow
-    utils.initCell(0x2588, 0x00FFFF00, 2), // Yellow
-    utils.initCell(0x2591, 0x00FFFFFF, 4), // White
-    utils.initCell(0x2592, 0x00FFFFFF, 4), // White
-    utils.initCell(0x2593, 0x00FFFFFF, 4), // White
-    utils.initCell(0x2588, 0x00FFFFFF, 4), // White
-};
+pub const STEPS = 12;
 
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
 buffer: []u8,
+fire: [STEPS + 1]utils.Cell,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer) !Doom {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u32, middle_color: u32, bottom_color: u32) !Doom {
     const buffer = try allocator.alloc(u8, terminal_buffer.width * terminal_buffer.height);
     initBuffer(buffer, terminal_buffer.width);
 
@@ -34,6 +20,21 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer) !Doom {
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
         .buffer = buffer,
+        .fire = [_]utils.Cell{
+            utils.initCell(' ', 0x00000000, 0),
+            utils.initCell(0x2591, top_color, 0),
+            utils.initCell(0x2592, top_color, 0),
+            utils.initCell(0x2593, top_color, 0),
+            utils.initCell(0x2588, top_color, 0),
+            utils.initCell(0x2591, middle_color, 2),
+            utils.initCell(0x2592, middle_color, 2),
+            utils.initCell(0x2593, middle_color, 2),
+            utils.initCell(0x2588, middle_color, 2),
+            utils.initCell(0x2591, bottom_color, 4),
+            utils.initCell(0x2592, bottom_color, 4),
+            utils.initCell(0x2593, bottom_color, 4),
+            utils.initCell(0x2588, bottom_color, 4),
+        },
     };
 }
 
@@ -62,16 +63,16 @@ pub fn draw(self: Doom) void {
             if (buffer_source < buffer_dest_offset) continue;
 
             var buffer_dest = buffer_source - buffer_dest_offset;
-            if (buffer_dest > 12) buffer_dest = 0;
+            if (buffer_dest > STEPS) buffer_dest = 0;
             self.buffer[dest] = @intCast(buffer_dest);
 
             const dest_y = dest / self.terminal_buffer.width;
             const dest_x = dest % self.terminal_buffer.width;
-            utils.putCell(dest_x, dest_y, FIRE[buffer_dest]);
+            utils.putCell(dest_x, dest_y, self.fire[buffer_dest]);
 
             const source_y = source / self.terminal_buffer.width;
             const source_x = source % self.terminal_buffer.width;
-            utils.putCell(source_x, source_y, FIRE[buffer_source]);
+            utils.putCell(source_x, source_y, self.fire[buffer_source]);
         }
     }
 }
@@ -82,5 +83,5 @@ fn initBuffer(buffer: []u8, width: usize) void {
     const slice_end = buffer[length..];
 
     @memset(slice_start, 0);
-    @memset(slice_end, STEPS - 1);
+    @memset(slice_end, STEPS);
 }
