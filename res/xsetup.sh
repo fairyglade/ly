@@ -83,6 +83,10 @@ if [ -d "$xsessionddir" ]; then
     done
 fi
 
+if [ -f "$USERXSESSION" ]; then
+    . "$USERXSESSION"
+fi
+
 if [ -d /etc/X11/Xresources ]; then
   for i in /etc/X11/Xresources/*; do
     [ -f $i ] && xrdb -merge $i
@@ -92,10 +96,6 @@ elif [ -f /etc/X11/Xresources ]; then
 fi
 [ -f $HOME/.Xresources ] && xrdb -merge $HOME/.Xresources
 [ -f $XDG_CONFIG_HOME/X11/Xresources ] && xrdb -merge $XDG_CONFIG_HOME/X11/Xresources
-
-if [ -f "$USERXSESSION" ]; then
-  . "$USERXSESSION"
-fi
 
 if [ -z "$*" ]; then
     exec xmessage -center -buttons OK:0 -default OK "Sorry, $DESKTOP_SESSION is no valid session."
