@@ -33,7 +33,7 @@ body:
       description: What did you expect to happen instead?
     validations:
       required: true
-  - type: textarea
+  - type: input
     id: desktop
     attributes:
       label: Desktop environment/Window manager
