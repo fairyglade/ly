@@ -15,7 +15,7 @@ body:
     id: version
     attributes:
       label: Ly version
-      description: The output of `ly --version`
+      description: The output of `ly --version`. Please note that only Ly v1.0.0 and above are supported.
       placeholder: 1.1.0-dev.12+2b0301c
     validations:
       required: true
@@ -31,6 +31,13 @@ body:
     attributes:
       label: Expected behavior
       description: What did you expect to happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Desktop environment/Window manager
+      description: Which DE or WM did you use when observing the problem?
     validations:
       required: true
   - type: textarea
@@ -50,5 +57,12 @@ body:
     id: logs
     attributes:
       label: Relevant logs
-      description: Please copy and paste any relevant logs, error messages or any other output. This will be automatically formatted into code, so no need for backticks. Screenshots are accepted if they make life easier for you.
+      description: |
+        Please copy and paste any relevant logs, error messages or any other output. This will be automatically formatted into code, so no need for backticks. Screenshots are accepted if they make life easier for you.
+        If you're using the latest code on master (for v1.1.0), including your session log (found at /var/log/ly-session.log unless modified) is a good idea. (But make sure it's relevant!)
       render: shell
+  - type: textarea
+    id: moreinfo
+    attributes:
+      label: Additional information
+      description: If you have any additional information that might be helpful in reproducing the problem, please provide it here.
