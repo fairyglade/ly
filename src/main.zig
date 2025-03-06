@@ -63,11 +63,10 @@ pub fn main() !void {
         }
     }
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}).init;
     defer _ = gpa.deinit();
 
-    // to be able to stop the animation after some time
-
+    // Allows stopping an animation after some time
     var tv_zero: interop.system_time.timeval = undefined;
     _ = interop.system_time.gettimeofday(&tv_zero, null);
     var animation_timed_out: bool = false;
@@ -227,7 +226,15 @@ pub fn main() !void {
     var prng = std.Random.DefaultPrng.init(seed);
     const random = prng.random();
 
-    var buffer = TerminalBuffer.init(config, labels_max_length, random);
+    const buffer_options = TerminalBuffer.InitOptions{
+        .fg = config.fg,
+        .bg = config.bg,
+        .border_fg = config.border_fg,
+        .margin_box_h = config.margin_box_h,
+        .margin_box_v = config.margin_box_v,
+        .input_len = config.input_len,
+    };
+    var buffer = TerminalBuffer.init(buffer_options, labels_max_length, random);
 
     // Initialize components
     var info_line = InfoLine.init(allocator, &buffer);
@@ -716,7 +723,18 @@ pub fn main() !void {
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
                         const current_environment = session.label.list.items[session.label.current];
-                        auth.authenticate(config, current_environment, login_text, password_text) catch |err| {
+                        const auth_options = auth.AuthOptions{
+                            .tty = config.tty,
+                            .service_name = config.service_name,
+                            .path = config.path,
+                            .session_log = config.session_log,
+                            .xauth_cmd = config.xauth_cmd,
+                            .setup_cmd = config.setup_cmd,
+                            .login_cmd = config.login_cmd,
+                            .x_cmd = config.x_cmd,
+                        };
+
+                        auth.authenticate(auth_options, current_environment, login_text, password_text) catch |err| {
                             shared_err.writeError(err);
                             std.process.exit(1);
                         };

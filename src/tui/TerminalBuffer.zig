@@ -2,13 +2,21 @@ const std = @import("std");
 const builtin = @import("builtin");
 const interop = @import("../interop.zig");
 const utils = @import("utils.zig");
-const Config = @import("../config/Config.zig");
 
 const Random = std.Random;
 
 const termbox = interop.termbox;
 
 const TerminalBuffer = @This();
+
+pub const InitOptions = struct {
+    fg: u32,
+    bg: u32,
+    border_fg: u32,
+    margin_box_h: u8,
+    margin_box_v: u8,
+    input_len: u8,
+};
 
 random: Random,
 width: usize,
@@ -35,15 +43,15 @@ box_height: usize,
 margin_box_v: u8,
 margin_box_h: u8,
 
-pub fn init(config: Config, labels_max_length: usize, random: Random) TerminalBuffer {
+pub fn init(options: InitOptions, labels_max_length: usize, random: Random) TerminalBuffer {
     return .{
         .random = random,
         .width = @intCast(termbox.tb_width()),
         .height = @intCast(termbox.tb_height()),
         .buffer = termbox.tb_cell_buffer(),
-        .fg = config.fg,
-        .bg = config.bg,
-        .border_fg = config.border_fg,
+        .fg = options.fg,
+        .bg = options.bg,
+        .border_fg = options.border_fg,
         .box_chars = if (builtin.os.tag == .linux or builtin.os.tag.isBSD()) .{
             .left_up = 0x250C,
             .left_down = 0x2514,
@@ -66,10 +74,10 @@ pub fn init(config: Config, labels_max_length: usize, random: Random) TerminalBu
         .labels_max_length = labels_max_length,
         .box_x = 0,
         .box_y = 0,
-        .box_width = (2 * config.margin_box_h) + config.input_len + 1 + labels_max_length,
-        .box_height = 7 + (2 * config.margin_box_v),
-        .margin_box_v = config.margin_box_v,
-        .margin_box_h = config.margin_box_h,
+        .box_width = (2 * options.margin_box_h) + options.input_len + 1 + labels_max_length,
+        .box_height = 7 + (2 * options.margin_box_v),
+        .margin_box_v = options.margin_box_v,
+        .margin_box_h = options.margin_box_h,
     };
 }
 

@@ -1,5 +1,4 @@
 const std = @import("std");
-const enums = @import("../../enums.zig");
 const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 
