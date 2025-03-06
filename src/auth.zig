@@ -455,7 +455,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptio
     interop.xcb.xcb_disconnect(xcb);
 
     std.posix.kill(x_pid, 0) catch return;
-    std.posix.kill(x_pid, std.posix.SIG.TERM) catch {};
+    std.posix.kill(x_pid, std.posix.SIG.KILL) catch {};
 
     var status: c_int = 0;
     _ = std.c.waitpid(x_pid, &status, 0);
