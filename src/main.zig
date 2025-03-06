@@ -854,7 +854,7 @@ fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
         error.SetUserGidFailed => lang.err_user_gid,
         error.SetUserUidFailed => lang.err_user_uid,
         error.ChangeDirectoryFailed => lang.err_perm_dir,
-        error.TtyControlTransferFailed => "tty control transfer failed",
+        error.TtyControlTransferFailed => lang.err_tty_ctrl,
         error.SetPathFailed => lang.err_path,
         error.PamAccountExpired => lang.err_pam_acct_expired,
         error.PamAuthError => lang.err_pam_auth,
