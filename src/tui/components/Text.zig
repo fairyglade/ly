@@ -19,9 +19,9 @@ visible_length: usize,
 x: usize,
 y: usize,
 masked: bool,
-maybe_mask: ?u8,
+maybe_mask: ?u32,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, masked: bool, maybe_mask: ?u8) Text {
+pub fn init(allocator: Allocator, buffer: *TerminalBuffer, masked: bool, maybe_mask: ?u32) Text {
     const text = DynamicString.init(allocator);
 
     return .{

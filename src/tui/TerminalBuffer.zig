@@ -202,7 +202,7 @@ pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: usize, y: us
     }
 }
 
-pub fn drawCharMultiple(self: TerminalBuffer, char: u8, x: usize, y: usize, length: usize) void {
+pub fn drawCharMultiple(self: TerminalBuffer, char: u32, x: usize, y: usize, length: usize) void {
     const cell = utils.initCell(char, self.fg, self.bg);
     for (0..length) |xx| utils.putCell(x + xx, y, cell);
 }
