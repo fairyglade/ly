@@ -375,9 +375,6 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, opti
 
     const pid = try std.posix.fork();
     if (pid == 0) {
-        const log_file = try redirectStandardStreams(options.session_log, true);
-        defer log_file.close();
-
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . {s}", .{ options.xauth_cmd, display_name, magic_cookie }) catch std.process.exit(1);
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
@@ -417,7 +414,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptio
     const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s} >{s} 2>&1", .{ options.x_cmd, display_name, vt, options.session_log }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.x_cmd, display_name, vt }) catch std.process.exit(1);
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
@@ -440,7 +437,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptio
     xorg_pid = try std.posix.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s} >{s} 2>&1", .{ options.setup_cmd, options.login_cmd orelse "", desktop_cmd, options.session_log }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", desktop_cmd }) catch std.process.exit(1);
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
