@@ -21,7 +21,6 @@ pub const InitOptions = struct {
 random: Random,
 width: usize,
 height: usize,
-buffer: [*]termbox.tb_cell,
 fg: u32,
 bg: u32,
 border_fg: u32,
@@ -48,7 +47,6 @@ pub fn init(options: InitOptions, labels_max_length: usize, random: Random) Term
         .random = random,
         .width = @intCast(termbox.tb_width()),
         .height = @intCast(termbox.tb_height()),
-        .buffer = termbox.tb_cell_buffer(),
         .fg = options.fg,
         .bg = options.bg,
         .border_fg = options.border_fg,
@@ -87,8 +85,11 @@ pub fn cascade(self: TerminalBuffer) bool {
 
     while (y > 0) : (y -= 1) {
         for (0..self.width) |x| {
-            const cell = self.buffer[(y - 1) * self.width + x];
-            const cell_under = self.buffer[y * self.width + x];
+            var cell: termbox.tb_cell = undefined;
+            var cell_under: termbox.tb_cell = undefined;
+
+            _ = termbox.tb_get_cell(@intCast(x), @intCast(y - 1), 1, &cell);
+            _ = termbox.tb_get_cell(@intCast(x), @intCast(y), 1, &cell_under);
 
             const char: u8 = @truncate(cell.ch);
             if (std.ascii.isWhitespace(char)) continue;

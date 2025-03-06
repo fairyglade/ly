@@ -378,7 +378,7 @@ pub fn main() !void {
         if (!update or config.animation != .none) {
             if (!update) std.time.sleep(std.time.ns_per_ms * 100);
 
-            _ = termbox.tb_present(); // Required to update tb_width(), tb_height() and tb_cell_buffer()
+            _ = termbox.tb_present(); // Required to update tb_width() and tb_height()
 
             const width: usize = @intCast(termbox.tb_width());
             const height: usize = @intCast(termbox.tb_height());
@@ -388,7 +388,6 @@ pub fn main() !void {
 
                 buffer.width = width;
                 buffer.height = height;
-                buffer.buffer = termbox.tb_cell_buffer();
 
                 switch (config.animation) {
                     .none => {},
