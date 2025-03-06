@@ -26,7 +26,7 @@ const unistd = interop.unistd;
 const temporary_allocator = std.heap.page_allocator;
 
 var session_pid: std.posix.pid_t = -1;
-pub fn signalHandler(i: c_int) callconv(.C) void {
+fn signalHandler(i: c_int) callconv(.C) void {
     if (session_pid == 0) return;
 
     // Forward signal to session to clean up
@@ -38,6 +38,10 @@ pub fn signalHandler(i: c_int) callconv(.C) void {
 
     _ = termbox.tb_shutdown();
     std.c.exit(i);
+}
+
+fn ttyControlTransferSignalHandler(_: c_int) callconv(.C) void {
+    _ = termbox.tb_shutdown();
 }
 
 pub fn main() !void {
@@ -718,7 +722,7 @@ pub fn main() !void {
                     defer allocator.free(password_text);
 
                     // Give up control on the TTY
-                    _ = termbox.tb_shutdown();
+                    // _ = termbox.tb_shutdown();
 
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
@@ -732,7 +736,16 @@ pub fn main() !void {
                             .setup_cmd = config.setup_cmd,
                             .login_cmd = config.login_cmd,
                             .x_cmd = config.x_cmd,
+                            .session_pid = session_pid,
                         };
+
+                        // Signal action to give up control on the TTY
+                        const tty_control_transfer_act = std.posix.Sigaction{
+                            .handler = .{ .handler = &ttyControlTransferSignalHandler },
+                            .mask = std.posix.empty_sigset,
+                            .flags = 0,
+                        };
+                        std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);
 
                         auth.authenticate(auth_options, current_environment, login_text, password_text) catch |err| {
                             shared_err.writeError(err);
@@ -830,6 +843,7 @@ fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
         error.SetUserGidFailed => lang.err_user_gid,
         error.SetUserUidFailed => lang.err_user_uid,
         error.ChangeDirectoryFailed => lang.err_perm_dir,
+        error.TtyControlTransferFailed => "tty control transfer failed",
         error.SetPathFailed => lang.err_path,
         error.PamAccountExpired => lang.err_pam_acct_expired,
         error.PamAuthError => lang.err_pam_auth,

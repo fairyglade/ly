@@ -20,6 +20,7 @@ pub const AuthOptions = struct {
     setup_cmd: []const u8,
     login_cmd: ?[]const u8,
     x_cmd: []const u8,
+    session_pid: std.posix.pid_t,
 };
 
 var xorg_pid: std.posix.pid_t = 0;
@@ -163,6 +164,9 @@ fn startSession(
 
     // Change to the user's home directory
     std.posix.chdirZ(pwd.pw_dir.?) catch return error.ChangeDirectoryFailed;
+
+    // Signal to the session process to give up control on the TTY
+    _ = std.posix.kill(options.session_pid, std.posix.SIG.CHLD) catch return error.TtyControlTransferFailed;
 
     // Execute what the user requested
     switch (current_environment.display_server) {
