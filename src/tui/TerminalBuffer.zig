@@ -14,9 +14,9 @@ random: Random,
 width: usize,
 height: usize,
 buffer: [*]termbox.tb_cell,
-fg: u16,
-bg: u16,
-border_fg: u16,
+fg: u32,
+bg: u32,
+border_fg: u32,
 box_chars: struct {
     left_up: u32,
     left_down: u32,
@@ -170,7 +170,7 @@ pub fn drawLabel(self: TerminalBuffer, text: []const u8, x: usize, y: usize) voi
     drawColorLabel(text, x, y, self.fg, self.bg);
 }
 
-pub fn drawColorLabel(text: []const u8, x: usize, y: usize, fg: u16, bg: u16) void {
+pub fn drawColorLabel(text: []const u8, x: usize, y: usize, fg: u32, bg: u32) void {
     const yc: c_int = @intCast(y);
     const utf8view = std.unicode.Utf8View.init(text) catch return;
     var utf8 = utf8view.iterator();

@@ -20,7 +20,7 @@ pattern_cos_mod: f32,
 pattern_sin_mod: f32,
 palette: [palette_len]utils.Cell,
 
-pub fn init(terminal_buffer: *TerminalBuffer, col1: u16, col2: u16, col3: u16) ColorMix {
+pub fn init(terminal_buffer: *TerminalBuffer, col1: u32, col2: u32, col3: u32) ColorMix {
     return .{
         .terminal_buffer = terminal_buffer,
         .frames = 0,

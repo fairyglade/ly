@@ -2,17 +2,17 @@ const std = @import("std");
 const interop = @import("interop.zig");
 const utils = @import("tui/utils.zig");
 const enums = @import("enums.zig");
-const Lang  = @import("bigclock/Lang.zig");
-const en    = @import("bigclock/en.zig");
-const fa    = @import("bigclock/fa.zig");
+const Lang = @import("bigclock/Lang.zig");
+const en = @import("bigclock/en.zig");
+const fa = @import("bigclock/fa.zig");
 
-const termbox    = interop.termbox;
-const Bigclock   = enums.Bigclock;
-pub const WIDTH  = Lang.WIDTH;
+const termbox = interop.termbox;
+const Bigclock = enums.Bigclock;
+pub const WIDTH = Lang.WIDTH;
 pub const HEIGHT = Lang.HEIGHT;
-pub const SIZE   = Lang.SIZE;
+pub const SIZE = Lang.SIZE;
 
-pub fn clockCell(animate: bool, char: u8, fg: u16, bg: u16, bigclock: Bigclock) [SIZE]utils.Cell {
+pub fn clockCell(animate: bool, char: u8, fg: u32, bg: u32, bigclock: Bigclock) [SIZE]utils.Cell {
     var cells: [SIZE]utils.Cell = undefined;
 
     var tv: interop.system_time.timeval = undefined;
@@ -37,9 +37,9 @@ pub fn alphaBlit(x: usize, y: usize, tb_width: usize, tb_height: usize, cells: [
 
 fn toBigNumber(char: u8, bigclock: Bigclock) []const u21 {
     const locale_chars = switch (bigclock) {
-        .fa     => fa.locale_chars,
-        .en     => en.locale_chars,
-        .none   => unreachable,
+        .fa => fa.locale_chars,
+        .en => en.locale_chars,
+        .none => unreachable,
     };
     return switch (char) {
         '0' => &locale_chars.ZERO,

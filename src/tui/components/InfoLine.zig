@@ -12,8 +12,8 @@ const InfoLine = @This();
 const Message = struct {
     width: u8,
     text: []const u8,
-    bg: u16,
-    fg: u16,
+    bg: u32,
+    fg: u32,
 };
 
 label: MessageLabel,
@@ -28,7 +28,7 @@ pub fn deinit(self: InfoLine) void {
     self.label.deinit();
 }
 
-pub fn addMessage(self: *InfoLine, text: []const u8, bg: u16, fg: u16) !void {
+pub fn addMessage(self: *InfoLine, text: []const u8, bg: u32, fg: u32) !void {
     if (text.len == 0) return;
 
     try self.label.addItem(.{

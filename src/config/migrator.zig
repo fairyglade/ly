@@ -2,8 +2,33 @@
 
 const std = @import("std");
 const ini = @import("zigini");
+const interop = @import("../interop.zig");
 const Save = @import("Save.zig");
 const enums = @import("../enums.zig");
+
+const termbox = interop.termbox;
+const color_properties = [_][]const u8{
+    "bg",
+    "border_fg",
+    "cmatrix_fg",
+    "colormix_col1",
+    "colormix_col2",
+    "colormix_col3",
+    "error_bg",
+    "error_fg",
+    "fg",
+};
+const removed_properties = [_][]const u8{
+    "wayland_specifier",
+    "max_desktop_len",
+    "max_login_len",
+    "max_password_len",
+    "mcookie_cmd",
+    "term_reset_cmd",
+    "term_restore_cursor_cmd",
+    "x_cmd_setup",
+    "wayland_cmd",
+};
 
 var temporary_allocator = std.heap.page_allocator;
 
@@ -12,7 +37,7 @@ pub var maybe_save_file: ?[]const u8 = null;
 
 pub var mapped_config_fields = false;
 
-pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniField {
+pub fn configFieldHandler(allocator: std.mem.Allocator, field: ini.IniField) ?ini.IniField {
     if (std.mem.eql(u8, field.key, "animate")) {
         // The option doesn't exist anymore, but we save its value for "animation"
         maybe_animate = std.mem.eql(u8, field.value, "true");
@@ -35,6 +60,18 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
 
         mapped_config_fields = true;
         return mapped_field;
+    }
+
+    inline for (color_properties) |property| {
+        if (std.mem.eql(u8, field.key, property)) {
+            // These options now uses a 32-bit RGB value instead of an arbitrary 16-bit integer
+            const color = std.fmt.parseInt(u16, field.value, 0) catch return field;
+            var mapped_field = field;
+
+            mapped_field.value = mapColor(allocator, color) catch return field;
+            mapped_config_fields = true;
+            return mapped_field;
+        }
     }
 
     if (std.mem.eql(u8, field.key, "blank_password")) {
@@ -70,19 +107,12 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         return null;
     }
 
-    if (std.mem.eql(u8, field.key, "wayland_specifier") or
-        std.mem.eql(u8, field.key, "max_desktop_len") or
-        std.mem.eql(u8, field.key, "max_login_len") or
-        std.mem.eql(u8, field.key, "max_password_len") or
-        std.mem.eql(u8, field.key, "mcookie_cmd") or
-        std.mem.eql(u8, field.key, "term_reset_cmd") or
-        std.mem.eql(u8, field.key, "term_restore_cursor_cmd") or
-        std.mem.eql(u8, field.key, "x_cmd_setup") or
-        std.mem.eql(u8, field.key, "wayland_cmd"))
-    {
-        // The options don't exist anymore
-        mapped_config_fields = true;
-        return null;
+    inline for (removed_properties) |property| {
+        if (std.mem.eql(u8, field.key, property)) {
+            // The options don't exist anymore
+            mapped_config_fields = true;
+            return null;
+        }
     }
 
     if (std.mem.eql(u8, field.key, "bigclock")) {
@@ -90,14 +120,14 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         // It also includes the ability to change active bigclock's language
         var mapped_field = field;
 
-        if (std.mem.eql(u8, field.value, "true")){
+        if (std.mem.eql(u8, field.value, "true")) {
             mapped_field.value = "en";
             mapped_config_fields = true;
-        }else if (std.mem.eql(u8, field.value, "false")){
+        } else if (std.mem.eql(u8, field.value, "false")) {
             mapped_field.value = "none";
             mapped_config_fields = true;
         }
-        
+
         return mapped_field;
     }
 
@@ -141,4 +171,29 @@ pub fn tryMigrateSaveFile(user_buf: *[32]u8) Save {
     }
 
     return save;
+}
+
+fn mapColor(allocator: std.mem.Allocator, color: u16) ![]const u8 {
+    const color_no_styling = color & 0x00FF;
+    const styling_only = color & 0xFF00;
+
+    var new_color: u32 = switch (color_no_styling) {
+        termbox.TB_BLACK => termbox.TB_HI_BLACK,
+        termbox.TB_RED => 0x00FF0000,
+        termbox.TB_GREEN => 0x0000FF00,
+        termbox.TB_YELLOW => 0x00FFFF00,
+        termbox.TB_BLUE => 0x000000FF,
+        termbox.TB_MAGENTA => 0x00FF00FF,
+        termbox.TB_CYAN => 0x0000FFFF,
+        termbox.TB_WHITE => 0x00FFFFFF,
+        else => termbox.TB_DEFAULT,
+    };
+
+    // Only applying styling if color isn't black and styling isn't also black
+    if (!(new_color == termbox.TB_HI_BLACK and styling_only == termbox.TB_HI_BLACK)) {
+        // Shift styling by 16 to the left to apply it to the new 32-bit color
+        new_color |= @as(u32, @intCast(styling_only)) << 16;
+    }
+
+    return try std.fmt.allocPrint(allocator, "0x{X}", .{new_color});
 }

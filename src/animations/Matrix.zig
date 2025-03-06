@@ -34,9 +34,9 @@ dots: []Dot,
 lines: []Line,
 frame: u64,
 count: u64,
-fg_ini: u16,
+fg_ini: u32,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u16) !Matrix {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u32) !Matrix {
     const dots = try allocator.alloc(Dot, terminal_buffer.width * (terminal_buffer.height + 1));
     const lines = try allocator.alloc(Line, terminal_buffer.width);
 

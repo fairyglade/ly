@@ -5,11 +5,11 @@ const termbox = interop.termbox;
 
 pub const Cell = struct {
     ch: u32,
-    fg: u16,
-    bg: u16,
+    fg: u32,
+    bg: u32,
 };
 
-pub fn initCell(ch: u32, fg: u16, bg: u16) Cell {
+pub fn initCell(ch: u32, fg: u32, bg: u32) Cell {
     return .{
         .ch = ch,
         .fg = fg,

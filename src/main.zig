@@ -212,7 +212,7 @@ pub fn main() !void {
     };
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
-    _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_NORMAL);
+    _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
     _ = termbox.tb_clear();
 
     // Needed to reset termbox after auth
@@ -729,7 +729,7 @@ pub fn main() !void {
 
                 // Take back control of the TTY
                 _ = termbox.tb_init();
-                _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_NORMAL);
+                _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
 
                 const auth_err = shared_err.readError();
                 if (auth_err) |err| {

@@ -72,6 +72,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     translate_c.defineCMacroRaw("TB_IMPL");
+    translate_c.defineCMacro("TB_OPT_ATTR_W", "32"); // Enable 24-bit color support + styling (32-bit)
     const termbox2 = translate_c.addModule("termbox2");
     exe.root_module.addImport("termbox2", termbox2);
 
