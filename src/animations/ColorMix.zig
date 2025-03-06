@@ -71,12 +71,7 @@ pub fn draw(self: *ColorMix) void {
             }
 
             const cell = self.palette[@as(usize, @intFromFloat(math.floor(length(uv) * 5.0))) % palette_len];
-            const screen_index: usize = y * self.terminal_buffer.width + x;
-            self.terminal_buffer.buffer[screen_index] = .{
-                .ch = cell.ch,
-                .fg = cell.fg,
-                .bg = cell.bg,
-            };
+            utils.putCell(x, y, cell);
         }
     }
 }
