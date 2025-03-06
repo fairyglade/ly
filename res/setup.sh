@@ -89,6 +89,10 @@ if [ "$XDG_SESSION_TYPE" = "x11" ]; then
         done
     fi
 
+    if [ -f "$USERXSESSION" ]; then
+        . "$USERXSESSION"
+    fi
+
     if [ -d "$CONFIG_DIRECTORY"/X11/Xresources ]; then
         for i in "$CONFIG_DIRECTORY"/X11/Xresources/*; do
             [ -f "$i" ] && xrdb -merge "$i"
@@ -98,10 +102,6 @@ if [ "$XDG_SESSION_TYPE" = "x11" ]; then
     fi
     [ -f "$HOME"/.Xresources ] && xrdb -merge "$HOME"/.Xresources
     [ -f "$XDG_CONFIG_HOME"/X11/Xresources ] && xrdb -merge "$XDG_CONFIG_HOME"/X11/Xresources
-
-    if [ -f "$USERXSESSION" ]; then
-        . "$USERXSESSION"
-    fi
 fi
 
 exec "$@"
