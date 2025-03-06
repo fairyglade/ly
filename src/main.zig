@@ -357,9 +357,9 @@ pub fn main() !void {
     const restart_len = try utils.strWidth(lang.restart);
     const sleep_key = try std.fmt.parseInt(u8, config.sleep_key[1..], 10);
     const sleep_len = try utils.strWidth(lang.sleep);
-    const brightness_down_key = try std.fmt.parseInt(u8, config.brightness_down_key[1..], 10);
+    const brightness_down_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
     const brightness_down_len = try utils.strWidth(lang.brightness_down);
-    const brightness_up_key = try std.fmt.parseInt(u8, config.brightness_up_key[1..], 10);
+    const brightness_up_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
     const brightness_up_len = try utils.strWidth(lang.brightness_up);
 
     var event: termbox.tb_event = undefined;
@@ -503,19 +503,23 @@ pub fn main() !void {
                         length += sleep_len + 1;
                     }
 
-                    buffer.drawLabel(config.brightness_down_key, length, 0);
-                    length += config.brightness_down_key.len + 1;
-                    buffer.drawLabel(" ", length - 1, 0);
+                    if (config.brightness_down_key) |key| {
+                        buffer.drawLabel(key, length, 0);
+                        length += key.len + 1;
+                        buffer.drawLabel(" ", length - 1, 0);
 
-                    buffer.drawLabel(lang.brightness_down, length, 0);
-                    length += brightness_down_len + 1;
+                        buffer.drawLabel(lang.brightness_down, length, 0);
+                        length += brightness_down_len + 1;
+                    }
 
-                    buffer.drawLabel(config.brightness_up_key, length, 0);
-                    length += config.brightness_up_key.len + 1;
-                    buffer.drawLabel(" ", length - 1, 0);
+                    if (config.brightness_up_key) |key| {
+                        buffer.drawLabel(key, length, 0);
+                        length += key.len + 1;
+                        buffer.drawLabel(" ", length - 1, 0);
 
-                    buffer.drawLabel(lang.brightness_up, length, 0);
-                    length += brightness_up_len + 1;
+                        buffer.drawLabel(lang.brightness_up, length, 0);
+                        length += brightness_up_len + 1;
+                    }
                 }
 
                 if (config.box_title) |title| {
@@ -627,21 +631,14 @@ pub fn main() !void {
                             }
                         }
                     }
-                } else if (pressed_key == brightness_down_key or pressed_key == brightness_up_key) {
-                    const cmd = if (pressed_key == brightness_down_key) config.brightness_down_cmd else config.brightness_up_cmd;
-
-                    var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", cmd }, allocator);
-                    brightness.stdout_behavior = .Ignore;
-                    brightness.stderr_behavior = .Ignore;
-
-                    handle_brightness_cmd: {
-                        const process_result = brightness.spawnAndWait() catch {
-                            break :handle_brightness_cmd;
-                        };
-                        if (process_result.Exited != 0) {
-                            try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
-                        }
-                    }
+                } else if (brightness_down_key != null and pressed_key == brightness_down_key.?) {
+                    adjustBrightness(allocator, config.brightness_down_cmd) catch {
+                        try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
+                    };
+                } else if (brightness_up_key != null and pressed_key == brightness_up_key.?) {
+                    adjustBrightness(allocator, config.brightness_up_cmd) catch {
+                        try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
+                    };
                 }
             },
             termbox.TB_KEY_CTRL_C => run = false,
@@ -828,6 +825,21 @@ pub fn main() !void {
                 }
                 update = true;
             },
+        }
+    }
+}
+
+fn adjustBrightness(allocator: std.mem.Allocator, cmd: []const u8) !void {
+    var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", cmd }, allocator);
+    brightness.stdout_behavior = .Ignore;
+    brightness.stderr_behavior = .Ignore;
+
+    handle_brightness_cmd: {
+        const process_result = brightness.spawnAndWait() catch {
+            break :handle_brightness_cmd;
+        };
+        if (process_result.Exited != 0) {
+            return error.BrightnessChangeFailed;
         }
     }
 }
