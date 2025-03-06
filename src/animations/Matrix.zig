@@ -7,11 +7,11 @@ const utils = @import("../tui/utils.zig");
 const interop = @import("../interop.zig");
 const termbox = interop.termbox;
 
-pub const FRAME_DELAY: u64 = 8;
+pub const FRAME_DELAY: usize = 8;
 
 // Allowed codepoints
-pub const MIN_CODEPOINT: isize = 33;
-pub const MAX_CODEPOINT: isize = 123 - MIN_CODEPOINT;
+pub const MIN_CODEPOINT: u16 = 33;
+pub const MAX_CODEPOINT: u16 = 123 - MIN_CODEPOINT;
 
 // Characters change mid-scroll
 pub const MID_SCROLL_CHANGE = true;
@@ -19,22 +19,22 @@ pub const MID_SCROLL_CHANGE = true;
 const Matrix = @This();
 
 pub const Dot = struct {
-    value: isize,
+    value: ?usize,
     is_head: bool,
 };
 
 pub const Line = struct {
-    space: isize,
-    length: isize,
-    update: isize,
+    space: usize,
+    length: usize,
+    update: usize,
 };
 
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
 dots: []Dot,
 lines: []Line,
-frame: u64,
-count: u64,
+frame: usize,
+count: usize,
 fg_ini: u32,
 
 pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u32) !Matrix {
@@ -84,12 +84,12 @@ pub fn draw(self: *Matrix) void {
             var line = &self.lines[x];
             if (self.frame <= line.update) continue;
 
-            if (self.dots[x].value == -1 and self.dots[self.terminal_buffer.width + x].value == ' ') {
+            if (self.dots[x].value == null and self.dots[self.terminal_buffer.width + x].value == ' ') {
                 if (line.space > 0) {
                     line.space -= 1;
                 } else {
-                    const randint = self.terminal_buffer.random.int(i16);
-                    const h: isize = @intCast(self.terminal_buffer.height);
+                    const randint = self.terminal_buffer.random.int(u16);
+                    const h = self.terminal_buffer.height;
                     line.length = @mod(randint, h - 3) + 3;
                     self.dots[x].value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
                     line.space = @mod(randint, h + 1);
@@ -102,7 +102,7 @@ pub fn draw(self: *Matrix) void {
             height_it: while (y <= buf_height) : (y += 1) {
                 var dot = &self.dots[buf_width * y + x];
                 // Skip over spaces
-                while (y <= buf_height and (dot.value == ' ' or dot.value == -1)) {
+                while (y <= buf_height and (dot.value == ' ' or dot.value == null)) {
                     y += 1;
                     if (y > buf_height) break :height_it;
                     dot = &self.dots[buf_width * y + x];
@@ -111,10 +111,10 @@ pub fn draw(self: *Matrix) void {
                 // Find the head of this column
                 tail = y;
                 seg_len = 0;
-                while (y <= buf_height and dot.value != ' ' and dot.value != -1) {
+                while (y <= buf_height and dot.value != ' ' and dot.value != null) {
                     dot.is_head = false;
                     if (MID_SCROLL_CHANGE) {
-                        const randint = self.terminal_buffer.random.int(i16);
+                        const randint = self.terminal_buffer.random.int(u16);
                         if (@mod(randint, 8) == 0) {
                             dot.value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
                         }
@@ -130,13 +130,13 @@ pub fn draw(self: *Matrix) void {
                     dot = &self.dots[buf_width * y + x];
                 }
 
-                const randint = self.terminal_buffer.random.int(i16);
+                const randint = self.terminal_buffer.random.int(u16);
                 dot.value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
                 dot.is_head = true;
 
                 if (seg_len > line.length or !first_col) {
                     self.dots[buf_width * tail + x].value = ' ';
-                    self.dots[x].value = -1;
+                    self.dots[x].value = null;
                 }
                 first_col = false;
             }
@@ -151,13 +151,13 @@ pub fn draw(self: *Matrix) void {
 
             var fg = self.fg_ini;
 
-            if (dot.value == -1 or dot.value == ' ') {
+            if (dot.value == null or dot.value == ' ') {
                 utils.putCell(x, y - 1, .{ .ch = ' ', .fg = fg, .bg = termbox.TB_DEFAULT });
                 continue;
             }
 
             if (dot.is_head) fg = @intCast(0x00FFFFFF | termbox.TB_BOLD); // White and bold
-            utils.putCell(x, y - 1, .{ .ch = @intCast(dot.value), .fg = fg, .bg = termbox.TB_DEFAULT });
+            utils.putCell(x, y - 1, .{ .ch = @intCast(dot.value.?), .fg = fg, .bg = termbox.TB_DEFAULT });
         }
     }
 }
@@ -167,17 +167,16 @@ fn initBuffers(dots: []Dot, lines: []Line, width: usize, height: usize, random: 
     while (y <= height) : (y += 1) {
         var x: usize = 0;
         while (x < width) : (x += 2) {
-            dots[y * width + x].value = -1;
+            dots[y * width + x].value = null;
         }
     }
 
     var x: usize = 0;
     while (x < width) : (x += 2) {
         var line = lines[x];
-        const h: isize = @intCast(height);
-        line.space = @mod(random.int(i16), h) + 1;
-        line.length = @mod(random.int(i16), h - 3) + 3;
-        line.update = @mod(random.int(i16), 3) + 1;
+        line.space = @mod(random.int(u16), height) + 1;
+        line.length = @mod(random.int(u16), height - 3) + 3;
+        line.update = @mod(random.int(u16), 3) + 1;
         lines[x] = line;
 
         dots[width + x].value = ' ';
