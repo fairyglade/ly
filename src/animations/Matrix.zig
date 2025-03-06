@@ -9,10 +9,6 @@ const termbox = interop.termbox;
 
 pub const FRAME_DELAY: usize = 8;
 
-// Allowed codepoints
-pub const MIN_CODEPOINT: u16 = 33;
-pub const MAX_CODEPOINT: u16 = 123 - MIN_CODEPOINT;
-
 // Characters change mid-scroll
 pub const MID_SCROLL_CHANGE = true;
 
@@ -36,8 +32,10 @@ lines: []Line,
 frame: usize,
 count: usize,
 fg_ini: u32,
+min_codepoint: u16,
+max_codepoint: u16,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u32) !Matrix {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u32, min_codepoint: u16, max_codepoint: u16) !Matrix {
     const dots = try allocator.alloc(Dot, terminal_buffer.width * (terminal_buffer.height + 1));
     const lines = try allocator.alloc(Line, terminal_buffer.width);
 
@@ -51,6 +49,8 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u32)
         .frame = 3,
         .count = 0,
         .fg_ini = fg_ini,
+        .min_codepoint = min_codepoint,
+        .max_codepoint = max_codepoint - min_codepoint,
     };
 }
 
@@ -91,7 +91,7 @@ pub fn draw(self: *Matrix) void {
                     const randint = self.terminal_buffer.random.int(u16);
                     const h = self.terminal_buffer.height;
                     line.length = @mod(randint, h - 3) + 3;
-                    self.dots[x].value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                    self.dots[x].value = @mod(randint, self.max_codepoint) + self.min_codepoint;
                     line.space = @mod(randint, h + 1);
                 }
             }
@@ -116,7 +116,7 @@ pub fn draw(self: *Matrix) void {
                     if (MID_SCROLL_CHANGE) {
                         const randint = self.terminal_buffer.random.int(u16);
                         if (@mod(randint, 8) == 0) {
-                            dot.value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                            dot.value = @mod(randint, self.max_codepoint) + self.min_codepoint;
                         }
                     }
 
@@ -131,7 +131,7 @@ pub fn draw(self: *Matrix) void {
                 }
 
                 const randint = self.terminal_buffer.random.int(u16);
-                dot.value = @mod(randint, MAX_CODEPOINT) + MIN_CODEPOINT;
+                dot.value = @mod(randint, self.max_codepoint) + self.min_codepoint;
                 dot.is_head = true;
 
                 if (seg_len > line.length or !first_col) {
