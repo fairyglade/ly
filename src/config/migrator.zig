@@ -37,7 +37,7 @@ pub var maybe_save_file: ?[]const u8 = null;
 
 pub var mapped_config_fields = false;
 
-pub fn configFieldHandler(allocator: std.mem.Allocator, field: ini.IniField) ?ini.IniField {
+pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniField {
     if (std.mem.eql(u8, field.key, "animate")) {
         // The option doesn't exist anymore, but we save its value for "animation"
         maybe_animate = std.mem.eql(u8, field.value, "true");
@@ -68,7 +68,7 @@ pub fn configFieldHandler(allocator: std.mem.Allocator, field: ini.IniField) ?in
             const color = std.fmt.parseInt(u16, field.value, 0) catch return field;
             var mapped_field = field;
 
-            mapped_field.value = mapColor(allocator, color) catch return field;
+            mapped_field.value = mapColor(color) catch return field;
             mapped_config_fields = true;
             return mapped_field;
         }
@@ -173,7 +173,7 @@ pub fn tryMigrateSaveFile(user_buf: *[32]u8) Save {
     return save;
 }
 
-fn mapColor(allocator: std.mem.Allocator, color: u16) ![]const u8 {
+fn mapColor(color: u16) ![]const u8 {
     const color_no_styling = color & 0x00FF;
     const styling_only = color & 0xFF00;
 
@@ -195,5 +195,6 @@ fn mapColor(allocator: std.mem.Allocator, color: u16) ![]const u8 {
         new_color |= @as(u32, @intCast(styling_only)) << 16;
     }
 
-    return try std.fmt.allocPrint(allocator, "0x{X}", .{new_color});
+    var buffer = std.mem.zeroes([10]u8);
+    return try std.fmt.bufPrint(&buffer, "0x{X}", .{new_color});
 }
