@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Random = std.Random;
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+const utils = @import("../tui/utils.zig");
 
 const interop = @import("../interop.zig");
 const termbox = interop.termbox;
@@ -151,12 +152,12 @@ pub fn draw(self: *Matrix) void {
             var fg = self.fg_ini;
 
             if (dot.value == -1 or dot.value == ' ') {
-                _ = termbox.tb_set_cell(@intCast(x), @intCast(y - 1), ' ', fg, termbox.TB_DEFAULT);
+                utils.putCell(x, y - 1, .{ .ch = ' ', .fg = fg, .bg = termbox.TB_DEFAULT });
                 continue;
             }
 
-            if (dot.is_head) fg = @intCast(termbox.TB_WHITE | termbox.TB_BOLD);
-            _ = termbox.tb_set_cell(@intCast(x), @intCast(y - 1), @intCast(dot.value), fg, termbox.TB_DEFAULT);
+            if (dot.is_head) fg = @intCast(0x00FFFFFF | termbox.TB_BOLD); // White and bold
+            utils.putCell(x, y - 1, .{ .ch = @intCast(dot.value), .fg = fg, .bg = termbox.TB_DEFAULT });
         }
     }
 }

@@ -31,6 +31,7 @@ const removed_properties = [_][]const u8{
 };
 
 var temporary_allocator = std.heap.page_allocator;
+var buffer = std.mem.zeroes([10 * color_properties.len]u8);
 
 pub var maybe_animate: ?bool = null;
 pub var maybe_save_file: ?[]const u8 = null;
@@ -177,7 +178,12 @@ fn mapColor(color: u16) ![]const u8 {
     const color_no_styling = color & 0x00FF;
     const styling_only = color & 0xFF00;
 
+    if (color_no_styling > termbox.TB_WHITE or styling_only > 0x8000) { // TB_DIM in 16-bit mode
+        return error.InvalidColor;
+    }
+
     var new_color: u32 = switch (color_no_styling) {
+        termbox.TB_DEFAULT => termbox.TB_DEFAULT,
         termbox.TB_BLACK => termbox.TB_HI_BLACK,
         termbox.TB_RED => 0x00FF0000,
         termbox.TB_GREEN => 0x0000FF00,
@@ -186,7 +192,7 @@ fn mapColor(color: u16) ![]const u8 {
         termbox.TB_MAGENTA => 0x00FF00FF,
         termbox.TB_CYAN => 0x0000FFFF,
         termbox.TB_WHITE => 0x00FFFFFF,
-        else => termbox.TB_DEFAULT,
+        else => unreachable,
     };
 
     // Only applying styling if color isn't black and styling isn't also black
@@ -195,6 +201,5 @@ fn mapColor(color: u16) ![]const u8 {
         new_color |= @as(u32, @intCast(styling_only)) << 16;
     }
 
-    var buffer = std.mem.zeroes([10]u8);
     return try std.fmt.bufPrint(&buffer, "0x{X}", .{new_color});
 }

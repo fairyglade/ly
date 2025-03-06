@@ -3,26 +3,23 @@ const Allocator = std.mem.Allocator;
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const utils = @import("../tui/utils.zig");
 
-const interop = @import("../interop.zig");
-const termbox = interop.termbox;
-
 const Doom = @This();
 
 pub const STEPS = 13;
 pub const FIRE = [_]utils.Cell{
     utils.initCell(' ', 9, 0),
-    utils.initCell(0x2591, 2, 0), // Red
-    utils.initCell(0x2592, 2, 0), // Red
-    utils.initCell(0x2593, 2, 0), // Red
-    utils.initCell(0x2588, 2, 0), // Red
-    utils.initCell(0x2591, 4, 2), // Yellow
-    utils.initCell(0x2592, 4, 2), // Yellow
-    utils.initCell(0x2593, 4, 2), // Yellow
-    utils.initCell(0x2588, 4, 2), // Yellow
-    utils.initCell(0x2591, 8, 4), // White
-    utils.initCell(0x2592, 8, 4), // White
-    utils.initCell(0x2593, 8, 4), // White
-    utils.initCell(0x2588, 8, 4), // White
+    utils.initCell(0x2591, 0x00FF0000, 0), // Red
+    utils.initCell(0x2592, 0x00FF0000, 0), // Red
+    utils.initCell(0x2593, 0x00FF0000, 0), // Red
+    utils.initCell(0x2588, 0x00FF0000, 0), // Red
+    utils.initCell(0x2591, 0x00FFFF00, 2), // Yellow
+    utils.initCell(0x2592, 0x00FFFF00, 2), // Yellow
+    utils.initCell(0x2593, 0x00FFFF00, 2), // Yellow
+    utils.initCell(0x2588, 0x00FFFF00, 2), // Yellow
+    utils.initCell(0x2591, 0x00FFFFFF, 4), // White
+    utils.initCell(0x2592, 0x00FFFFFF, 4), // White
+    utils.initCell(0x2593, 0x00FFFFFF, 4), // White
+    utils.initCell(0x2588, 0x00FFFFFF, 4), // White
 };
 
 allocator: Allocator,
@@ -68,8 +65,13 @@ pub fn draw(self: Doom) void {
             if (buffer_dest > 12) buffer_dest = 0;
             self.buffer[dest] = @intCast(buffer_dest);
 
-            self.terminal_buffer.buffer[dest] = toTermboxCell(FIRE[buffer_dest]);
-            self.terminal_buffer.buffer[source] = toTermboxCell(FIRE[buffer_source]);
+            const dest_y = dest / self.terminal_buffer.width;
+            const dest_x = dest % self.terminal_buffer.width;
+            utils.putCell(dest_x, dest_y, FIRE[buffer_dest]);
+
+            const source_y = source / self.terminal_buffer.width;
+            const source_x = source % self.terminal_buffer.width;
+            utils.putCell(source_x, source_y, FIRE[buffer_source]);
         }
     }
 }
@@ -81,12 +83,4 @@ fn initBuffer(buffer: []u8, width: usize) void {
 
     @memset(slice_start, 0);
     @memset(slice_end, STEPS - 1);
-}
-
-fn toTermboxCell(cell: utils.Cell) termbox.tb_cell {
-    return .{
-        .ch = cell.ch,
-        .fg = cell.fg,
-        .bg = cell.bg,
-    };
 }
