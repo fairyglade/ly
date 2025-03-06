@@ -36,8 +36,8 @@ body:
   - type: input
     id: desktop
     attributes:
-      label: Desktop environment/Window manager
-      description: Which DE or WM did you use when observing the problem?
+      label: OS + Desktop environment/Window manager
+      description: Which OS and DE (or WM) did you use when observing the problem?
     validations:
       required: true
   - type: textarea
