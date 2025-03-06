@@ -46,6 +46,7 @@ The following desktop environments were tested with success:
  - i3
  - kde
  - labwc
+ - leftwm
  - lxde
  - lxqt
  - mate
