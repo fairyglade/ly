@@ -2,6 +2,13 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const PatchMap = std.StringHashMap([]const u8);
+const InitSystem = enum {
+    systemd,
+    openrc,
+    runit,
+    s6,
+    dinit,
+};
 
 const min_zig_string = "0.14.0";
 const current_zig = builtin.zig_version;
@@ -20,6 +27,7 @@ var dest_directory: []const u8 = undefined;
 var config_directory: []const u8 = undefined;
 var prefix_directory: []const u8 = undefined;
 var executable_name: []const u8 = undefined;
+var init_system: InitSystem = undefined;
 var default_tty_str: []const u8 = undefined;
 
 pub fn build(b: *std.Build) !void {
@@ -27,8 +35,7 @@ pub fn build(b: *std.Build) !void {
     config_directory = b.option([]const u8, "config_directory", "Specify a default config directory (default is /etc). This path gets embedded into the binary") orelse "/etc";
     prefix_directory = b.option([]const u8, "prefix_directory", "Specify a default prefix directory (default is /usr)") orelse "/usr";
     executable_name = b.option([]const u8, "name", "Specify installed executable file name (default is ly)") orelse "ly";
-
-    const bin_directory = try b.allocator.dupe(u8, config_directory);
+    init_system = b.option(InitSystem, "init_system", "Specify the target init system (default is systemd)") orelse .systemd;
 
     const build_options = b.addOptions();
     const version_str = try getVersionStr(b, "ly", ly_version);
@@ -37,7 +44,7 @@ pub fn build(b: *std.Build) !void {
 
     default_tty_str = try std.fmt.allocPrint(b.allocator, "{d}", .{default_tty});
 
-    build_options.addOption([]const u8, "config_directory", bin_directory);
+    build_options.addOption([]const u8, "config_directory", config_directory);
     build_options.addOption([]const u8, "prefix_directory", prefix_directory);
     build_options.addOption([]const u8, "version", version_str);
     build_options.addOption(u8, "tty", default_tty);
@@ -87,55 +94,22 @@ pub fn build(b: *std.Build) !void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    const installexe_step = b.step("installexe", "Install Ly");
-    installexe_step.makeFn = ExeInstaller(true).make;
+    const installexe_step = b.step("installexe", "Install Ly and the selected init system service");
+    installexe_step.makeFn = Installer(true).make;
     installexe_step.dependOn(b.getInstallStep());
 
-    const installnoconf_step = b.step("installnoconf", "Install Ly without its configuration file");
-    installnoconf_step.makeFn = ExeInstaller(false).make;
+    const installnoconf_step = b.step("installnoconf", "Install Ly and the selected init system service, but not the configuration file");
+    installnoconf_step.makeFn = Installer(false).make;
     installnoconf_step.dependOn(b.getInstallStep());
 
-    const installsystemd_step = b.step("installsystemd", "Install the Ly systemd service");
-    installsystemd_step.makeFn = ServiceInstaller(.Systemd).make;
-    installsystemd_step.dependOn(installexe_step);
+    const uninstallexe_step = b.step("uninstallexe", "Uninstall Ly and remove the selected init system service");
+    uninstallexe_step.makeFn = Uninstaller(true).make;
 
-    const installopenrc_step = b.step("installopenrc", "Install the Ly openrc service");
-    installopenrc_step.makeFn = ServiceInstaller(.Openrc).make;
-    installopenrc_step.dependOn(installexe_step);
-
-    const installrunit_step = b.step("installrunit", "Install the Ly runit service");
-    installrunit_step.makeFn = ServiceInstaller(.Runit).make;
-    installrunit_step.dependOn(installexe_step);
-
-    const installs6_step = b.step("installs6", "Install the Ly s6 service");
-    installs6_step.makeFn = ServiceInstaller(.S6).make;
-    installs6_step.dependOn(installexe_step);
-
-    const installdinit_step = b.step("installdinit", "Install the Ly dinit service");
-    installdinit_step.makeFn = ServiceInstaller(.Dinit).make;
-    installdinit_step.dependOn(installexe_step);
-
-    const uninstallall_step = b.step("uninstallall", "Uninstall Ly and all services");
-    uninstallall_step.makeFn = uninstallall;
+    const uninstallnoconf_step = b.step("uninstallnoconf", "Uninstall Ly and remove the selected init system service, but keep the configuration directory");
+    uninstallnoconf_step.makeFn = Uninstaller(false).make;
 }
 
-pub fn ExeInstaller(install_conf: bool) type {
-    return struct {
-        pub fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
-            try install_ly(step.owner.allocator, install_conf);
-        }
-    };
-}
-
-const InitSystem = enum {
-    Systemd,
-    Openrc,
-    Runit,
-    S6,
-    Dinit,
-};
-
-pub fn ServiceInstaller(comptime init_system: InitSystem) type {
+pub fn Installer(install_config: bool) type {
     return struct {
         pub fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
             const allocator = step.owner.allocator;
@@ -148,78 +122,13 @@ pub fn ServiceInstaller(comptime init_system: InitSystem) type {
             try patch_map.put("$PREFIX_DIRECTORY", prefix_directory);
             try patch_map.put("$EXECUTABLE_NAME", executable_name);
 
-            switch (init_system) {
-                .Systemd => {
-                    const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, prefix_directory, "/lib/systemd/system" });
-                    std.fs.cwd().makePath(service_path) catch {};
-                    var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
-                    defer service_dir.close();
-
-                    const patched_service = try patchFile(allocator, "res/ly.service", patch_map);
-                    try installText(patched_service, service_dir, service_path, "ly.service", .{ .mode = 0o644 });
-                },
-                .Openrc => {
-                    const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/init.d" });
-                    std.fs.cwd().makePath(service_path) catch {};
-                    var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
-                    defer service_dir.close();
-
-                    const patched_service = try patchFile(allocator, "res/ly-openrc", patch_map);
-                    try installText(patched_service, service_dir, service_path, executable_name, .{ .mode = 0o755 });
-                },
-                .Runit => {
-                    const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/sv/ly" });
-                    std.fs.cwd().makePath(service_path) catch {};
-                    var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
-                    defer service_dir.close();
-
-                    const supervise_path = try std.fs.path.join(allocator, &[_][]const u8{ service_path, "supervise" });
-
-                    const patched_conf = try patchFile(allocator, "res/ly-runit-service/conf", patch_map);
-                    try installText(patched_conf, service_dir, service_path, "conf", .{});
-
-                    try installFile("res/ly-runit-service/finish", service_dir, service_path, "finish", .{ .override_mode = 0o755 });
-
-                    const patched_run = try patchFile(allocator, "res/ly-runit-service/run", patch_map);
-                    try installText(patched_run, service_dir, service_path, "run", .{ .mode = 0o755 });
-
-                    try std.fs.cwd().symLink("/run/runit/supervise.ly", supervise_path, .{});
-                    std.debug.print("info: installed symlink /run/runit/supervise.ly\n", .{});
-                },
-                .S6 => {
-                    const admin_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/s6/adminsv/default/contents.d" });
-                    std.fs.cwd().makePath(admin_service_path) catch {};
-                    var admin_service_dir = std.fs.cwd().openDir(admin_service_path, .{}) catch unreachable;
-                    defer admin_service_dir.close();
-
-                    const file = try admin_service_dir.createFile("ly-srv", .{});
-                    file.close();
-
-                    const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/s6/sv/ly-srv" });
-                    std.fs.cwd().makePath(service_path) catch {};
-                    var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
-                    defer service_dir.close();
-
-                    const patched_run = try patchFile(allocator, "res/ly-s6/run", patch_map);
-                    try installText(patched_run, service_dir, service_path, "run", .{ .mode = 0o755 });
-
-                    try installFile("res/ly-s6/type", service_dir, service_path, "type", .{});
-                },
-                .Dinit => {
-                    const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/dinit.d" });
-                    std.fs.cwd().makePath(service_path) catch {};
-                    var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
-                    defer service_dir.close();
-
-                    const patched_service = try patchFile(allocator, "res/ly-dinit", patch_map);
-                    try installText(patched_service, service_dir, service_path, "ly", .{});
-                },
-            }
+            try install_ly(allocator, patch_map, install_config);
+            try install_service(allocator, patch_map);
         }
     };
 }
 
-fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
+fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config: bool) !void {
     const ly_config_directory = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/ly" });
 
     std.fs.cwd().makePath(ly_config_directory) catch {
@@ -250,26 +159,12 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
         defer config_dir.close();
 
         if (install_config) {
-            var patch_map = PatchMap.init(allocator);
-            defer patch_map.deinit();
-
-            try patch_map.put("$DEFAULT_TTY", default_tty_str);
-            try patch_map.put("$CONFIG_DIRECTORY", config_directory);
-            try patch_map.put("$PREFIX_DIRECTORY", prefix_directory);
-
             const patched_config = try patchFile(allocator, "res/config.ini", patch_map);
             try installText(patched_config, config_dir, ly_config_directory, "config.ini", .{});
         }
 
-        {
-            var patch_map = PatchMap.init(allocator);
-            defer patch_map.deinit();
-
-            try patch_map.put("$CONFIG_DIRECTORY", config_directory);
-
-            const patched_setup = try patchFile(allocator, "res/setup.sh", patch_map);
-            try installText(patched_setup, config_dir, ly_config_directory, "setup.sh", .{ .mode = 0o755 });
-        }
+        const patched_setup = try patchFile(allocator, "res/setup.sh", patch_map);
+        try installText(patched_setup, config_dir, ly_config_directory, "setup.sh", .{ .mode = 0o755 });
     }
 
     {
@@ -309,26 +204,107 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
     }
 }
 
-pub fn uninstallall(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
-    const allocator = step.owner.allocator;
+fn install_service(allocator: std.mem.Allocator, patch_map: PatchMap) !void {
+    switch (init_system) {
+        .systemd => {
+            const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, prefix_directory, "/lib/systemd/system" });
+            std.fs.cwd().makePath(service_path) catch {};
+            var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
+            defer service_dir.close();
 
-    try deleteTree(allocator, config_directory, "/ly", "ly config directory not found");
+            const patched_service = try patchFile(allocator, "res/ly.service", patch_map);
+            try installText(patched_service, service_dir, service_path, "ly.service", .{ .mode = 0o644 });
+        },
+        .openrc => {
+            const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/init.d" });
+            std.fs.cwd().makePath(service_path) catch {};
+            var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
+            defer service_dir.close();
 
-    const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, prefix_directory, "/bin/", executable_name });
-    var success = true;
-    std.fs.cwd().deleteFile(exe_path) catch {
-        std.debug.print("warn: ly executable not found\n", .{});
-        success = false;
+            const patched_service = try patchFile(allocator, "res/ly-openrc", patch_map);
+            try installText(patched_service, service_dir, service_path, executable_name, .{ .mode = 0o755 });
+        },
+        .runit => {
+            const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/sv/ly" });
+            std.fs.cwd().makePath(service_path) catch {};
+            var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
+            defer service_dir.close();
+
+            const supervise_path = try std.fs.path.join(allocator, &[_][]const u8{ service_path, "supervise" });
+
+            const patched_conf = try patchFile(allocator, "res/ly-runit-service/conf", patch_map);
+            try installText(patched_conf, service_dir, service_path, "conf", .{});
+
+            try installFile("res/ly-runit-service/finish", service_dir, service_path, "finish", .{ .override_mode = 0o755 });
+
+            const patched_run = try patchFile(allocator, "res/ly-runit-service/run", patch_map);
+            try installText(patched_run, service_dir, service_path, "run", .{ .mode = 0o755 });
+
+            try std.fs.cwd().symLink("/run/runit/supervise.ly", supervise_path, .{});
+            std.debug.print("info: installed symlink /run/runit/supervise.ly\n", .{});
+        },
+        .s6 => {
+            const admin_service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/s6/adminsv/default/contents.d" });
+            std.fs.cwd().makePath(admin_service_path) catch {};
+            var admin_service_dir = std.fs.cwd().openDir(admin_service_path, .{}) catch unreachable;
+            defer admin_service_dir.close();
+
+            const file = try admin_service_dir.createFile("ly-srv", .{});
+            file.close();
+
+            const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/s6/sv/ly-srv" });
+            std.fs.cwd().makePath(service_path) catch {};
+            var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
+            defer service_dir.close();
+
+            const patched_run = try patchFile(allocator, "res/ly-s6/run", patch_map);
+            try installText(patched_run, service_dir, service_path, "run", .{ .mode = 0o755 });
+
+            try installFile("res/ly-s6/type", service_dir, service_path, "type", .{});
+        },
+        .dinit => {
+            const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/dinit.d" });
+            std.fs.cwd().makePath(service_path) catch {};
+            var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
+            defer service_dir.close();
+
+            const patched_service = try patchFile(allocator, "res/ly-dinit", patch_map);
+            try installText(patched_service, service_dir, service_path, "ly", .{});
+        },
+    }
+}
+
+pub fn Uninstaller(uninstall_config: bool) type {
+    return struct {
+        pub fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
+            const allocator = step.owner.allocator;
+
+            if (uninstall_config) {
+                try deleteTree(allocator, config_directory, "/ly", "ly config directory not found");
+            }
+
+            const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ prefix_directory, "/bin/", executable_name });
+            var success = true;
+            std.fs.cwd().deleteFile(exe_path) catch {
+                std.debug.print("warn: ly executable not found\n", .{});
+                success = false;
+            };
+            if (success) std.debug.print("info: deleted {s}\n", .{exe_path});
+
+            try deleteFile(allocator, config_directory, "/pam.d/ly", "ly pam file not found");
+
+            switch (init_system) {
+                .systemd => try deleteFile(allocator, prefix_directory, "/lib/systemd/system/ly.service", "systemd service not found"),
+                .openrc => try deleteFile(allocator, config_directory, "/init.d/ly", "openrc service not found"),
+                .runit => try deleteTree(allocator, config_directory, "/sv/ly", "runit service not found"),
+                .s6 => {
+                    try deleteTree(allocator, config_directory, "/s6/sv/ly-srv", "s6 service not found");
+                    try deleteFile(allocator, config_directory, "/s6/adminsv/default/contents.d/ly-srv", "s6 admin service not found");
+                },
+                .dinit => try deleteFile(allocator, config_directory, "/dinit.d/ly", "dinit service not found"),
+            }
+        }
     };
-    if (success) std.debug.print("info: deleted {s}\n", .{exe_path});
-
-    try deleteFile(allocator, config_directory, "/pam.d/ly", "ly pam file not found");
-    try deleteFile(allocator, prefix_directory, "/lib/systemd/system/ly.service", "systemd service not found");
-    try deleteFile(allocator, config_directory, "/init.d/ly", "openrc service not found");
-    try deleteTree(allocator, config_directory, "/sv/ly", "runit service not found");
-    try deleteTree(allocator, config_directory, "/s6/sv/ly-srv", "s6 service not found");
-    try deleteFile(allocator, config_directory, "/s6/adminsv/default/contents.d/ly-srv", "s6 admin service not found");
-    try deleteFile(allocator, config_directory, "/dinit.d/ly", "dinit service not found");
 }
 
 fn getVersionStr(b: *std.Build, name: []const u8, version: std.SemanticVersion) ![]const u8 {
