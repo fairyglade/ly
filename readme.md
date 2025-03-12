@@ -92,7 +92,7 @@ or a terminal emulator (but desktop environments won't start)
 
 Install Ly and the provided systemd service file
 ```
-# zig build installsystemd
+# zig build installexe
 ```
 
 Enable the service
