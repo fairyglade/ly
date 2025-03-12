@@ -100,12 +100,6 @@ Install Ly for systemd-based systems (the default)
 # zig build installexe
 ```
 
-(You can also install Ly without overriding the current configuration
-file)
-```
-# zig build installnoconf
-```
-
 Enable the service
 ```
 # systemctl enable ly.service
