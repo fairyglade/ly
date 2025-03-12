@@ -72,7 +72,7 @@ changing the source code won't be necessary :)
 ## Cloning and Compiling
 Clone the repository
 ```
-$ git clone https://github.com/fairyglade/ly
+$ git clone https://codeberg.org/AnErrupTion/ly
 ```
 
 Change the directory to ly
@@ -86,14 +86,24 @@ $ zig build
 ```
 
 Test in the configured tty (tty2 by default)
-or a terminal emulator (but desktop environments won't start)
+or a terminal emulator (but authentication won't work)
 ```
-# zig build run
+$ zig build run
 ```
 
-Install Ly and the provided systemd service file
+**Important**: Running Ly in a terminal emulator as root is *not* recommended. If you
+want to properly test Ly, please enable its service (as described below) and reboot
+your machine.
+
+Install Ly for systemd-based systems (the default)
 ```
-# zig build installsystemd
+# zig build installexe
+```
+
+(You can also install Ly without overriding the current configuration
+file)
+```
+# zig build installnoconf
 ```
 
 Enable the service
@@ -114,7 +124,7 @@ Clone, compile and test.
 
 Install Ly and the provided OpenRC service
 ```
-# zig build installopenrc
+# zig build installexe -Dinit_system=openrc
 ```
 
 Enable the service
@@ -134,7 +144,7 @@ then you have to disable getty, so it doesn't respawn on top of ly
 
 ### runit
 ```
-# zig build installrunit
+# zig build installexe -Dinit_system=runit
 # ln -s /etc/sv/ly /var/service/
 ```
 
@@ -156,7 +166,7 @@ you should disable the agetty-tty2 service like this:
 
 ### s6
 ```
-# zig build installs6
+# zig build installexe -Dinit_system=s6
 ```
 
 Then, edit `/etc/s6/config/ttyX.conf` and set `SPAWN="no"`, where X is the TTY ID (e.g. `2`).
@@ -171,7 +181,7 @@ Finally, enable the service:
 
 ### dinit
 ```
-# zig build installdinit
+# zig build installexe -Dinit_system=dinit
 # dinitctl enable ly
 ```
 
@@ -180,23 +190,19 @@ In addition to the steps above, you will also have to keep a TTY free within `/e
 To do that, change `ACTIVE_CONSOLES` so that the tty that ly should use in `/etc/ly/config.ini` is free.
 
 ### Updating
-You can also install Ly without copying the system service and the configuration file. That's
-called *updating*. To update, simply run:
+You can also install Ly without overrding the current configuration file. That's called
+*updating*. To update, simply run:
 
 ```
 # zig build installnoconf
 ```
 
-If you want to also copy the default config file (but still not the system service), run:
-
-```
-# zig build installexe
-```
+You can, of course, still select the init system of your choice when using this command.
 
 ## Arch Linux Installation
 You can install ly from the [`[extra]` repos](https://archlinux.org/packages/extra/x86_64/ly/):
 ```
-$ sudo pacman -S ly
+# pacman -S ly
 ```
 
 ## Gentoo Installation
@@ -243,15 +249,10 @@ On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
 ```
 
 ## Tips
-The numlock and capslock state is printed in the top-right corner.
-Use the F1 and F2 keys to respectively shutdown and reboot.
-Take a look at your .xsession if X doesn't start, as it can interfere
-(this file is launched with X to configure the display properly).
-
-## PSX DOOM fire animation
-To enable the famous PSX DOOM fire described by [Fabien Sanglard](http://fabiensanglard.net/doom_fire_psx/index.html),
-just set `animation = doom` in `/etc/ly/config.ini`. You may also
-disable the main box borders with `hide_borders = true`.
+- The numlock and capslock state is printed in the top-right corner.
+- Use the F1 and F2 keys to respectively shutdown and reboot.
+- Take a look at your .xsession if X doesn't start, as it can interfere
+  (this file is launched with X to configure the display properly).
 
 ## Additional Information
 The name "Ly" is a tribute to the fairy from the game Rayman.
