@@ -51,6 +51,7 @@ The following desktop environments were tested with success:
  - lxqt
  - mate
  - maxx
+ - niri
  - pantheon
  - qtile
  - spectrwm
