@@ -24,6 +24,7 @@ const Ini = ini.Ini;
 const termbox = interop.termbox;
 const unistd = interop.unistd;
 const temporary_allocator = std.heap.page_allocator;
+const ly_top_str = "Ly version " ++ build_options.version;
 
 var session_pid: std.posix.pid_t = -1;
 fn signalHandler(i: c_int) callconv(.C) void {
@@ -421,6 +422,8 @@ pub fn main() !void {
                     }
                 }
 
+                buffer.drawLabel(ly_top_str, 0, 0);
+
                 if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) draw_big_clock: {
                     const format = "%H:%M";
                     const xo = buffer.width / 2 - @min(buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
@@ -480,7 +483,7 @@ pub fn main() !void {
                 info_line.label.draw();
 
                 if (!config.hide_key_hints) {
-                    var length: usize = 0;
+                    var length: usize = ly_top_str.len + 1;
 
                     buffer.drawLabel(config.shutdown_key, length, 0);
                     length += config.shutdown_key.len + 1;
