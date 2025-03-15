@@ -5,6 +5,8 @@ const clap = @import("clap");
 const ini = @import("zigini");
 const auth = @import("auth.zig");
 const bigclock = @import("bigclock.zig");
+const enums = @import("enums.zig");
+const Environment = @import("Environment.zig");
 const interop = @import("interop.zig");
 const Doom = @import("animations/Doom.zig");
 const Matrix = @import("animations/Matrix.zig");
@@ -21,6 +23,8 @@ const SharedError = @import("SharedError.zig");
 const utils = @import("tui/utils.zig");
 
 const Ini = ini.Ini;
+const DisplayServer = enums.DisplayServer;
+const Entry = Environment.Entry;
 const termbox = interop.termbox;
 const unistd = interop.unistd;
 const temporary_allocator = std.heap.page_allocator;
@@ -254,16 +258,16 @@ pub fn main() !void {
         try info_line.addMessage(lang.err_numlock, config.error_bg, config.error_fg);
     };
 
-    var session = Session.init(allocator, &buffer, lang);
+    var session = Session.init(allocator, &buffer);
     defer session.deinit();
 
-    session.addEnvironment(.{ .Name = lang.shell }, null, .shell) catch {
+    addOtherEnvironment(&session, lang, .shell, null) catch {
         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
     };
 
     if (build_options.enable_x11_support) {
-        if (config.xinitrc) |xinitrc| {
-            session.addEnvironment(.{ .Name = lang.xinitrc, .Exec = xinitrc }, null, .xinitrc) catch {
+        if (config.xinitrc) |xinitrc_cmd| {
+            addOtherEnvironment(&session, lang, .xinitrc, xinitrc_cmd) catch {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
             };
         }
@@ -283,8 +287,8 @@ pub fn main() !void {
         try info_line.addMessage(hostname, config.bg, config.fg);
     }
 
-    try session.crawl(config.waylandsessions, .wayland);
-    if (build_options.enable_x11_support) try session.crawl(config.xsessions, .x11);
+    try crawl(&session, lang, config.waylandsessions, .wayland);
+    if (build_options.enable_x11_support) try crawl(&session, lang, config.xsessions, .x11);
 
     var login = Text.init(allocator, &buffer, false, null);
     defer login.deinit();
@@ -841,6 +845,83 @@ pub fn main() !void {
                 update = true;
             },
         }
+    }
+}
+
+fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplayServer, exec: ?[]const u8) !void {
+    const name = switch (display_server) {
+        .shell => lang.shell,
+        .xinitrc => lang.xinitrc,
+        else => unreachable,
+    };
+
+    try session.addEnvironment(.{
+        .entry_ini = null,
+        .name = name,
+        .xdg_session_desktop = null,
+        .xdg_desktop_names = null,
+        .cmd = exec orelse "",
+        .specifier = switch (display_server) {
+            .wayland => lang.wayland,
+            .x11 => lang.x11,
+            else => lang.other,
+        },
+        .display_server = display_server,
+    });
+}
+
+fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: DisplayServer) !void {
+    var iterable_directory = std.fs.openDirAbsolute(path, .{ .iterate = true }) catch return;
+    defer iterable_directory.close();
+
+    var iterator = iterable_directory.iterate();
+    while (try iterator.next()) |item| {
+        if (!std.mem.eql(u8, std.fs.path.extension(item.name), ".desktop")) continue;
+
+        const entry_path = try std.fmt.allocPrint(session.label.allocator, "{s}/{s}", .{ path, item.name });
+        defer session.label.allocator.free(entry_path);
+        var entry_ini = Ini(Entry).init(session.label.allocator);
+        _ = try entry_ini.readFileToStruct(entry_path, .{
+            .fieldHandler = null,
+            .comment_characters = "#",
+        });
+        errdefer entry_ini.deinit();
+
+        var xdg_session_desktop: []const u8 = undefined;
+        const maybe_desktop_names = entry_ini.data.@"Desktop Entry".DesktopNames;
+        if (maybe_desktop_names) |desktop_names| {
+            xdg_session_desktop = std.mem.sliceTo(desktop_names, ';');
+        } else {
+            // if DesktopNames is empty, we'll take the name of the session file
+            xdg_session_desktop = std.fs.path.stem(item.name);
+        }
+
+        // Prepare the XDG_CURRENT_DESKTOP environment variable here
+        const entry = entry_ini.data.@"Desktop Entry";
+        var xdg_desktop_names: ?[:0]const u8 = null;
+        if (entry.DesktopNames) |desktop_names| {
+            for (desktop_names) |*c| {
+                if (c.* == ';') c.* = ':';
+            }
+            xdg_desktop_names = desktop_names;
+        }
+
+        const session_desktop = try session.label.allocator.dupeZ(u8, xdg_session_desktop);
+        errdefer session.label.allocator.free(session_desktop);
+
+        try session.addEnvironment(.{
+            .entry_ini = entry_ini,
+            .name = entry.Name,
+            .xdg_session_desktop = session_desktop,
+            .xdg_desktop_names = xdg_desktop_names,
+            .cmd = entry.Exec,
+            .specifier = switch (display_server) {
+                .wayland => lang.wayland,
+                .x11 => lang.x11,
+                else => lang.other,
+            },
+            .display_server = display_server,
+        });
     }
 }
 

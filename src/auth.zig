@@ -2,8 +2,8 @@ const std = @import("std");
 const build_options = @import("build_options");
 const builtin = @import("builtin");
 const enums = @import("enums.zig");
+const Environment = @import("Environment.zig");
 const interop = @import("interop.zig");
-const Session = @import("tui/components/Session.zig");
 const SharedError = @import("SharedError.zig");
 
 const Allocator = std.mem.Allocator;
@@ -33,7 +33,7 @@ pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(options: AuthOptions, current_environment: Session.Environment, login: [:0]const u8, password: [:0]const u8) !void {
+pub fn authenticate(options: AuthOptions, current_environment: Environment, login: [:0]const u8, password: [:0]const u8) !void {
     var tty_buffer: [3]u8 = undefined;
     const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{options.tty});
 
@@ -134,7 +134,7 @@ fn startSession(
     options: AuthOptions,
     pwd: *interop.pwd.passwd,
     handle: ?*interop.pam.pam_handle,
-    current_environment: Session.Environment,
+    current_environment: Environment,
 ) !void {
     if (builtin.os.tag == .freebsd) {
         // FreeBSD has initgroups() in unistd
