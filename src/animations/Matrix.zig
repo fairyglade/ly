@@ -1,17 +1,19 @@
 const std = @import("std");
+const interop = @import("../interop.zig");
+const Animation = @import("../tui/Animation.zig");
+const Cell = @import("../tui/Cell.zig");
+const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+
 const Allocator = std.mem.Allocator;
 const Random = std.Random;
-const Animation = @import("../tui/Animation.zig");
-const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
-const utils = @import("../tui/utils.zig");
-
-const interop = @import("../interop.zig");
 const termbox = interop.termbox;
 
 pub const FRAME_DELAY: usize = 8;
 
 // Characters change mid-scroll
 pub const MID_SCROLL_CHANGE = true;
+
+const DOT_HEAD_COLOR: u32 = @intCast(0x00FFFFFF | termbox.TB_BOLD); // White and bold
 
 const Matrix = @This();
 
@@ -35,6 +37,7 @@ count: usize,
 fg_ini: u32,
 min_codepoint: u16,
 max_codepoint: u16,
+default_cell: Cell,
 
 pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u32, min_codepoint: u16, max_codepoint: u16) !Matrix {
     const dots = try allocator.alloc(Dot, terminal_buffer.width * (terminal_buffer.height + 1));
@@ -52,6 +55,7 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u32,
         .fg_ini = fg_ini,
         .min_codepoint = min_codepoint,
         .max_codepoint = max_codepoint - min_codepoint,
+        .default_cell = .{ .ch = ' ', .fg = fg_ini, .bg = termbox.TB_DEFAULT },
     };
 }
 
@@ -153,16 +157,13 @@ fn draw(self: *Matrix) void {
         var y: usize = 1;
         while (y <= self.terminal_buffer.height) : (y += 1) {
             const dot = self.dots[buf_width * y + x];
+            const cell = if (dot.value == null or dot.value == ' ') self.default_cell else Cell{
+                .ch = @intCast(dot.value.?),
+                .fg = if (dot.is_head) DOT_HEAD_COLOR else self.fg_ini,
+                .bg = termbox.TB_DEFAULT,
+            };
 
-            var fg = self.fg_ini;
-
-            if (dot.value == null or dot.value == ' ') {
-                utils.putCell(x, y - 1, .{ .ch = ' ', .fg = fg, .bg = termbox.TB_DEFAULT });
-                continue;
-            }
-
-            if (dot.is_head) fg = @intCast(0x00FFFFFF | termbox.TB_BOLD); // White and bold
-            utils.putCell(x, y - 1, .{ .ch = @intCast(dot.value.?), .fg = fg, .bg = termbox.TB_DEFAULT });
+            cell.put(x, y - 1);
         }
     }
 }

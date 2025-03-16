@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const interop = @import("../interop.zig");
-const utils = @import("utils.zig");
+const Cell = @import("Cell.zig");
 
 const Random = std.Random;
 
@@ -41,6 +41,7 @@ box_width: usize,
 box_height: usize,
 margin_box_v: u8,
 margin_box_h: u8,
+blank_cell: Cell,
 
 pub fn init(options: InitOptions, labels_max_length: usize, random: Random) TerminalBuffer {
     return .{
@@ -76,6 +77,7 @@ pub fn init(options: InitOptions, labels_max_length: usize, random: Random) Term
         .box_height = 7 + (2 * options.margin_box_v),
         .margin_box_v = options.margin_box_v,
         .margin_box_h = options.margin_box_h,
+        .blank_cell = Cell.init(' ', options.fg, options.bg),
     };
 }
 
@@ -125,29 +127,27 @@ pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool)
         _ = termbox.tb_set_cell(@intCast(x1 - 1), @intCast(y2), self.box_chars.left_down, self.border_fg, self.bg);
         _ = termbox.tb_set_cell(@intCast(x2), @intCast(y2), self.box_chars.right_down, self.border_fg, self.bg);
 
-        var c1 = utils.initCell(self.box_chars.top, self.border_fg, self.bg);
-        var c2 = utils.initCell(self.box_chars.bottom, self.border_fg, self.bg);
+        var c1 = Cell.init(self.box_chars.top, self.border_fg, self.bg);
+        var c2 = Cell.init(self.box_chars.bottom, self.border_fg, self.bg);
 
         for (0..self.box_width) |i| {
-            utils.putCell(x1 + i, y1 - 1, c1);
-            utils.putCell(x1 + i, y2, c2);
+            c1.put(x1 + i, y1 - 1);
+            c2.put(x1 + i, y2);
         }
 
         c1.ch = self.box_chars.left;
         c2.ch = self.box_chars.right;
 
         for (0..self.box_height) |i| {
-            utils.putCell(x1 - 1, y1 + i, c1);
-            utils.putCell(x2, y1 + i, c2);
+            c1.put(x1 - 1, y1 + i);
+            c2.put(x2, y1 + i);
         }
     }
 
     if (blank_box) {
-        const blank = utils.initCell(' ', self.fg, self.bg);
-
         for (0..self.box_height) |y| {
             for (0..self.box_width) |x| {
-                utils.putCell(x1 + x, y1 + y, blank);
+                self.blank_cell.put(x1 + x, y1 + y);
             }
         }
     }
@@ -203,6 +203,16 @@ pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: usize, y: us
 }
 
 pub fn drawCharMultiple(self: TerminalBuffer, char: u32, x: usize, y: usize, length: usize) void {
-    const cell = utils.initCell(char, self.fg, self.bg);
-    for (0..length) |xx| utils.putCell(x + xx, y, cell);
+    const cell = Cell.init(char, self.fg, self.bg);
+    for (0..length) |xx| cell.put(x + xx, y);
+}
+
+// Every codepoint is assumed to have a width of 1.
+// Since Ly is normally running in a TTY, this should be fine.
+pub fn strWidth(str: []const u8) !u8 {
+    const utf8view = try std.unicode.Utf8View.init(str);
+    var utf8 = utf8view.iterator();
+    var i: u8 = 0;
+    while (utf8.nextCodepoint()) |_| i += 1;
+    return i;
 }

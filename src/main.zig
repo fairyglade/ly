@@ -21,7 +21,6 @@ const Lang = @import("config/Lang.zig");
 const Save = @import("config/Save.zig");
 const migrator = @import("config/migrator.zig");
 const SharedError = @import("SharedError.zig");
-const utils = @import("tui/utils.zig");
 
 const Ini = ini.Ini;
 const DisplayServer = enums.DisplayServer;
@@ -358,15 +357,15 @@ pub fn main() !void {
 
     const animate = config.animation != .none;
     const shutdown_key = try std.fmt.parseInt(u8, config.shutdown_key[1..], 10);
-    const shutdown_len = try utils.strWidth(lang.shutdown);
+    const shutdown_len = try TerminalBuffer.strWidth(lang.shutdown);
     const restart_key = try std.fmt.parseInt(u8, config.restart_key[1..], 10);
-    const restart_len = try utils.strWidth(lang.restart);
+    const restart_len = try TerminalBuffer.strWidth(lang.restart);
     const sleep_key = try std.fmt.parseInt(u8, config.sleep_key[1..], 10);
-    const sleep_len = try utils.strWidth(lang.sleep);
+    const sleep_len = try TerminalBuffer.strWidth(lang.sleep);
     const brightness_down_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
-    const brightness_down_len = try utils.strWidth(lang.brightness_down);
+    const brightness_down_len = try TerminalBuffer.strWidth(lang.brightness_down);
     const brightness_up_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
-    const brightness_up_len = try utils.strWidth(lang.brightness_up);
+    const brightness_up_len = try TerminalBuffer.strWidth(lang.brightness_up);
 
     var event: termbox.tb_event = undefined;
     var run = true;

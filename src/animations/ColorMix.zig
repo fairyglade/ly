@@ -1,7 +1,7 @@
 const std = @import("std");
 const Animation = @import("../tui/Animation.zig");
+const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
-const utils = @import("../tui/utils.zig");
 
 const ColorMix = @This();
 
@@ -19,7 +19,7 @@ terminal_buffer: *TerminalBuffer,
 frames: u64,
 pattern_cos_mod: f32,
 pattern_sin_mod: f32,
-palette: [palette_len]utils.Cell,
+palette: [palette_len]Cell,
 
 pub fn init(terminal_buffer: *TerminalBuffer, col1: u32, col2: u32, col3: u32) ColorMix {
     return .{
@@ -27,19 +27,19 @@ pub fn init(terminal_buffer: *TerminalBuffer, col1: u32, col2: u32, col3: u32) C
         .frames = 0,
         .pattern_cos_mod = terminal_buffer.random.float(f32) * math.pi * 2.0,
         .pattern_sin_mod = terminal_buffer.random.float(f32) * math.pi * 2.0,
-        .palette = [palette_len]utils.Cell{
-            utils.initCell(0x2588, col1, col2),
-            utils.initCell(0x2593, col1, col2),
-            utils.initCell(0x2592, col1, col2),
-            utils.initCell(0x2591, col1, col2),
-            utils.initCell(0x2588, col2, col3),
-            utils.initCell(0x2593, col2, col3),
-            utils.initCell(0x2592, col2, col3),
-            utils.initCell(0x2591, col2, col3),
-            utils.initCell(0x2588, col3, col1),
-            utils.initCell(0x2593, col3, col1),
-            utils.initCell(0x2592, col3, col1),
-            utils.initCell(0x2591, col3, col1),
+        .palette = [palette_len]Cell{
+            Cell.init(0x2588, col1, col2),
+            Cell.init(0x2593, col1, col2),
+            Cell.init(0x2592, col1, col2),
+            Cell.init(0x2591, col1, col2),
+            Cell.init(0x2588, col2, col3),
+            Cell.init(0x2593, col2, col3),
+            Cell.init(0x2592, col2, col3),
+            Cell.init(0x2591, col2, col3),
+            Cell.init(0x2588, col3, col1),
+            Cell.init(0x2593, col3, col1),
+            Cell.init(0x2592, col3, col1),
+            Cell.init(0x2591, col3, col1),
         },
     };
 }
@@ -80,7 +80,7 @@ fn draw(self: *ColorMix) void {
             }
 
             const cell = self.palette[@as(usize, @intFromFloat(math.floor(length(uv) * 5.0))) % palette_len];
-            utils.putCell(x, y, cell);
+            cell.put(x, y);
         }
     }
 }

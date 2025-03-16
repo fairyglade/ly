@@ -1,8 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Animation = @import("../tui/Animation.zig");
+const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
-const utils = @import("../tui/utils.zig");
 
 const Doom = @This();
 
@@ -11,7 +11,7 @@ pub const STEPS = 12;
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
 buffer: []u8,
-fire: [STEPS + 1]utils.Cell,
+fire: [STEPS + 1]Cell,
 
 pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u32, middle_color: u32, bottom_color: u32) !Doom {
     const buffer = try allocator.alloc(u8, terminal_buffer.width * terminal_buffer.height);
@@ -21,20 +21,20 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
         .buffer = buffer,
-        .fire = [_]utils.Cell{
-            utils.initCell(' ', 0x00000000, 0),
-            utils.initCell(0x2591, top_color, 0),
-            utils.initCell(0x2592, top_color, 0),
-            utils.initCell(0x2593, top_color, 0),
-            utils.initCell(0x2588, top_color, 0),
-            utils.initCell(0x2591, middle_color, 2),
-            utils.initCell(0x2592, middle_color, 2),
-            utils.initCell(0x2593, middle_color, 2),
-            utils.initCell(0x2588, middle_color, 2),
-            utils.initCell(0x2591, bottom_color, 4),
-            utils.initCell(0x2592, bottom_color, 4),
-            utils.initCell(0x2593, bottom_color, 4),
-            utils.initCell(0x2588, bottom_color, 4),
+        .fire = [_]Cell{
+            Cell.init(' ', 0x00000000, 0),
+            Cell.init(0x2591, top_color, 0),
+            Cell.init(0x2592, top_color, 0),
+            Cell.init(0x2593, top_color, 0),
+            Cell.init(0x2588, top_color, 0),
+            Cell.init(0x2591, middle_color, 2),
+            Cell.init(0x2592, middle_color, 2),
+            Cell.init(0x2593, middle_color, 2),
+            Cell.init(0x2588, middle_color, 2),
+            Cell.init(0x2591, bottom_color, 4),
+            Cell.init(0x2592, bottom_color, 4),
+            Cell.init(0x2593, bottom_color, 4),
+            Cell.init(0x2588, bottom_color, 4),
         },
     };
 }
@@ -73,11 +73,13 @@ fn draw(self: *Doom) void {
 
             const dest_y = dest / self.terminal_buffer.width;
             const dest_x = dest % self.terminal_buffer.width;
-            utils.putCell(dest_x, dest_y, self.fire[buffer_dest]);
+            const dest_cell = self.fire[buffer_dest];
+            dest_cell.put(dest_x, dest_y);
 
             const source_y = source / self.terminal_buffer.width;
             const source_x = source % self.terminal_buffer.width;
-            utils.putCell(source_x, source_y, self.fire[buffer_source]);
+            const source_cell = self.fire[buffer_source];
+            source_cell.put(source_x, source_y);
         }
     }
 }

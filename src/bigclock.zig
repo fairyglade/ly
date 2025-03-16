@@ -1,36 +1,35 @@
 const std = @import("std");
 const interop = @import("interop.zig");
-const utils = @import("tui/utils.zig");
 const enums = @import("enums.zig");
 const Lang = @import("bigclock/Lang.zig");
 const en = @import("bigclock/en.zig");
 const fa = @import("bigclock/fa.zig");
+const Cell = @import("tui/Cell.zig");
 
-const termbox = interop.termbox;
 const Bigclock = enums.Bigclock;
 pub const WIDTH = Lang.WIDTH;
 pub const HEIGHT = Lang.HEIGHT;
 pub const SIZE = Lang.SIZE;
 
-pub fn clockCell(animate: bool, char: u8, fg: u32, bg: u32, bigclock: Bigclock) [SIZE]utils.Cell {
-    var cells: [SIZE]utils.Cell = undefined;
+pub fn clockCell(animate: bool, char: u8, fg: u32, bg: u32, bigclock: Bigclock) [SIZE]Cell {
+    var cells: [SIZE]Cell = undefined;
 
     var tv: interop.system_time.timeval = undefined;
     _ = interop.system_time.gettimeofday(&tv, null);
 
     const clock_chars = toBigNumber(if (animate and char == ':' and @divTrunc(tv.tv_usec, 500000) != 0) ' ' else char, bigclock);
-    for (0..cells.len) |i| cells[i] = utils.initCell(clock_chars[i], fg, bg);
+    for (0..cells.len) |i| cells[i] = Cell.init(clock_chars[i], fg, bg);
 
     return cells;
 }
 
-pub fn alphaBlit(x: usize, y: usize, tb_width: usize, tb_height: usize, cells: [SIZE]utils.Cell) void {
+pub fn alphaBlit(x: usize, y: usize, tb_width: usize, tb_height: usize, cells: [SIZE]Cell) void {
     if (x + WIDTH >= tb_width or y + HEIGHT >= tb_height) return;
 
     for (0..HEIGHT) |yy| {
         for (0..WIDTH) |xx| {
             const cell = cells[yy * WIDTH + xx];
-            if (cell.ch != 0) utils.putCell(x + xx, y + yy, cell);
+            cell.put(x + xx, y + yy);
         }
     }
 }

@@ -1,7 +1,6 @@
 const std = @import("std");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const generic = @import("generic.zig");
-const utils = @import("../utils.zig");
 
 const Allocator = std.mem.Allocator;
 
@@ -32,7 +31,7 @@ pub fn addMessage(self: *InfoLine, text: []const u8, bg: u32, fg: u32) !void {
     if (text.len == 0) return;
 
     try self.label.addItem(.{
-        .width = try utils.strWidth(text),
+        .width = try TerminalBuffer.strWidth(text),
         .text = text,
         .bg = bg,
         .fg = fg,
