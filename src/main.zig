@@ -8,9 +8,10 @@ const bigclock = @import("bigclock.zig");
 const enums = @import("enums.zig");
 const Environment = @import("Environment.zig");
 const interop = @import("interop.zig");
-const Doom = @import("animations/Doom.zig");
-const Matrix = @import("animations/Matrix.zig");
 const ColorMix = @import("animations/ColorMix.zig");
+const Doom = @import("animations/Doom.zig");
+const Dummy = @import("animations/Dummy.zig");
+const Matrix = @import("animations/Matrix.zig");
 const Animation = @import("tui/Animation.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const Session = @import("tui/components/Session.zig");
@@ -339,7 +340,10 @@ pub fn main() !void {
     var animation: Animation = undefined;
 
     switch (config.animation) {
-        .none => {},
+        .none => {
+            var dummy = Dummy{};
+            animation = dummy.animation();
+        },
         .doom => {
             var doom = try Doom.init(allocator, &buffer, config.doom_top_color, config.doom_middle_color, config.doom_bottom_color);
             animation = doom.animation();

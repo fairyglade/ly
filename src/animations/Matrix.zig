@@ -1,19 +1,17 @@
 const std = @import("std");
-const interop = @import("../interop.zig");
 const Animation = @import("../tui/Animation.zig");
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 
 const Allocator = std.mem.Allocator;
 const Random = std.Random;
-const termbox = interop.termbox;
 
 pub const FRAME_DELAY: usize = 8;
 
 // Characters change mid-scroll
 pub const MID_SCROLL_CHANGE = true;
 
-const DOT_HEAD_COLOR: u32 = @intCast(0x00FFFFFF | termbox.TB_BOLD); // White and bold
+const DOT_HEAD_COLOR: u32 = @intCast(TerminalBuffer.Color.WHITE | TerminalBuffer.Styling.BOLD);
 
 const Matrix = @This();
 
@@ -34,12 +32,12 @@ dots: []Dot,
 lines: []Line,
 frame: usize,
 count: usize,
-fg_ini: u32,
+fg: u32,
 min_codepoint: u16,
 max_codepoint: u16,
 default_cell: Cell,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u32, min_codepoint: u16, max_codepoint: u16) !Matrix {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg: u32, min_codepoint: u16, max_codepoint: u16) !Matrix {
     const dots = try allocator.alloc(Dot, terminal_buffer.width * (terminal_buffer.height + 1));
     const lines = try allocator.alloc(Line, terminal_buffer.width);
 
@@ -52,10 +50,10 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u32,
         .lines = lines,
         .frame = 3,
         .count = 0,
-        .fg_ini = fg_ini,
+        .fg = fg,
         .min_codepoint = min_codepoint,
         .max_codepoint = max_codepoint - min_codepoint,
-        .default_cell = .{ .ch = ' ', .fg = fg_ini, .bg = termbox.TB_DEFAULT },
+        .default_cell = .{ .ch = ' ', .fg = fg, .bg = terminal_buffer.bg },
     };
 }
 
@@ -159,8 +157,8 @@ fn draw(self: *Matrix) void {
             const dot = self.dots[buf_width * y + x];
             const cell = if (dot.value == null or dot.value == ' ') self.default_cell else Cell{
                 .ch = @intCast(dot.value.?),
-                .fg = if (dot.is_head) DOT_HEAD_COLOR else self.fg_ini,
-                .bg = termbox.TB_DEFAULT,
+                .fg = if (dot.is_head) DOT_HEAD_COLOR else self.fg,
+                .bg = self.terminal_buffer.bg,
             };
 
             cell.put(x, y - 1);

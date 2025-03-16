@@ -18,6 +18,29 @@ pub const InitOptions = struct {
     input_len: u8,
 };
 
+pub const Styling = struct {
+    pub const BOLD = termbox.TB_BOLD;
+    pub const UNDERLINE = termbox.TB_UNDERLINE;
+    pub const REVERSE = termbox.TB_REVERSE;
+    pub const ITALIC = termbox.TB_ITALIC;
+    pub const BLINK = termbox.TB_BLINK;
+    pub const HI_BLACK = termbox.TB_HI_BLACK;
+    pub const BRIGHT = termbox.TB_BRIGHT;
+    pub const DIM = termbox.TB_DIM;
+};
+
+pub const Color = struct {
+    pub const DEFAULT = 0x00000000;
+    pub const BLACK = Styling.HI_BLACK;
+    pub const RED = 0x00FF0000;
+    pub const GREEN = 0x0000FF00;
+    pub const YELLOW = 0x00FFFF00;
+    pub const BLUE = 0x000000FF;
+    pub const MAGENTA = 0x00FF00FF;
+    pub const CYAN = 0x0000FFFF;
+    pub const WHITE = 0x00FFFFFF;
+};
+
 random: Random,
 width: usize,
 height: usize,

@@ -2,11 +2,9 @@
 
 const std = @import("std");
 const ini = @import("zigini");
-const interop = @import("../interop.zig");
 const Save = @import("Save.zig");
 const enums = @import("../enums.zig");
 
-const termbox = interop.termbox;
 const color_properties = [_][]const u8{
     "bg",
     "border_fg",
@@ -178,25 +176,25 @@ fn mapColor(color: u16) ![]const u8 {
     const color_no_styling = color & 0x00FF;
     const styling_only = color & 0xFF00;
 
-    if (color_no_styling > termbox.TB_WHITE or styling_only > 0x8000) { // TB_DIM in 16-bit mode
-        return error.InvalidColor;
-    }
+    // If color is "greater" than TB_WHITE, or the styling is "greater" than TB_DIM,
+    // we have an invalid color, so return an error
+    if (color_no_styling > 0x0008 or styling_only > 0x8000) return error.InvalidColor;
 
     var new_color: u32 = switch (color_no_styling) {
-        termbox.TB_DEFAULT => termbox.TB_DEFAULT,
-        termbox.TB_BLACK => termbox.TB_HI_BLACK,
-        termbox.TB_RED => 0x00FF0000,
-        termbox.TB_GREEN => 0x0000FF00,
-        termbox.TB_YELLOW => 0x00FFFF00,
-        termbox.TB_BLUE => 0x000000FF,
-        termbox.TB_MAGENTA => 0x00FF00FF,
-        termbox.TB_CYAN => 0x0000FFFF,
-        termbox.TB_WHITE => 0x00FFFFFF,
+        0x0000 => 0x00000000, // Default
+        0x0001 => 0x20000000, // "Hi-black" styling
+        0x0002 => 0x00FF0000, // Red
+        0x0003 => 0x0000FF00, // Green
+        0x0004 => 0x00FFFF00, // Yellow
+        0x0005 => 0x000000FF, // Blue
+        0x0006 => 0x00FF00FF, // Magenta
+        0x0007 => 0x0000FFFF, // Cyan
+        0x0008 => 0x00FFFFFF, // White
         else => unreachable,
     };
 
     // Only applying styling if color isn't black and styling isn't also black
-    if (!(new_color == termbox.TB_HI_BLACK and styling_only == termbox.TB_HI_BLACK)) {
+    if (!(new_color == 0x20000000 and styling_only == 0x20000000)) {
         // Shift styling by 16 to the left to apply it to the new 32-bit color
         new_color |= @as(u32, @intCast(styling_only)) << 16;
     }
