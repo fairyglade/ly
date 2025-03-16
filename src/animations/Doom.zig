@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Animation = @import("../tui/Animation.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const utils = @import("../tui/utils.zig");
 
@@ -38,17 +39,21 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u
     };
 }
 
-pub fn deinit(self: Doom) void {
+pub fn animation(self: *Doom) Animation {
+    return Animation.init(self, deinit, realloc, draw);
+}
+
+fn deinit(self: *Doom) void {
     self.allocator.free(self.buffer);
 }
 
-pub fn realloc(self: *Doom) !void {
+fn realloc(self: *Doom) anyerror!void {
     const buffer = try self.allocator.realloc(self.buffer, self.terminal_buffer.width * self.terminal_buffer.height);
     initBuffer(buffer, self.terminal_buffer.width);
     self.buffer = buffer;
 }
 
-pub fn draw(self: Doom) void {
+fn draw(self: *Doom) void {
     for (0..self.terminal_buffer.width) |x| {
         for (1..self.terminal_buffer.height) |y| {
             const source = y * self.terminal_buffer.width + x;

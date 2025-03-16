@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Random = std.Random;
+const Animation = @import("../tui/Animation.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const utils = @import("../tui/utils.zig");
 
@@ -54,12 +55,16 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_ini: u32,
     };
 }
 
-pub fn deinit(self: Matrix) void {
+pub fn animation(self: *Matrix) Animation {
+    return Animation.init(self, deinit, realloc, draw);
+}
+
+fn deinit(self: *Matrix) void {
     self.allocator.free(self.dots);
     self.allocator.free(self.lines);
 }
 
-pub fn realloc(self: *Matrix) !void {
+fn realloc(self: *Matrix) anyerror!void {
     const dots = try self.allocator.realloc(self.dots, self.terminal_buffer.width * (self.terminal_buffer.height + 1));
     const lines = try self.allocator.realloc(self.lines, self.terminal_buffer.width);
 
@@ -69,7 +74,7 @@ pub fn realloc(self: *Matrix) !void {
     self.lines = lines;
 }
 
-pub fn draw(self: *Matrix) void {
+fn draw(self: *Matrix) void {
     const buf_height = self.terminal_buffer.height;
     const buf_width = self.terminal_buffer.width;
     self.count += 1;

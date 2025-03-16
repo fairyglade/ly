@@ -11,6 +11,7 @@ const interop = @import("interop.zig");
 const Doom = @import("animations/Doom.zig");
 const Matrix = @import("animations/Matrix.zig");
 const ColorMix = @import("animations/ColorMix.zig");
+const Animation = @import("tui/Animation.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
@@ -336,24 +337,24 @@ pub fn main() !void {
     }
 
     // Initialize the animation, if any
-    var doom: Doom = undefined;
-    var matrix: Matrix = undefined;
-    var color_mix: ColorMix = undefined;
+    var animation: Animation = undefined;
 
     switch (config.animation) {
         .none => {},
-        .doom => doom = try Doom.init(allocator, &buffer, config.doom_top_color, config.doom_middle_color, config.doom_bottom_color),
-        .matrix => matrix = try Matrix.init(allocator, &buffer, config.cmatrix_fg, config.cmatrix_min_codepoint, config.cmatrix_max_codepoint),
-        .colormix => color_mix = ColorMix.init(&buffer, config.colormix_col1, config.colormix_col2, config.colormix_col3),
+        .doom => {
+            var doom = try Doom.init(allocator, &buffer, config.doom_top_color, config.doom_middle_color, config.doom_bottom_color);
+            animation = doom.animation();
+        },
+        .matrix => {
+            var matrix = try Matrix.init(allocator, &buffer, config.cmatrix_fg, config.cmatrix_min_codepoint, config.cmatrix_max_codepoint);
+            animation = matrix.animation();
+        },
+        .colormix => {
+            var color_mix = ColorMix.init(&buffer, config.colormix_col1, config.colormix_col2, config.colormix_col3);
+            animation = color_mix.animation();
+        },
     }
-    defer {
-        switch (config.animation) {
-            .none => {},
-            .doom => doom.deinit(),
-            .matrix => matrix.deinit(),
-            .colormix => {},
-        }
-    }
+    defer animation.deinit();
 
     const animate = config.animation != .none;
     const shutdown_key = try std.fmt.parseInt(u8, config.shutdown_key[1..], 10);
@@ -382,7 +383,7 @@ pub fn main() !void {
 
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
-        if (!update or config.animation != .none) {
+        if (!update or animate) {
             if (!update) std.time.sleep(std.time.ns_per_ms * 100);
 
             _ = termbox.tb_present(); // Required to update tb_width() and tb_height()
@@ -396,16 +397,9 @@ pub fn main() !void {
                 buffer.width = width;
                 buffer.height = height;
 
-                switch (config.animation) {
-                    .none => {},
-                    .doom => doom.realloc() catch {
-                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    },
-                    .matrix => matrix.realloc() catch {
-                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    },
-                    .colormix => {},
-                }
+                animation.realloc() catch {
+                    try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                };
 
                 update = true;
                 resolution_changed = true;
@@ -417,14 +411,7 @@ pub fn main() !void {
             if (auth_fails < config.auth_fails) {
                 _ = termbox.tb_clear();
 
-                if (!animation_timed_out) {
-                    switch (config.animation) {
-                        .none => {},
-                        .doom => doom.draw(),
-                        .matrix => matrix.draw(),
-                        .colormix => color_mix.draw(),
-                    }
-                }
+                if (!animation_timed_out) animation.draw();
 
                 buffer.drawLabel(ly_top_str, 0, 0);
 
@@ -585,12 +572,7 @@ pub fn main() !void {
 
             if (config.animation_timeout_sec > 0 and tv.tv_sec - tv_zero.tv_sec > config.animation_timeout_sec) {
                 animation_timed_out = true;
-                switch (config.animation) {
-                    .none => {},
-                    .doom => doom.deinit(),
-                    .matrix => matrix.deinit(),
-                    .colormix => {},
-                }
+                animation.deinit();
             }
         } else if (config.bigclock != .none and config.clock == null) {
             var tv: interop.system_time.timeval = undefined;
@@ -735,9 +717,6 @@ pub fn main() !void {
                     defer allocator.free(login_text);
                     const password_text = try allocator.dupeZ(u8, password.text.items);
                     defer allocator.free(password_text);
-
-                    // Give up control on the TTY
-                    // _ = termbox.tb_shutdown();
 
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {

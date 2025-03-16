@@ -1,4 +1,5 @@
 const std = @import("std");
+const Animation = @import("../tui/Animation.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const utils = @import("../tui/utils.zig");
 
@@ -43,7 +44,15 @@ pub fn init(terminal_buffer: *TerminalBuffer, col1: u32, col2: u32, col3: u32) C
     };
 }
 
-pub fn draw(self: *ColorMix) void {
+pub fn animation(self: *ColorMix) Animation {
+    return Animation.init(self, deinit, realloc, draw);
+}
+
+fn deinit(_: *ColorMix) void {}
+
+fn realloc(_: *ColorMix) anyerror!void {}
+
+fn draw(self: *ColorMix) void {
     self.frames +%= 1;
     const time: f32 = @as(f32, @floatFromInt(self.frames)) * time_scale;
 
