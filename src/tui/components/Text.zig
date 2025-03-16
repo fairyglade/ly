@@ -3,7 +3,7 @@ const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 
 const Allocator = std.mem.Allocator;
-const DynamicString = std.ArrayList(u8);
+const DynamicString = std.ArrayListUnmanaged(u8);
 
 const termbox = interop.termbox;
 
@@ -22,7 +22,7 @@ masked: bool,
 maybe_mask: ?u32,
 
 pub fn init(allocator: Allocator, buffer: *TerminalBuffer, masked: bool, maybe_mask: ?u32) Text {
-    const text = DynamicString.init(allocator);
+    const text: DynamicString = .empty;
 
     return .{
         .allocator = allocator,
@@ -39,8 +39,8 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer, masked: bool, maybe_m
     };
 }
 
-pub fn deinit(self: Text) void {
-    self.text.deinit();
+pub fn deinit(self: *Text) void {
+    self.text.deinit(self.allocator);
 }
 
 pub fn position(self: *Text, x: usize, y: usize, visible_length: usize) void {
@@ -153,7 +153,7 @@ fn backspace(self: *Text) void {
 fn write(self: *Text, char: u8) !void {
     if (char == 0) return;
 
-    try self.text.insert(self.cursor, char);
+    try self.text.insert(self.allocator, self.cursor, char);
 
     self.end += 1;
     self.goRight();

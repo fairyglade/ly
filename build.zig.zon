@@ -9,7 +9,7 @@
             .hash = "clap-0.10.0-oBajB434AQBDh-Ei3YtoKIRxZacVPF1iSwp3IX_ZB8f0",
         },
         .zigini = .{
-            .url = "https://github.com/AnErrupTion/zigini/archive/e61d31b2b7db3365993a20cc90e491d0cb0b7282.tar.gz",
+            .url = "https://github.com/Kawaii-Ash/zigini/archive/2ed3d417f17fab5b0ee8cad8a63c6d62d7ac1042.tar.gz",
             .hash = "zigini-0.3.1-BSkB7XJGAAB2E-sKyzhTaQCBlYBL8yqzE4E_jmSY99sC",
         },
     },

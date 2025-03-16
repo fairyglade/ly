@@ -5,7 +5,7 @@ const TerminalBuffer = @import("../TerminalBuffer.zig");
 pub fn CyclableLabel(comptime ItemType: type) type {
     return struct {
         const Allocator = std.mem.Allocator;
-        const ItemList = std.ArrayList(ItemType);
+        const ItemList = std.ArrayListUnmanaged(ItemType);
         const DrawItemFn = *const fn (*Self, ItemType, usize, usize) bool;
 
         const termbox = interop.termbox;
@@ -27,7 +27,7 @@ pub fn CyclableLabel(comptime ItemType: type) type {
             return .{
                 .allocator = allocator,
                 .buffer = buffer,
-                .list = ItemList.init(allocator),
+                .list = .empty,
                 .current = 0,
                 .visible_length = 0,
                 .x = 0,
@@ -38,8 +38,8 @@ pub fn CyclableLabel(comptime ItemType: type) type {
             };
         }
 
-        pub fn deinit(self: Self) void {
-            self.list.deinit();
+        pub fn deinit(self: *Self) void {
+            self.list.deinit(self.allocator);
         }
 
         pub fn position(self: *Self, x: usize, y: usize, visible_length: usize, text_in_center: ?bool) void {
@@ -53,7 +53,7 @@ pub fn CyclableLabel(comptime ItemType: type) type {
         }
 
         pub fn addItem(self: *Self, item: ItemType) !void {
-            try self.list.append(item);
+            try self.list.append(self.allocator, item);
             self.current = self.list.items.len - 1;
         }
 

@@ -303,7 +303,7 @@ pub fn main() !void {
     // Load last saved username and desktop selection, if any
     if (config.load) {
         if (save.user) |user| {
-            try login.text.appendSlice(user);
+            try login.text.appendSlice(login.allocator, user);
             login.end = user.len;
             login.cursor = login.end;
             active_input = .password;
@@ -387,7 +387,7 @@ pub fn main() !void {
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
         if (!update or animate) {
-            if (!update) std.time.sleep(std.time.ns_per_ms * 100);
+            if (!update) std.Thread.sleep(std.time.ns_per_ms * 100);
 
             _ = termbox.tb_present(); // Required to update tb_width() and tb_height()
 
@@ -551,11 +551,11 @@ pub fn main() !void {
                 login.draw();
                 password.draw();
             } else {
-                std.time.sleep(std.time.ns_per_ms * 10);
+                std.Thread.sleep(std.time.ns_per_ms * 10);
                 update = buffer.cascade();
 
                 if (!update) {
-                    std.time.sleep(std.time.ns_per_s * 7);
+                    std.Thread.sleep(std.time.ns_per_s * 7);
                     auth_fails = 0;
                 }
             }

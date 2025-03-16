@@ -23,7 +23,7 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer) InfoLine {
     };
 }
 
-pub fn deinit(self: InfoLine) void {
+pub fn deinit(self: *InfoLine) void {
     self.label.deinit();
 }
 
