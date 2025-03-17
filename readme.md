@@ -59,7 +59,7 @@ The following desktop environments were tested with success:
 </details>
 
 <details>
-<summary>X11 environments</summary>
+<summary>X environments</summary>
 <br>
  - awesome
 <br>
