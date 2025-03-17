@@ -34,7 +34,6 @@ It is recommended to add a rule for Ly as it currently does not ship one.
 The following desktop environments were tested with success:
 <details>
 <summary>Wayland environments</summary>
-<br>
  - budgie
 <br>
  - cosmic
@@ -60,7 +59,6 @@ The following desktop environments were tested with success:
 
 <details>
 <summary>X environments</summary>
-<br>
  - awesome
 <br>
  - bspwm
