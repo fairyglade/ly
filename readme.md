@@ -32,33 +32,69 @@ It is recommended to add a rule for Ly as it currently does not ship one.
 
 ## Support
 The following desktop environments were tested with success:
- - awesome
- - bspwm
+<details>
+<summary>Wayland environments</summary>
+<br>
  - budgie
- - cinnamon
+<br>
  - cosmic
+<br>
  - deepin
- - dwl
- - dwm
+<br>
  - enlightenment
+<br>
  - gnome
+<br>
  - hyprland
- - i3
+<br>
  - kde
+<br>
  - labwc
- - leftwm
- - lxde
- - lxqt
- - mate
- - maxx
- - niri
+<br>
  - pantheon
- - qtile
- - spectrwm
+<br>
  - sway
+<br>
+ - weston
+</details>
+
+<details>
+<summary>X11 environments</summary>
+<br>
+ - awesome
+<br>
+ - bspwm
+<br>
+ - budgie
+<br>
+ - cinnamon
+<br>
+ - enlightenment
+<br>
+ - kde
+<br>
+ - leftwm
+<br>
+ - lxde
+<br>
+ - mate
+<br>
+ - maxx
+<br>
+ - niri
+<br>
+ - pantheon
+<br>
+ - qwm
+<br>
+ - spectrwm
+<br>
  - windowmaker
+<br>
  - xfce
+<br>
  - xmonad
+</details>
 
 Ly should work with any X desktop environment, and provides
 basic wayland support (sway works very well, for example).
