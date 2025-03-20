@@ -32,33 +32,10 @@ It is recommended to add a rule for Ly as it currently does not ship one.
 
 ## Support
 The following desktop environments were tested with success:
- - awesome
- - bspwm
- - budgie
- - cinnamon
- - cosmic
- - deepin
- - dwl
- - dwm
- - enlightenment
- - gnome
- - hyprland
- - i3
- - kde
- - labwc
- - leftwm
- - lxde
- - lxqt
- - mate
- - maxx
- - niri
- - pantheon
- - qtile
- - spectrwm
- - sway
- - windowmaker
- - xfce
- - xmonad
+
+[Wayland Environments](#supported-wayland-environments)
+
+[X11 Environments](#supported-x11-environments)
 
 Ly should work with any X desktop environment, and provides
 basic wayland support (sway works very well, for example).
@@ -247,6 +224,39 @@ On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
 - Use the F1 and F2 keys to respectively shutdown and reboot.
 - Take a look at your .xsession if X doesn't start, as it can interfere
   (this file is launched with X to configure the display properly).
+
+## Supported Wayland Environments
+ - budgie
+ - cosmic
+ - deepin
+ - enlightenment
+ - gnome
+ - hyprland
+ - kde
+ - labwc
+ - niri
+ - pantheon
+ - sway
+ - weston
+
+## Supported X11 Environments
+ - awesome
+ - bspwm
+ - budgie
+ - cinnamon
+ - enlightenment
+ - kde
+ - leftwm
+ - lxde
+ - mate
+ - maxx
+ - pantheon
+ - qwm
+ - spectrwm
+ - windowmaker
+ - xfce
+ - xmonad
+
 
 ## Additional Information
 The name "Ly" is a tribute to the fairy from the game Rayman.
