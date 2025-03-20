@@ -234,6 +234,7 @@ On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
  - hyprland
  - kde
  - labwc
+ - niri
  - pantheon
  - sway
  - weston
@@ -249,7 +250,6 @@ On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
  - lxde
  - mate
  - maxx
- - niri
  - pantheon
  - qwm
  - spectrwm
