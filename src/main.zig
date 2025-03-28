@@ -288,8 +288,16 @@ pub fn main() !void {
         try info_line.addMessage(hostname, config.bg, config.fg);
     }
 
-    try crawl(&session, lang, config.waylandsessions, .wayland);
-    if (build_options.enable_x11_support) try crawl(&session, lang, config.xsessions, .x11);
+    var waylandsessiondirs = std.mem.splitScalar(u8, config.waylandsessions, ':');
+    while (waylandsessiondirs.next()) |dir| {
+        try crawl(&session, lang, dir, .wayland);
+    }
+    if (build_options.enable_x11_support) {
+        var xsessiondirs = std.mem.splitScalar(u8, config.xsessions, ':');
+        while (xsessiondirs.next()) |dir| {
+            try crawl(&session, lang, dir, .x11);
+        }
+    }
 
     var login = Text.init(allocator, &buffer, false, null);
     defer login.deinit();
