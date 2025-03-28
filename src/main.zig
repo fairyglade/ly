@@ -288,13 +288,13 @@ pub fn main() !void {
         try info_line.addMessage(hostname, config.bg, config.fg);
     }
 
-    var waylandsessiondirs = std.mem.splitScalar(u8, config.waylandsessions, ':');
-    while (waylandsessiondirs.next()) |dir| {
+    var wayland_session_dirs = std.mem.splitScalar(u8, config.waylandsessions, ':');
+    while (wayland_session_dirs.next()) |dir| {
         try crawl(&session, lang, dir, .wayland);
     }
     if (build_options.enable_x11_support) {
-        var xsessiondirs = std.mem.splitScalar(u8, config.xsessions, ':');
-        while (xsessiondirs.next()) |dir| {
+        var x_session_dirs = std.mem.splitScalar(u8, config.xsessions, ':');
+        while (x_session_dirs.next()) |dir| {
             try crawl(&session, lang, dir, .x11);
         }
     }
