@@ -271,6 +271,12 @@ fn install_ly(allocator: std.mem.Allocator, install_config: bool) !void {
 
             const patched_setup = try patchFile(allocator, "res/setup.sh", patch_map);
             try installText(patched_setup, config_dir, ly_config_directory, "setup.sh", .{ .mode = 0o755 });
+
+
+        
+
+            const patched_setup = try patchFile(allocator, "res/default_img.lyim", patch_map);
+            try installText(patched_setup, config_dir, ly_config_directory, "default_img.lyimñ", .{ .mode = 0o755 });
         }
     }
 
