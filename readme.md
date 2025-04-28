@@ -244,7 +244,9 @@ On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
  - bspwm
  - budgie
  - cinnamon
+ - dwm
  - enlightenment
+ - gnome
  - kde
  - leftwm
  - lxde
