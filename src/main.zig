@@ -376,7 +376,7 @@ pub fn main() !void {
     const sleep_len = try TerminalBuffer.strWidth(lang.sleep);
     const brightness_down_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
     const brightness_down_len = try TerminalBuffer.strWidth(lang.brightness_down);
-    const brightness_up_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
+    const brightness_up_key = if (config.brightness_up_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
     const brightness_up_len = try TerminalBuffer.strWidth(lang.brightness_up);
 
     var event: termbox.tb_event = undefined;
