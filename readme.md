@@ -16,6 +16,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
   - xorg
   - xorg-xauth
   - shutdown
+  - brightnessctl
 
 ### Debian
 ```
@@ -75,6 +76,14 @@ your machine.
 Install Ly for systemd-based systems (the default)
 ```
 # zig build installexe
+```
+
+Instead of DISPLAY_MANAGER you need to add your DM:
+- gdm.service
+- sddm.service
+- lightdm.service
+```
+# systemctl disable DISPLAY_MANAGER
 ```
 
 Enable the service
@@ -244,7 +253,9 @@ On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
  - bspwm
  - budgie
  - cinnamon
+ - dwm
  - enlightenment
+ - gnome
  - kde
  - leftwm
  - lxde

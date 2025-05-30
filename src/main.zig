@@ -381,7 +381,7 @@ pub fn main() !void {
     const sleep_len = try TerminalBuffer.strWidth(lang.sleep);
     const brightness_down_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
     const brightness_down_len = try TerminalBuffer.strWidth(lang.brightness_down);
-    const brightness_up_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
+    const brightness_up_key = if (config.brightness_up_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
     const brightness_up_len = try TerminalBuffer.strWidth(lang.brightness_up);
 
     var event: termbox.tb_event = undefined;
@@ -787,6 +787,11 @@ pub fn main() !void {
                     password.clear();
                     try info_line.addMessage(lang.logout, config.bg, config.fg);
                 }
+
+                // Clear the TTY because termbox2 doesn't properly do it
+                const capability = termbox.global.caps[termbox.TB_CAP_CLEAR_SCREEN];
+                const capability_slice = capability[0..std.mem.len(capability)];
+                _ = try std.posix.write(termbox.global.ttyfd, capability_slice);
 
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
                 if (auth_fails < config.auth_fails) _ = termbox.tb_clear();
