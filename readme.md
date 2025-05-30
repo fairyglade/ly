@@ -16,6 +16,7 @@ Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
   - xorg
   - xorg-xauth
   - shutdown
+  - brightnessctl
 
 ### Debian
 ```
