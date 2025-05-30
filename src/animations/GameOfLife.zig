@@ -8,30 +8,9 @@ const Random = std.Random;
 
 const GameOfLife = @This();
 
-pub const FRAME_DELAY: usize = 6; // Slightly faster for smoother animation
-pub const INITIAL_DENSITY: f32 = 0.4; // Increased for more activity
-pub const COLOR_CYCLE_DELAY: usize = 192; // Change color every N frames
-
 // Visual styles - using block characters like other animations
 const ALIVE_CHAR: u21 = 0x2588; // Full block █
 const DEAD_CHAR: u21 = ' ';
-
-// ANSI basic colors using TerminalBuffer.Color like other animations
-const ANSI_COLORS = [_]u32{
-    @intCast(TerminalBuffer.Color.RED),
-    @intCast(TerminalBuffer.Color.GREEN),
-    @intCast(TerminalBuffer.Color.YELLOW),
-    @intCast(TerminalBuffer.Color.BLUE),
-    @intCast(TerminalBuffer.Color.MAGENTA),
-    @intCast(TerminalBuffer.Color.CYAN),
-    @intCast(TerminalBuffer.Color.RED | TerminalBuffer.Styling.BOLD),
-    @intCast(TerminalBuffer.Color.GREEN | TerminalBuffer.Styling.BOLD),
-    @intCast(TerminalBuffer.Color.YELLOW | TerminalBuffer.Styling.BOLD),
-    @intCast(TerminalBuffer.Color.BLUE | TerminalBuffer.Styling.BOLD),
-    @intCast(TerminalBuffer.Color.MAGENTA | TerminalBuffer.Styling.BOLD),
-    @intCast(TerminalBuffer.Color.CYAN | TerminalBuffer.Styling.BOLD),
-};
-const NUM_COLORS = ANSI_COLORS.len;
 const NEIGHBOR_DIRS = [_][2]i8{
     .{ -1, -1 }, .{ -1, 0 }, .{ -1, 1 },
     .{ 0, -1 },  .{ 0, 1 },  .{ 1, -1 },
@@ -44,13 +23,16 @@ current_grid: []bool,
 next_grid: []bool,
 frame_counter: usize,
 generation: u64,
-color_index: usize,
-color_counter: usize,
+fg_color: u32,
+entropy_interval: usize,
+frame_delay: usize,
+initial_density: f32,
+randomize_colors: bool,
 dead_cell: Cell,
 width: usize,
 height: usize,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer) !GameOfLife {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_color: u32, entropy_interval: usize, frame_delay: usize, initial_density: f32, randomize_colors: bool) !GameOfLife {
     const width = terminal_buffer.width;
     const height = terminal_buffer.height;
     const grid_size = width * height;
@@ -65,8 +47,11 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer) !GameOfLife 
         .next_grid = next_grid,
         .frame_counter = 0,
         .generation = 0,
-        .color_index = 0,
-        .color_counter = 0,
+        .fg_color = if (randomize_colors) generateRandomColor(terminal_buffer.random) else fg_color,
+        .entropy_interval = entropy_interval,
+        .frame_delay = frame_delay,
+        .initial_density = initial_density,
+        .randomize_colors = randomize_colors,
         .dead_cell = .{ .ch = DEAD_CHAR, .fg = @intCast(TerminalBuffer.Color.DEFAULT), .bg = terminal_buffer.bg },
         .width = width,
         .height = height,
@@ -92,47 +77,35 @@ fn realloc(self: *GameOfLife) anyerror!void {
     const new_height = self.terminal_buffer.height;
     const new_size = new_width * new_height;
 
-    // Only reallocate if size changed significantly
-    if (new_size != self.width * self.height) {
-        const current_grid = try self.allocator.realloc(self.current_grid, new_size);
-        const next_grid = try self.allocator.realloc(self.next_grid, new_size);
+    // Always reallocate to be safe
+    const current_grid = try self.allocator.realloc(self.current_grid, new_size);
+    const next_grid = try self.allocator.realloc(self.next_grid, new_size);
 
-        self.current_grid = current_grid;
-        self.next_grid = next_grid;
-        self.width = new_width;
-        self.height = new_height;
+    self.current_grid = current_grid;
+    self.next_grid = next_grid;
+    self.width = new_width;
+    self.height = new_height;
 
-        self.initializeGrid();
-        self.generation = 0;
-        self.color_index = 0;
-        self.color_counter = 0;
-    }
+    self.initializeGrid();
+    self.generation = 0;
 }
 
 fn draw(self: *GameOfLife) void {
-    // Update ANSI color cycling at controlled rate
-    self.color_counter += 1;
-    if (self.color_counter >= COLOR_CYCLE_DELAY) {
-        self.color_counter = 0;
-        self.color_index = (self.color_index + 1) % NUM_COLORS;
-    }
-
     // Update game state at controlled frame rate
     self.frame_counter += 1;
-    if (self.frame_counter >= FRAME_DELAY) {
+    if (self.frame_counter >= self.frame_delay) {
         self.frame_counter = 0;
         self.updateGeneration();
         self.generation += 1;
 
-        // Add entropy less frequently to reduce computational overhead
-        if (self.generation % 150 == 0) {
+        // Add entropy based on configuration (0 = disabled, >0 = interval)
+        if (self.entropy_interval > 0 and self.generation % self.entropy_interval == 0) {
             self.addEntropy();
         }
     }
 
-    // Render with ANSI color cycling - use current color from the array (same method as Matrix/Doom)
-    const current_color = ANSI_COLORS[self.color_index];
-    const alive_cell = Cell{ .ch = ALIVE_CHAR, .fg = current_color, .bg = self.terminal_buffer.bg };
+    // Render with the set color (either configured or randomly generated at startup)
+    const alive_cell = Cell{ .ch = ALIVE_CHAR, .fg = self.fg_color, .bg = self.terminal_buffer.bg };
 
     for (0..self.height) |y| {
         const row_offset = y * self.width;
@@ -141,6 +114,15 @@ fn draw(self: *GameOfLife) void {
             cell.put(x, y);
         }
     }
+}
+
+fn generateRandomColor(random: Random) u32 {
+    // Generate a random RGB color with good visibility
+    // Avoid very dark colors by using range 64-255 for each component
+    const r = random.intRangeAtMost(u8, 64, 255);
+    const g = random.intRangeAtMost(u8, 64, 255);
+    const b = random.intRangeAtMost(u8, 64, 255);
+    return (@as(u32, r) << 16) | (@as(u32, g) << 8) | @as(u32, b);
 }
 
 fn updateGeneration(self: *GameOfLife) void {
@@ -170,12 +152,16 @@ fn countNeighborsOptimized(self: *GameOfLife, x: usize, y: usize) u8 {
 
     // Use cached dimensions and more efficient bounds checking
     for (NEIGHBOR_DIRS) |dir| {
-        const nx = @as(i32, @intCast(x)) + dir[0];
-        const ny = @as(i32, @intCast(y)) + dir[1];
+        const nx: i32 = @intCast(x);
+        const ny: i32 = @intCast(y);
+        const neighbor_x: i32 = nx + dir[0];
+        const neighbor_y: i32 = ny + dir[1];
+        const width_i32: i32 = @intCast(self.width);
+        const height_i32: i32 = @intCast(self.height);
 
         // Toroidal wrapping with modular arithmetic
-        const wx: usize = @intCast(@mod(nx + @as(i32, @intCast(self.width)), @as(i32, @intCast(self.width))));
-        const wy: usize = @intCast(@mod(ny + @as(i32, @intCast(self.height)), @as(i32, @intCast(self.height))));
+        const wx: usize = @intCast(@mod(neighbor_x + width_i32, width_i32));
+        const wy: usize = @intCast(@mod(neighbor_y + height_i32, height_i32));
 
         if (self.current_grid[wy * self.width + wx]) {
             count += 1;
@@ -192,62 +178,9 @@ fn initializeGrid(self: *GameOfLife) void {
     @memset(self.current_grid, false);
     @memset(self.next_grid, false);
 
-    // Random initialization with better distribution
+    // Random initialization with configurable density
     for (0..total_cells) |i| {
-        self.current_grid[i] = self.terminal_buffer.random.float(f32) < INITIAL_DENSITY;
-    }
-
-    // Add interesting patterns with better positioning
-    self.addPatterns();
-}
-
-fn addPatterns(self: *GameOfLife) void {
-    if (self.width < 8 or self.height < 8) return;
-
-    // Add multiple instances of each pattern for liveliness
-    for (0..3) |_| {
-        self.addGlider();
-        if (self.width >= 10 and self.height >= 10) {
-            self.addBlock();
-            self.addBlinker();
-        }
-    }
-}
-
-fn addGlider(self: *GameOfLife) void {
-    const x = self.terminal_buffer.random.intRangeAtMost(usize, 2, self.width - 4);
-    const y = self.terminal_buffer.random.intRangeAtMost(usize, 2, self.height - 4);
-
-    // Classic glider pattern
-    const positions = [_][2]usize{ .{ 1, 0 }, .{ 2, 1 }, .{ 0, 2 }, .{ 1, 2 }, .{ 2, 2 } };
-
-    for (positions) |pos| {
-        const idx = (y + pos[1]) * self.width + (x + pos[0]);
-        self.current_grid[idx] = true;
-    }
-}
-
-fn addBlock(self: *GameOfLife) void {
-    const x = self.terminal_buffer.random.intRangeAtMost(usize, 1, self.width - 3);
-    const y = self.terminal_buffer.random.intRangeAtMost(usize, 1, self.height - 3);
-
-    // 2x2 block
-    const positions = [_][2]usize{ .{ 0, 0 }, .{ 1, 0 }, .{ 0, 1 }, .{ 1, 1 } };
-
-    for (positions) |pos| {
-        const idx = (y + pos[1]) * self.width + (x + pos[0]);
-        self.current_grid[idx] = true;
-    }
-}
-
-fn addBlinker(self: *GameOfLife) void {
-    const x = self.terminal_buffer.random.intRangeAtMost(usize, 1, self.width - 4);
-    const y = self.terminal_buffer.random.intRangeAtMost(usize, 1, self.height - 2);
-
-    // 3-cell horizontal line
-    for (0..3) |i| {
-        const idx = y * self.width + (x + i);
-        self.current_grid[idx] = true;
+        self.current_grid[i] = self.terminal_buffer.random.float(f32) < self.initial_density;
     }
 }
 
