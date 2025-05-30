@@ -78,6 +78,14 @@ Install Ly for systemd-based systems (the default)
 # zig build installexe
 ```
 
+Instead of DISPLAY_MANAGER you need to add your DM:
+- gdm.service
+- sddm.service
+- lightdm.service
+```
+# systemctl disable DISPLAY_MANAGER
+```
+
 Enable the service
 ```
 # systemctl enable ly.service
