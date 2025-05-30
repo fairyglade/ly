@@ -55,31 +55,21 @@ fn realloc(self: *Doom) anyerror!void {
 
 fn draw(self: *Doom) void {
     for (0..self.terminal_buffer.width) |x| {
+        // We start from 1 so that we always have the topmost line when spreading fire
         for (1..self.terminal_buffer.height) |y| {
-            const source = y * self.terminal_buffer.width + x;
-            const random = (self.terminal_buffer.random.int(u16) % 7) & 3;
+            // Get current cell
+            const from = y * self.terminal_buffer.width + x;
+            const cell_index = self.buffer[from];
 
-            var dest = (source - @min(source, random)) + 1;
-            if (self.terminal_buffer.width > dest) dest = 0 else dest -= self.terminal_buffer.width;
+            // Spread fire
+            const propagate = self.terminal_buffer.random.int(u1);
+            const to = from - self.terminal_buffer.width; // Get the line above
 
-            const buffer_source = self.buffer[source];
-            const buffer_dest_offset = random & 1;
+            self.buffer[to] = if (cell_index > 0) cell_index - propagate else cell_index;
 
-            if (buffer_source < buffer_dest_offset) continue;
-
-            var buffer_dest = buffer_source - buffer_dest_offset;
-            if (buffer_dest > STEPS) buffer_dest = 0;
-            self.buffer[dest] = @intCast(buffer_dest);
-
-            const dest_y = dest / self.terminal_buffer.width;
-            const dest_x = dest % self.terminal_buffer.width;
-            const dest_cell = self.fire[buffer_dest];
-            dest_cell.put(dest_x, dest_y);
-
-            const source_y = source / self.terminal_buffer.width;
-            const source_x = source % self.terminal_buffer.width;
-            const source_cell = self.fire[buffer_source];
-            source_cell.put(source_x, source_y);
+            // Put the cell
+            const cell = self.fire[cell_index];
+            cell.put(x, y);
         }
     }
 }
@@ -89,6 +79,8 @@ fn initBuffer(buffer: []u8, width: usize) void {
     const slice_start = buffer[0..length];
     const slice_end = buffer[length..];
 
+    // Initialize the framebuffer in black, except for the "fire source" as the
+    // last color
     @memset(slice_start, 0);
     @memset(slice_end, STEPS);
 }
