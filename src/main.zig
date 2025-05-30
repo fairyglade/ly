@@ -783,6 +783,11 @@ pub fn main() !void {
                     try info_line.addMessage(lang.logout, config.bg, config.fg);
                 }
 
+                // Clear the TTY because termbox2 doesn't properly do it
+                const capability = termbox.global.caps[termbox.TB_CAP_CLEAR_SCREEN];
+                const capability_slice = capability[0..std.mem.len(capability)];
+                _ = try std.posix.write(termbox.global.ttyfd, capability_slice);
+
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
                 if (auth_fails < config.auth_fails) _ = termbox.tb_clear();
 
