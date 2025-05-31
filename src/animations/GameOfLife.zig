@@ -77,7 +77,6 @@ fn realloc(self: *GameOfLife) anyerror!void {
     const new_height = self.terminal_buffer.height;
     const new_size = new_width * new_height;
 
-    // Always reallocate to be safe
     const current_grid = try self.allocator.realloc(self.current_grid, new_size);
     const next_grid = try self.allocator.realloc(self.next_grid, new_size);
 
@@ -150,12 +149,9 @@ fn updateGeneration(self: *GameOfLife) void {
 fn countNeighborsOptimized(self: *GameOfLife, x: usize, y: usize) u8 {
     var count: u8 = 0;
 
-    // Use cached dimensions and more efficient bounds checking
     for (NEIGHBOR_DIRS) |dir| {
-        const nx: i32 = @intCast(x);
-        const ny: i32 = @intCast(y);
-        const neighbor_x: i32 = nx + dir[0];
-        const neighbor_y: i32 = ny + dir[1];
+        const neighbor_x = @as(i32, @intCast(x)) + dir[0];
+        const neighbor_y = @as(i32, @intCast(y)) + dir[1];
         const width_i32: i32 = @intCast(self.width);
         const height_i32: i32 = @intCast(self.height);
 
