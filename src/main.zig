@@ -962,6 +962,6 @@ fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
         error.PamSystemError => lang.err_pam_sys,
         error.PamUserUnknown => lang.err_pam_user_unknown,
         error.PamAbort => lang.err_pam_abort,
-        else => lang.err_unknown,
+        else => @errorName(err),
     };
 }
