@@ -7,6 +7,7 @@ pub const SIZE = WIDTH * HEIGHT;
 pub const X: u32 = if (builtin.os.tag == .linux or builtin.os.tag.isBSD()) 0x2593 else '#';
 pub const O: u32 = 0;
 
+// zig fmt: off
 pub const LocaleChars = struct {
     ZERO:   [SIZE]u21,
     ONE:    [SIZE]u21,
@@ -21,3 +22,4 @@ pub const LocaleChars = struct {
     S:      [SIZE]u21,
     E:      [SIZE]u21,
 };
+// zig fmt: on
