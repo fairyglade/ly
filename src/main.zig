@@ -427,7 +427,7 @@ pub fn main() !void {
                 if (!animation_timed_out) animation.draw();
 
                 if (!config.hide_version_string) {
-                    buffer.drawLabel(ly_top_str, 0, 0);
+                    buffer.drawLabel(ly_top_str, length, 0);
                     length += ly_top_str.len + 1;
                 }
 
