@@ -366,7 +366,7 @@ pub fn main() !void {
             animation = color_mix.animation();
         },
         .gameoflife => {
-            var game_of_life = try GameOfLife.init(allocator, &buffer, config.gameoflife_fg, config.gameoflife_entropy_interval, config.gameoflife_frame_delay, config.gameoflife_initial_density, config.gameoflife_randomize_colors);
+            var game_of_life = try GameOfLife.init(allocator, &buffer, config.gameoflife_fg, config.gameoflife_entropy_interval, config.gameoflife_frame_delay, config.gameoflife_initial_density);
             animation = game_of_life.animation();
         },
     }
