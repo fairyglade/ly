@@ -4,7 +4,6 @@ const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 
 const Allocator = std.mem.Allocator;
-const Random = std.Random;
 
 const GameOfLife = @This();
 
@@ -27,12 +26,11 @@ fg_color: u32,
 entropy_interval: usize,
 frame_delay: usize,
 initial_density: f32,
-randomize_colors: bool,
 dead_cell: Cell,
 width: usize,
 height: usize,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_color: u32, entropy_interval: usize, frame_delay: usize, initial_density: f32, randomize_colors: bool) !GameOfLife {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_color: u32, entropy_interval: usize, frame_delay: usize, initial_density: f32) !GameOfLife {
     const width = terminal_buffer.width;
     const height = terminal_buffer.height;
     const grid_size = width * height;
@@ -47,11 +45,10 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_color: u3
         .next_grid = next_grid,
         .frame_counter = 0,
         .generation = 0,
-        .fg_color = if (randomize_colors) generateRandomColor(terminal_buffer.random) else fg_color,
+        .fg_color = fg_color,
         .entropy_interval = entropy_interval,
         .frame_delay = frame_delay,
         .initial_density = initial_density,
-        .randomize_colors = randomize_colors,
         .dead_cell = .{ .ch = DEAD_CHAR, .fg = @intCast(TerminalBuffer.Color.DEFAULT), .bg = terminal_buffer.bg },
         .width = width,
         .height = height,
@@ -103,7 +100,7 @@ fn draw(self: *GameOfLife) void {
         }
     }
 
-    // Render with the set color (either configured or randomly generated at startup)
+    // Render with the configured color
     const alive_cell = Cell{ .ch = ALIVE_CHAR, .fg = self.fg_color, .bg = self.terminal_buffer.bg };
 
     for (0..self.height) |y| {
@@ -113,15 +110,6 @@ fn draw(self: *GameOfLife) void {
             cell.put(x, y);
         }
     }
-}
-
-fn generateRandomColor(random: Random) u32 {
-    // Generate a random RGB color with good visibility
-    // Avoid very dark colors by using range 64-255 for each component
-    const r = random.intRangeAtMost(u8, 64, 255);
-    const g = random.intRangeAtMost(u8, 64, 255);
-    const b = random.intRangeAtMost(u8, 64, 255);
-    return (@as(u32, r) << 16) | (@as(u32, g) << 8) | @as(u32, b);
 }
 
 fn updateGeneration(self: *GameOfLife) void {
