@@ -11,17 +11,31 @@ pub const STEPS = 12;
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
 buffer: []u8,
+height: u8,
 fire: [STEPS + 1]Cell,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u32, middle_color: u32, bottom_color: u32) !Doom {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fire_height: u8, default_colors: bool, top_color: u32, middle_color: u32, bottom_color: u32) !Doom {
     const buffer = try allocator.alloc(u8, terminal_buffer.width * terminal_buffer.height);
     initBuffer(buffer, terminal_buffer.width);
 
-    return .{
-        .allocator = allocator,
-        .terminal_buffer = terminal_buffer,
-        .buffer = buffer,
-        .fire = [_]Cell{
+    const levels = if (default_colors)
+        [_]Cell{
+            Cell.init(' ', TerminalBuffer.Color.DEFAULT, TerminalBuffer.Color.DEFAULT),
+            Cell.init(0x2591, 0x070707, TerminalBuffer.Color.DEFAULT),
+            Cell.init(0x2592, 0x470F07, TerminalBuffer.Color.DEFAULT),
+            Cell.init(0x2593, 0x771F07, TerminalBuffer.Color.DEFAULT),
+            Cell.init(0x2588, 0xAF3F07, TerminalBuffer.Color.DEFAULT),
+            Cell.init(0x2591, 0xC74707, 0xAF3F07),
+            Cell.init(0x2592, 0xDF5707, 0xAF3F07),
+            Cell.init(0x2593, 0xCF6F0F, 0xAF3F07),
+            Cell.init(0x2588, 0xC78F17, 0xAF3F07),
+            Cell.init(0x2591, 0xBF9F1F, 0xAF3F07),
+            Cell.init(0x2592, 0xBFAF2F, 0xAF3F07),
+            Cell.init(0x2593, 0xCFCF6F, 0xAF3F07),
+            Cell.init(0x2588, 0xFFFFFF, 0xAF3F07),
+        }
+    else
+        [_]Cell{
             Cell.init(' ', TerminalBuffer.Color.DEFAULT, TerminalBuffer.Color.DEFAULT),
             Cell.init(0x2591, top_color, TerminalBuffer.Color.DEFAULT),
             Cell.init(0x2592, top_color, TerminalBuffer.Color.DEFAULT),
@@ -35,7 +49,14 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u
             Cell.init(0x2592, bottom_color, middle_color),
             Cell.init(0x2593, bottom_color, middle_color),
             Cell.init(0x2588, bottom_color, middle_color),
-        },
+        };
+
+    return .{
+        .allocator = allocator,
+        .terminal_buffer = terminal_buffer,
+        .buffer = buffer,
+        .height = @min(9, fire_height),
+        .fire = levels,
     };
 }
 
@@ -57,20 +78,31 @@ fn draw(self: *Doom) void {
     for (0..self.terminal_buffer.width) |x| {
         // We start from 1 so that we always have the topmost line when spreading fire
         for (1..self.terminal_buffer.height) |y| {
-            // Get current cell
+            // Get index of current cell in fire level buffer
             const from = y * self.terminal_buffer.width + x;
-            const cell_index = self.buffer[from];
 
-            // Spread fire
-            const propagate = self.terminal_buffer.random.int(u1);
-            const to = from - self.terminal_buffer.width; // Get the line above
+            // Generate random datum for fire propagation
+            const random = (self.terminal_buffer.random.int(u16) % 10);
 
-            self.buffer[to] = if (cell_index > 0) cell_index - propagate else cell_index;
+            // Select semi-random target cell
+            const to = from -| self.terminal_buffer.width -| (random & 3) + 1;
 
-            // Put the cell
-            const cell = self.fire[cell_index];
-            cell.put(x, y);
+            // Get fire level of current cell
+            const level_buf_from = self.buffer[from];
+
+            // Choose new fire level and store in level buffer
+            var level_buf_to = level_buf_from;
+            if (random >= self.height) level_buf_to -|= 1;
+            self.buffer[to] = @intCast(level_buf_to);
+
+            // Send fire level to terminal buffer
+            const to_cell = self.fire[level_buf_to];
+            to_cell.put(x, y);
         }
+
+        // Draw bottom line (fire source)
+        const src_cell = self.fire[STEPS];
+        src_cell.put(x, self.terminal_buffer.height - 1);
     }
 }
 
