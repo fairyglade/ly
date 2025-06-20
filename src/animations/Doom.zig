@@ -24,14 +24,14 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fire_height:
             Cell.init(0x2591, 0x070707, TerminalBuffer.Color.DEFAULT),
             Cell.init(0x2592, 0x470F07, TerminalBuffer.Color.DEFAULT),
             Cell.init(0x2593, 0x771F07, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2588, 0xAF3F07, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2591, 0xC74707, 0xAF3F07),
-            Cell.init(0x2592, 0xDF5707, 0xAF3F07),
-            Cell.init(0x2593, 0xCF6F0F, 0xAF3F07),
-            Cell.init(0x2588, 0xC78F17, 0xAF3F07),
-            Cell.init(0x2591, 0xBF9F1F, 0xAF3F07),
-            Cell.init(0x2592, 0xBFAF2F, 0xAF3F07),
-            Cell.init(0x2593, 0xCFCF6F, 0xAF3F07),
+            Cell.init(0x2588, 0x9F2F07, TerminalBuffer.Color.DEFAULT),
+            Cell.init(0x2591, 0xBF4707, 0xAF3F07),
+            Cell.init(0x2592, 0xC74707, 0xAF3F07),
+            Cell.init(0x2593, 0xDF5707, 0xAF3F07),
+            Cell.init(0x2588, 0xCF6F0F, 0xAF3F07),
+            Cell.init(0x2591, 0xC78F17, 0xAF3F07),
+            Cell.init(0x2592, 0xBF9F1F, 0xAF3F07),
+            Cell.init(0x2593, 0xBFAF2F, 0xAF3F07),
             Cell.init(0x2588, 0xFFFFFF, 0xAF3F07),
         }
     else
@@ -82,10 +82,12 @@ fn draw(self: *Doom) void {
             const from = y * self.terminal_buffer.width + x;
 
             // Generate random datum for fire propagation
-            const random = (self.terminal_buffer.random.int(u16) % 10);
+            const random = (self.terminal_buffer.random.int(u8) % 10);
 
             // Select semi-random target cell
             const to = from -| self.terminal_buffer.width -| (random & 3) + 1;
+            const to_x = to % self.terminal_buffer.width;
+            const to_y = to / self.terminal_buffer.width;
 
             // Get fire level of current cell
             const level_buf_from = self.buffer[from];
@@ -95,9 +97,11 @@ fn draw(self: *Doom) void {
             if (random >= self.height) level_buf_to -|= 1;
             self.buffer[to] = @intCast(level_buf_to);
 
-            // Send fire level to terminal buffer
+            // Send known fire levels to terminal buffer
+            const from_cell = self.fire[level_buf_from];
             const to_cell = self.fire[level_buf_to];
-            to_cell.put(x, y);
+            from_cell.put(x, y);
+            to_cell.put(to_x, to_y);
         }
 
         // Draw bottom line (fire source)
