@@ -21,18 +21,18 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fire_height:
     const levels = if (default_colors)
         [_]Cell{
             Cell.init(' ', TerminalBuffer.Color.DEFAULT, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2591, 0x070707, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2592, 0x470F07, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2593, 0x771F07, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2588, 0x9F2F07, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2591, 0xBF4707, 0xAF3F07),
-            Cell.init(0x2592, 0xC74707, 0xAF3F07),
-            Cell.init(0x2593, 0xDF5707, 0xAF3F07),
-            Cell.init(0x2588, 0xCF6F0F, 0xAF3F07),
-            Cell.init(0x2591, 0xC78F17, 0xAF3F07),
-            Cell.init(0x2592, 0xBF9F1F, 0xAF3F07),
-            Cell.init(0x2593, 0xBFAF2F, 0xAF3F07),
-            Cell.init(0x2588, 0xFFFFFF, 0xAF3F07),
+            Cell.init(0x2591, 0x009F2707, TerminalBuffer.Color.DEFAULT),
+            Cell.init(0x2592, 0x009F2707, TerminalBuffer.Color.DEFAULT),
+            Cell.init(0x2593, 0x009F2707, TerminalBuffer.Color.DEFAULT),
+            Cell.init(0x2588, 0x009F2707, TerminalBuffer.Color.DEFAULT),
+            Cell.init(0x2591, 0x00C78F17, 0x009F2707),
+            Cell.init(0x2592, 0x00C78F17, 0x009F2707),
+            Cell.init(0x2593, 0x00C78F17, 0x009F2707),
+            Cell.init(0x2588, 0x00C78F17, 0x009F2707),
+            Cell.init(0x2591, 0x00FFFFFF, 0x00C78F17),
+            Cell.init(0x2592, 0x00FFFFFF, 0x00C78F17),
+            Cell.init(0x2593, 0x00FFFFFF, 0x00C78F17),
+            Cell.init(0x2588, 0x00FFFFFF, 0x00C78F17),
         }
     else
         [_]Cell{
