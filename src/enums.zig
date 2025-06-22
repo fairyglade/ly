@@ -3,6 +3,7 @@ pub const Animation = enum {
     doom,
     matrix,
     colormix,
+    gameoflife,
 };
 
 pub const DisplayServer = enum {
