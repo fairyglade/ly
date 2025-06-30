@@ -292,6 +292,7 @@ On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
 - cinnamon
 - dwm
 - enlightenment
+- exwm
 - gnome
 - kde
 - leftwm
