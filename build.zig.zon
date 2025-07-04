@@ -12,6 +12,10 @@
             .url = "https://github.com/Kawaii-Ash/zigini/archive/2ed3d417f17fab5b0ee8cad8a63c6d62d7ac1042.tar.gz",
             .hash = "zigini-0.3.1-BSkB7XJGAAB2E-sKyzhTaQCBlYBL8yqzE4E_jmSY99sC",
         },
+        .termbox2 = .{
+            .url = "git+https://github.com/termbox/termbox2#8ee9dc17e1ca61c630f91db0aa7f81fa29a32040",
+            .hash = "N-V-__8AAKvjBAAUF2KVdkHsNs7L5EEZYzBnrJTBvj-baBMZ",
+        },
     },
     .paths = .{""},
 }
