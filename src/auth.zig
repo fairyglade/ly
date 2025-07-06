@@ -96,7 +96,7 @@ pub fn authenticate(options: AuthOptions, current_environment: Environment, logi
 
     child_pid = try std.posix.fork();
     if (child_pid == 0) {
-        startSession(options, pwd, handle, current_environment) catch |e| {
+        startSession(options, tty_str, pwd, handle, current_environment) catch |e| {
             shared_err.writeError(e);
             std.process.exit(1);
         };
@@ -132,6 +132,7 @@ pub fn authenticate(options: AuthOptions, current_environment: Environment, logi
 
 fn startSession(
     options: AuthOptions,
+    tty_str: [:0]u8,
     pwd: *interop.pwd.passwd,
     handle: ?*interop.pam.pam_handle,
     current_environment: Environment,
@@ -154,6 +155,10 @@ fn startSession(
 
     // Set up the environment
     try initEnv(pwd, options.path);
+
+    // Reset the XDG environment variables
+    setXdgSessionEnv(current_environment.display_server);
+    try setXdgEnv(tty_str, current_environment.xdg_session_desktop, current_environment.xdg_desktop_names);
 
     // Set the PAM variables
     const pam_env_vars: ?[*:null]?[*:0]u8 = interop.pam.pam_getenvlist(handle);
