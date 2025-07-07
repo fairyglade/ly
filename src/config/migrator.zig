@@ -26,6 +26,7 @@ const removed_properties = [_][]const u8{
     "term_restore_cursor_cmd",
     "x_cmd_setup",
     "wayland_cmd",
+    "console_dev",
 };
 
 var temporary_allocator = std.heap.page_allocator;
