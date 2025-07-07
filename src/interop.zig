@@ -36,7 +36,7 @@ pub const stdlib = @cImport({
 pub const pwd = @cImport({
     @cInclude("pwd.h");
     // We include a FreeBSD-specific header here since login_cap.h references
-    // the passwd struct directly, so we can't import it separately'
+    // the passwd struct directly, so we can't import it separately
     if (builtin.os.tag == .freebsd) @cInclude("login_cap.h");
 });
 
@@ -75,23 +75,21 @@ pub fn timeAsString(buf: [:0]u8, format: [:0]const u8) ![]u8 {
     return buf[0..len];
 }
 
-pub fn switchTty(console_dev: []const u8, tty: u8) !void {
-    const fd = try std.posix.open(console_dev, .{ .ACCMODE = .WRONLY }, 0);
-    defer std.posix.close(fd);
+pub fn switchTty(tty: u8) !void {
+    var status = std.c.ioctl(std.c.STDIN_FILENO, vt.VT_ACTIVATE, tty);
+    if (status != 0) return error.FailedToActivateTty;
 
-    _ = std.c.ioctl(fd, vt.VT_ACTIVATE, tty);
-    _ = std.c.ioctl(fd, vt.VT_WAITACTIVE, tty);
+    status = std.c.ioctl(std.c.STDIN_FILENO, vt.VT_WAITACTIVE, tty);
+    if (status != 0) return error.FailedToWaitForActiveTty;
 }
 
-pub fn getLockState(console_dev: []const u8) !struct {
+pub fn getLockState() !struct {
     numlock: bool,
     capslock: bool,
 } {
-    const fd = try std.posix.open(console_dev, .{ .ACCMODE = .RDONLY }, 0);
-    defer std.posix.close(fd);
-
     var led: LedState = undefined;
-    _ = std.c.ioctl(fd, get_led_state, &led);
+    const status = std.c.ioctl(std.c.STDIN_FILENO, get_led_state, &led);
+    if (status != 0) return error.FailedToGetLockState;
 
     return .{
         .numlock = (led & numlock_led) != 0,
@@ -101,11 +99,12 @@ pub fn getLockState(console_dev: []const u8) !struct {
 
 pub fn setNumlock(val: bool) !void {
     var led: LedState = undefined;
-    _ = std.c.ioctl(0, get_led_state, &led);
+    var status = std.c.ioctl(std.c.STDIN_FILENO, get_led_state, &led);
+    if (status != 0) return error.FailedToGetNumlock;
 
     const numlock = (led & numlock_led) != 0;
     if (numlock != val) {
-        const status = std.c.ioctl(std.posix.STDIN_FILENO, set_led_state, led ^ numlock_led);
+        status = std.c.ioctl(std.posix.STDIN_FILENO, set_led_state, led ^ numlock_led);
         if (status != 0) return error.FailedToSetNumlock;
     }
 }

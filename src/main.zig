@@ -389,12 +389,10 @@ pub fn main() !void {
     var update = true;
     var resolution_changed = false;
     var auth_fails: u64 = 0;
-    var can_access_console_dev = true;
 
-    // Switch to selected TTY if possible
-    interop.switchTty(config.console_dev, config.tty) catch {
-        try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
-        can_access_console_dev = false;
+    // Switch to selected TTY
+    interop.switchTty(config.tty) catch {
+        try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
     };
 
     while (run) {
@@ -546,9 +544,9 @@ pub fn main() !void {
                     buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
                 }
 
-                if (can_access_console_dev) draw_lock_state: {
-                    const lock_state = interop.getLockState(config.console_dev) catch {
-                        try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
+                draw_lock_state: {
+                    const lock_state = interop.getLockState() catch {
+                        try info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
                         break :draw_lock_state;
                     };
 
