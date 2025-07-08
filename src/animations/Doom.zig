@@ -7,34 +7,21 @@ const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const Doom = @This();
 
 pub const STEPS = 12;
+pub const HEIGHT_MAX = 9;
+pub const SPREAD_MAX = 4;
 
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
 buffer: []u8,
 height: u8,
+spread: u8,
 fire: [STEPS + 1]Cell,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fire_height: u8, default_colors: bool, top_color: u32, middle_color: u32, bottom_color: u32) !Doom {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u32, middle_color: u32, bottom_color: u32, fire_height: u8, fire_spread: u8) !Doom {
     const buffer = try allocator.alloc(u8, terminal_buffer.width * terminal_buffer.height);
     initBuffer(buffer, terminal_buffer.width);
 
-    const levels = if (default_colors)
-        [_]Cell{
-            Cell.init(' ', TerminalBuffer.Color.DEFAULT, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2591, 0x009F2707, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2592, 0x009F2707, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2593, 0x009F2707, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2588, 0x009F2707, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2591, 0x00C78F17, 0x009F2707),
-            Cell.init(0x2592, 0x00C78F17, 0x009F2707),
-            Cell.init(0x2593, 0x00C78F17, 0x009F2707),
-            Cell.init(0x2588, 0x00C78F17, 0x009F2707),
-            Cell.init(0x2591, 0x00FFFFFF, 0x00C78F17),
-            Cell.init(0x2592, 0x00FFFFFF, 0x00C78F17),
-            Cell.init(0x2593, 0x00FFFFFF, 0x00C78F17),
-            Cell.init(0x2588, 0x00FFFFFF, 0x00C78F17),
-        }
-    else
+    const levels =
         [_]Cell{
             Cell.init(' ', TerminalBuffer.Color.DEFAULT, TerminalBuffer.Color.DEFAULT),
             Cell.init(0x2591, top_color, TerminalBuffer.Color.DEFAULT),
@@ -55,7 +42,8 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fire_height:
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
         .buffer = buffer,
-        .height = @min(9, fire_height),
+        .height = @min(HEIGHT_MAX, fire_height),
+        .spread = @min(SPREAD_MAX, fire_spread),
         .fire = levels,
     };
 }
@@ -81,11 +69,12 @@ fn draw(self: *Doom) void {
             // Get index of current cell in fire level buffer
             const from = y * self.terminal_buffer.width + x;
 
-            // Generate random datum for fire propagation
-            const random = (self.terminal_buffer.random.int(u8) % 10);
+            // Generate random data for fire propagation
+            const rand_loss = self.terminal_buffer.random.intRangeAtMost(u8, 0, HEIGHT_MAX);
+            const rand_spread = self.terminal_buffer.random.intRangeAtMost(u8, 0, self.spread * 2);
 
             // Select semi-random target cell
-            const to = from -| self.terminal_buffer.width -| (random & 3) + 1;
+            const to = from -| self.terminal_buffer.width + self.spread -| rand_spread;
             const to_x = to % self.terminal_buffer.width;
             const to_y = to / self.terminal_buffer.width;
 
@@ -93,9 +82,8 @@ fn draw(self: *Doom) void {
             const level_buf_from = self.buffer[from];
 
             // Choose new fire level and store in level buffer
-            var level_buf_to = level_buf_from;
-            if (random >= self.height) level_buf_to -|= 1;
-            self.buffer[to] = @intCast(level_buf_to);
+            const level_buf_to = level_buf_from -| @intFromBool(rand_loss >= self.height);
+            self.buffer[to] = level_buf_to;
 
             // Send known fire levels to terminal buffer
             const from_cell = self.fire[level_buf_from];

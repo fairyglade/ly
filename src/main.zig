@@ -354,7 +354,7 @@ pub fn main() !void {
             animation = dummy.animation();
         },
         .doom => {
-            var doom = try Doom.init(allocator, &buffer, config.doom_fire_height, config.doom_default_colors, config.doom_top_color, config.doom_middle_color, config.doom_bottom_color);
+            var doom = try Doom.init(allocator, &buffer, config.doom_top_color, config.doom_middle_color, config.doom_bottom_color, config.doom_fire_height, config.doom_fire_spread);
             animation = doom.animation();
         },
         .matrix => {
