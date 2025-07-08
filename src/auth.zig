@@ -180,6 +180,7 @@ fn startSession(
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{options.tty});
             try executeX11Cmd(pwd.pw_shell.?, pwd.pw_dir.?, options, current_environment.cmd, vt);
         },
+        .custom => try executeCustomCmd(pwd.pw_shell.?, options, current_environment.is_terminal, current_environment.cmd),
     }
 }
 
@@ -201,6 +202,7 @@ fn setXdgEnv(tty_str: [:0]u8, environment: Environment) !void {
         .wayland => "wayland",
         .shell => "tty",
         .xinitrc, .x11 => "x11",
+        .custom => "unspecified",
     }, 0);
 
     // The "/run/user/%d" directory is not available on FreeBSD. It is much
@@ -460,6 +462,22 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptio
 
     var status: c_int = 0;
     _ = std.c.waitpid(x_pid, &status, 0);
+}
+
+fn executeCustomCmd(shell: [*:0]const u8, options: AuthOptions, is_terminal: bool, exec_cmd: []const u8) !void {
+    var maybe_log_file: ?std.fs.File = null;
+    if (!is_terminal) {
+        // For custom desktop entries, the "Terminal" value here determines if
+        // we redirect standard output & error or not. That is, we redirect only
+        // if it's equal to false (so if it's not running in a TTY).
+        maybe_log_file = try redirectStandardStreams(options.session_log, true);
+    }
+    defer if (maybe_log_file) |log_file| log_file.close();
+
+    var cmd_buffer: [1024]u8 = undefined;
+    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", exec_cmd });
+    const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
+    return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
 fn redirectStandardStreams(session_log: []const u8, create: bool) !std.fs.File {

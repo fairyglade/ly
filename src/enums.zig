@@ -11,6 +11,7 @@ pub const DisplayServer = enum {
     shell,
     xinitrc,
     x11,
+    custom,
 };
 
 pub const Input = enum {

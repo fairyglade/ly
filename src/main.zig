@@ -290,15 +290,22 @@ pub fn main() !void {
         try info_line.addMessage(hostname, config.bg, config.fg);
     }
 
+    // Crawl session directories (Wayland, X11 and custom respectively)
     var wayland_session_dirs = std.mem.splitScalar(u8, config.waylandsessions, ':');
     while (wayland_session_dirs.next()) |dir| {
         try crawl(&session, lang, dir, .wayland);
     }
+
     if (build_options.enable_x11_support) {
         var x_session_dirs = std.mem.splitScalar(u8, config.xsessions, ':');
         while (x_session_dirs.next()) |dir| {
             try crawl(&session, lang, dir, .x11);
         }
+    }
+
+    var custom_session_dirs = std.mem.splitScalar(u8, config.custom_sessions, ':');
+    while (custom_session_dirs.next()) |dir| {
+        try crawl(&session, lang, dir, .custom);
     }
 
     var login = Text.init(allocator, &buffer, false, null);
@@ -864,11 +871,7 @@ fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplaySer
         .xdg_session_desktop = null,
         .xdg_desktop_names = null,
         .cmd = exec orelse "",
-        .specifier = switch (display_server) {
-            .wayland => lang.wayland,
-            .x11 => lang.x11,
-            else => lang.other,
-        },
+        .specifier = lang.other,
         .display_server = display_server,
     });
 }
@@ -890,40 +893,43 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
         });
         errdefer entry_ini.deinit();
 
-        var xdg_session_desktop: []const u8 = undefined;
+        var maybe_xdg_session_desktop: ?[]const u8 = null;
         const maybe_desktop_names = entry_ini.data.@"Desktop Entry".DesktopNames;
         if (maybe_desktop_names) |desktop_names| {
-            xdg_session_desktop = std.mem.sliceTo(desktop_names, ';');
-        } else {
-            // if DesktopNames is empty, we'll take the name of the session file
-            xdg_session_desktop = std.fs.path.stem(item.name);
+            maybe_xdg_session_desktop = std.mem.sliceTo(desktop_names, ';');
+        } else if (display_server != .custom) {
+            // If DesktopNames is empty, and this isn't a custom session entry,
+            // we'll take the name of the session file
+            maybe_xdg_session_desktop = std.fs.path.stem(item.name);
         }
 
         // Prepare the XDG_CURRENT_DESKTOP environment variable here
         const entry = entry_ini.data.@"Desktop Entry";
-        var xdg_desktop_names: ?[:0]const u8 = null;
+        var maybe_xdg_desktop_names: ?[:0]const u8 = null;
         if (entry.DesktopNames) |desktop_names| {
             for (desktop_names) |*c| {
                 if (c.* == ';') c.* = ':';
             }
-            xdg_desktop_names = desktop_names;
+            maybe_xdg_desktop_names = desktop_names;
         }
 
-        const session_desktop = try session.label.allocator.dupeZ(u8, xdg_session_desktop);
-        errdefer session.label.allocator.free(session_desktop);
+        const maybe_session_desktop = if (maybe_xdg_session_desktop) |xdg_session_desktop| try session.label.allocator.dupeZ(u8, xdg_session_desktop) else null;
+        errdefer if (maybe_session_desktop) |session_desktop| session.label.allocator.free(session_desktop);
 
         try session.addEnvironment(.{
             .entry_ini = entry_ini,
             .name = entry.Name,
-            .xdg_session_desktop = session_desktop,
-            .xdg_desktop_names = xdg_desktop_names,
+            .xdg_session_desktop = maybe_session_desktop,
+            .xdg_desktop_names = maybe_xdg_desktop_names,
             .cmd = entry.Exec,
             .specifier = switch (display_server) {
                 .wayland => lang.wayland,
                 .x11 => lang.x11,
+                .custom => lang.custom,
                 else => lang.other,
             },
             .display_server = display_server,
+            .is_terminal = entry.Terminal orelse false,
         });
     }
 }
