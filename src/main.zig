@@ -102,6 +102,7 @@ pub fn main() !void {
     var lang: Lang = undefined;
     var save: Save = undefined;
     var config_load_failed = false;
+    var can_get_lock_state = true;
 
     if (res.args.help != 0) {
         try clap.help(stderr, clap.Help, &params, .{});
@@ -544,9 +545,10 @@ pub fn main() !void {
                     buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
                 }
 
-                draw_lock_state: {
+                if (can_get_lock_state) draw_lock_state: {
                     const lock_state = interop.getLockState() catch {
                         try info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
+                        can_get_lock_state = false;
                         break :draw_lock_state;
                     };
 
