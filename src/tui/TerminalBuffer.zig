@@ -220,7 +220,7 @@ pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: usize, y: us
 
     var i: c_int = @intCast(x);
     while (utf8.nextCodepoint()) |codepoint| : (i += termbox.tb_wcwidth(codepoint)) {
-        if (i >= max_length) break;
+        if (i - @as(c_int, @intCast(x)) >= max_length) break;
         _ = termbox.tb_set_cell(i, yc, codepoint, self.fg, self.bg);
     }
 }
