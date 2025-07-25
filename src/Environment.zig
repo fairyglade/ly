@@ -8,6 +8,7 @@ pub const DesktopEntry = struct {
     Exec: []const u8 = "",
     Name: [:0]const u8 = "",
     DesktopNames: ?[:0]u8 = null,
+    Terminal: ?bool = null,
 };
 
 pub const Entry = struct { @"Desktop Entry": DesktopEntry = .{} };
@@ -19,3 +20,4 @@ xdg_desktop_names: ?[:0]const u8 = null,
 cmd: []const u8 = "",
 specifier: []const u8 = "",
 display_server: DisplayServer = .wayland,
+is_terminal: bool = false,

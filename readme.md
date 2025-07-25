@@ -4,6 +4,8 @@
 
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
 
+Join us on Matrix over at [#ly:envs.net](https://matrix.to/#/#ly:envs.net)!
+
 **Note**: Development happens on [Codeberg](https://codeberg.org/AnErrupTion/ly) with a mirror on [GitHub](https://github.com/fairyglade/ly).
 
 ## Dependencies

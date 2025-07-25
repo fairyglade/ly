@@ -41,8 +41,7 @@ pub fn authenticate(options: AuthOptions, current_environment: Environment, logi
     const pam_tty_str = try std.fmt.bufPrintZ(&pam_tty_buffer, "tty{d}", .{options.tty});
 
     // Set the XDG environment variables
-    setXdgSessionEnv(current_environment.display_server);
-    try setXdgEnv(tty_str, current_environment.xdg_session_desktop, current_environment.xdg_desktop_names);
+    try setXdgEnv(tty_str, current_environment);
 
     // Open the PAM session
     var credentials = [_:null]?[*:0]const u8{ login, password };
@@ -96,7 +95,7 @@ pub fn authenticate(options: AuthOptions, current_environment: Environment, logi
 
     child_pid = try std.posix.fork();
     if (child_pid == 0) {
-        startSession(options, pwd, handle, current_environment) catch |e| {
+        startSession(options, tty_str, pwd, handle, current_environment) catch |e| {
             shared_err.writeError(e);
             std.process.exit(1);
         };
@@ -132,6 +131,7 @@ pub fn authenticate(options: AuthOptions, current_environment: Environment, logi
 
 fn startSession(
     options: AuthOptions,
+    tty_str: [:0]u8,
     pwd: *interop.pwd.passwd,
     handle: ?*interop.pam.pam_handle,
     current_environment: Environment,
@@ -155,6 +155,9 @@ fn startSession(
     // Set up the environment
     try initEnv(pwd, options.path);
 
+    // Reset the XDG environment variables
+    try setXdgEnv(tty_str, current_environment);
+
     // Set the PAM variables
     const pam_env_vars: ?[*:null]?[*:0]u8 = interop.pam.pam_getenvlist(handle);
     if (pam_env_vars == null) return error.GetEnvListFailed;
@@ -177,6 +180,7 @@ fn startSession(
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{options.tty});
             try executeX11Cmd(pwd.pw_shell.?, pwd.pw_dir.?, options, current_environment.cmd, vt);
         },
+        .custom => try executeCustomCmd(pwd.pw_shell.?, options, current_environment.is_terminal, current_environment.cmd),
     }
 }
 
@@ -193,15 +197,14 @@ fn initEnv(pwd: *interop.pwd.passwd, path_env: ?[:0]const u8) !void {
     }
 }
 
-fn setXdgSessionEnv(display_server: enums.DisplayServer) void {
-    _ = interop.stdlib.setenv("XDG_SESSION_TYPE", switch (display_server) {
+fn setXdgEnv(tty_str: [:0]u8, environment: Environment) !void {
+    _ = interop.stdlib.setenv("XDG_SESSION_TYPE", switch (environment.display_server) {
         .wayland => "wayland",
         .shell => "tty",
         .xinitrc, .x11 => "x11",
+        .custom => "unspecified",
     }, 0);
-}
 
-fn setXdgEnv(tty_str: [:0]u8, maybe_desktop_name: ?[:0]const u8, maybe_xdg_desktop_names: ?[:0]const u8) !void {
     // The "/run/user/%d" directory is not available on FreeBSD. It is much
     // better to stick to the defaults and let applications using
     // XDG_RUNTIME_DIR to fall back to directories inside user's home
@@ -214,10 +217,10 @@ fn setXdgEnv(tty_str: [:0]u8, maybe_desktop_name: ?[:0]const u8, maybe_xdg_deskt
         _ = interop.stdlib.setenv("XDG_RUNTIME_DIR", uid_str, 0);
     }
 
-    if (maybe_xdg_desktop_names) |xdg_desktop_names| _ = interop.stdlib.setenv("XDG_CURRENT_DESKTOP", xdg_desktop_names, 0);
+    if (environment.xdg_desktop_names) |xdg_desktop_names| _ = interop.stdlib.setenv("XDG_CURRENT_DESKTOP", xdg_desktop_names, 0);
     _ = interop.stdlib.setenv("XDG_SESSION_CLASS", "user", 0);
     _ = interop.stdlib.setenv("XDG_SESSION_ID", "1", 0);
-    if (maybe_desktop_name) |desktop_name| _ = interop.stdlib.setenv("XDG_SESSION_DESKTOP", desktop_name, 0);
+    if (environment.xdg_session_desktop) |desktop_name| _ = interop.stdlib.setenv("XDG_SESSION_DESKTOP", desktop_name, 0);
     _ = interop.stdlib.setenv("XDG_SEAT", "seat0", 0);
     _ = interop.stdlib.setenv("XDG_VTNR", tty_str, 0);
 }
@@ -459,6 +462,22 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptio
 
     var status: c_int = 0;
     _ = std.c.waitpid(x_pid, &status, 0);
+}
+
+fn executeCustomCmd(shell: [*:0]const u8, options: AuthOptions, is_terminal: bool, exec_cmd: []const u8) !void {
+    var maybe_log_file: ?std.fs.File = null;
+    if (!is_terminal) {
+        // For custom desktop entries, the "Terminal" value here determines if
+        // we redirect standard output & error or not. That is, we redirect only
+        // if it's equal to false (so if it's not running in a TTY).
+        maybe_log_file = try redirectStandardStreams(options.session_log, true);
+    }
+    defer if (maybe_log_file) |log_file| log_file.close();
+
+    var cmd_buffer: [1024]u8 = undefined;
+    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", exec_cmd });
+    const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
+    return std.posix.execveZ(shell, &args, std.c.environ);
 }
 
 fn redirectStandardStreams(session_log: []const u8, create: bool) !std.fs.File {

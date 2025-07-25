@@ -18,12 +18,15 @@ const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
 const InfoLine = @import("tui/components/InfoLine.zig");
+const UserList = @import("tui/components/UserList.zig");
 const Config = @import("config/Config.zig");
 const Lang = @import("config/Lang.zig");
 const Save = @import("config/Save.zig");
 const migrator = @import("config/migrator.zig");
 const SharedError = @import("SharedError.zig");
+const UidRange = @import("UidRange.zig");
 
+const StringList = std.ArrayListUnmanaged([]const u8);
 const Ini = ini.Ini;
 const DisplayServer = enums.DisplayServer;
 const Entry = Environment.Entry;
@@ -102,6 +105,7 @@ pub fn main() !void {
     var lang: Lang = undefined;
     var save: Save = undefined;
     var config_load_failed = false;
+    var can_get_lock_state = true;
 
     if (res.args.help != 0) {
         try clap.help(stderr, clap.Help, &params, .{});
@@ -289,10 +293,12 @@ pub fn main() !void {
         try info_line.addMessage(hostname, config.bg, config.fg);
     }
 
+    // Crawl session directories (Wayland, X11 and custom respectively)
     var wayland_session_dirs = std.mem.splitScalar(u8, config.waylandsessions, ':');
     while (wayland_session_dirs.next()) |dir| {
         try crawl(&session, lang, dir, .wayland);
     }
+
     if (build_options.enable_x11_support) {
         var x_session_dirs = std.mem.splitScalar(u8, config.xsessions, ':');
         while (x_session_dirs.next()) |dir| {
@@ -300,7 +306,26 @@ pub fn main() !void {
         }
     }
 
-    var login = Text.init(allocator, &buffer, false, null);
+    var custom_session_dirs = std.mem.splitScalar(u8, config.custom_sessions, ':');
+    while (custom_session_dirs.next()) |dir| {
+        try crawl(&session, lang, dir, .custom);
+    }
+
+    var usernames = try getAllUsernames(allocator, config.login_defs_path);
+    defer {
+        for (usernames.items) |username| allocator.free(username);
+        usernames.deinit(allocator);
+    }
+
+    if (usernames.items.len == 0) {
+        // If we have no usernames, simply add an error to the info line.
+        // This effectively means you can't login, since there would be no local
+        // accounts *and* no root account...but at this point, if that's the
+        // case, you have bigger problems to deal with in the first place. :D
+        try info_line.addMessage(lang.err_no_users, config.error_bg, config.error_fg);
+    }
+
+    var login = try UserList.init(allocator, &buffer, usernames);
     defer login.deinit();
 
     var password = Text.init(allocator, &buffer, true, config.asterisk);
@@ -312,9 +337,17 @@ pub fn main() !void {
     // Load last saved username and desktop selection, if any
     if (config.load) {
         if (save.user) |user| {
-            try login.text.appendSlice(login.allocator, user);
-            login.end = user.len;
-            login.cursor = login.end;
+            // Find user with saved name, and switch over to it
+            // If it doesn't exist (anymore), we don't change the value
+            // Note that we could instead save the username index, but migrating
+            // from the raw username to an index is non-trivial and I'm lazy :P
+            for (usernames.items, 0..) |username, i| {
+                if (std.mem.eql(u8, username, user)) {
+                    login.label.current = i;
+                    break;
+                }
+            }
+
             active_input = .password;
         }
 
@@ -330,15 +363,13 @@ pub fn main() !void {
         const coordinates = buffer.calculateComponentCoordinates();
         info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length, null);
         session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length, config.text_in_center);
-        login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
+        login.label.position(coordinates.x, coordinates.y + 4, coordinates.visible_length, config.text_in_center);
         password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
 
         switch (active_input) {
             .info_line => info_line.label.handle(null, insert_mode),
             .session => session.label.handle(null, insert_mode),
-            .login => login.handle(null, insert_mode) catch {
-                try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-            },
+            .login => login.label.handle(null, insert_mode),
             .password => password.handle(null, insert_mode) catch {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
             },
@@ -354,7 +385,7 @@ pub fn main() !void {
             animation = dummy.animation();
         },
         .doom => {
-            var doom = try Doom.init(allocator, &buffer, config.doom_top_color, config.doom_middle_color, config.doom_bottom_color);
+            var doom = try Doom.init(allocator, &buffer, config.doom_top_color, config.doom_middle_color, config.doom_bottom_color, config.doom_fire_height, config.doom_fire_spread);
             animation = doom.animation();
         },
         .matrix => {
@@ -389,12 +420,10 @@ pub fn main() !void {
     var update = true;
     var resolution_changed = false;
     var auth_fails: u64 = 0;
-    var can_access_console_dev = true;
 
-    // Switch to selected TTY if possible
-    interop.switchTty(config.console_dev, config.tty) catch {
-        try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
-        can_access_console_dev = false;
+    // Switch to selected TTY
+    interop.switchTty(config.tty) catch {
+        try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
     };
 
     while (run) {
@@ -458,7 +487,7 @@ pub fn main() !void {
                     const coordinates = buffer.calculateComponentCoordinates();
                     info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length, null);
                     session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length, config.text_in_center);
-                    login.position(coordinates.x, coordinates.y + 4, coordinates.visible_length);
+                    login.label.position(coordinates.x, coordinates.y + 4, coordinates.visible_length, config.text_in_center);
                     password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
 
                     resolution_changed = false;
@@ -467,9 +496,7 @@ pub fn main() !void {
                 switch (active_input) {
                     .info_line => info_line.label.handle(null, insert_mode),
                     .session => session.label.handle(null, insert_mode),
-                    .login => login.handle(null, insert_mode) catch {
-                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    },
+                    .login => login.label.handle(null, insert_mode),
                     .password => password.handle(null, insert_mode) catch {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
@@ -546,9 +573,10 @@ pub fn main() !void {
                     buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
                 }
 
-                if (can_access_console_dev) draw_lock_state: {
-                    const lock_state = interop.getLockState(config.console_dev) catch {
-                        try info_line.addMessage(lang.err_console_dev, config.error_bg, config.error_fg);
+                if (can_get_lock_state) draw_lock_state: {
+                    const lock_state = interop.getLockState() catch {
+                        try info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
+                        can_get_lock_state = false;
                         break :draw_lock_state;
                     };
 
@@ -564,7 +592,7 @@ pub fn main() !void {
                 }
 
                 session.label.draw();
-                login.draw();
+                login.label.draw();
                 password.draw();
             } else {
                 std.Thread.sleep(std.time.ns_per_ms * 10);
@@ -653,10 +681,7 @@ pub fn main() !void {
             },
             termbox.TB_KEY_CTRL_C => run = false,
             termbox.TB_KEY_CTRL_U => {
-                if (active_input == .login) {
-                    login.clear();
-                    update = true;
-                } else if (active_input == .password) {
+                if (active_input == .password) {
                     password.clear();
                     update = true;
                 }
@@ -719,7 +744,7 @@ pub fn main() !void {
                     defer file.close();
 
                     const save_data = Save{
-                        .user = login.text.items,
+                        .user = login.getCurrentUser(),
                         .session_index = session.label.current,
                     };
                     ini.writeFromStruct(save_data, file.writer(), null, .{}) catch break :save_last_settings;
@@ -732,7 +757,7 @@ pub fn main() !void {
                 defer shared_err.deinit();
 
                 {
-                    const login_text = try allocator.dupeZ(u8, login.text.items);
+                    const login_text = try allocator.dupeZ(u8, login.getCurrentUser());
                     defer allocator.free(login_text);
                     const password_text = try allocator.dupeZ(u8, password.text.items);
                     defer allocator.free(password_text);
@@ -838,9 +863,7 @@ pub fn main() !void {
                 switch (active_input) {
                     .info_line => info_line.label.handle(&event, insert_mode),
                     .session => session.label.handle(&event, insert_mode),
-                    .login => login.handle(&event, insert_mode) catch {
-                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    },
+                    .login => login.label.handle(&event, insert_mode),
                     .password => password.handle(&event, insert_mode) catch {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
@@ -864,11 +887,7 @@ fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplaySer
         .xdg_session_desktop = null,
         .xdg_desktop_names = null,
         .cmd = exec orelse "",
-        .specifier = switch (display_server) {
-            .wayland => lang.wayland,
-            .x11 => lang.x11,
-            else => lang.other,
-        },
+        .specifier = lang.other,
         .display_server = display_server,
     });
 }
@@ -890,42 +909,109 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
         });
         errdefer entry_ini.deinit();
 
-        var xdg_session_desktop: []const u8 = undefined;
+        var maybe_xdg_session_desktop: ?[]const u8 = null;
         const maybe_desktop_names = entry_ini.data.@"Desktop Entry".DesktopNames;
         if (maybe_desktop_names) |desktop_names| {
-            xdg_session_desktop = std.mem.sliceTo(desktop_names, ';');
-        } else {
-            // if DesktopNames is empty, we'll take the name of the session file
-            xdg_session_desktop = std.fs.path.stem(item.name);
+            maybe_xdg_session_desktop = std.mem.sliceTo(desktop_names, ';');
+        } else if (display_server != .custom) {
+            // If DesktopNames is empty, and this isn't a custom session entry,
+            // we'll take the name of the session file
+            maybe_xdg_session_desktop = std.fs.path.stem(item.name);
         }
 
         // Prepare the XDG_CURRENT_DESKTOP environment variable here
         const entry = entry_ini.data.@"Desktop Entry";
-        var xdg_desktop_names: ?[:0]const u8 = null;
+        var maybe_xdg_desktop_names: ?[:0]const u8 = null;
         if (entry.DesktopNames) |desktop_names| {
             for (desktop_names) |*c| {
                 if (c.* == ';') c.* = ':';
             }
-            xdg_desktop_names = desktop_names;
+            maybe_xdg_desktop_names = desktop_names;
         }
 
-        const session_desktop = try session.label.allocator.dupeZ(u8, xdg_session_desktop);
-        errdefer session.label.allocator.free(session_desktop);
+        const maybe_session_desktop = if (maybe_xdg_session_desktop) |xdg_session_desktop| try session.label.allocator.dupeZ(u8, xdg_session_desktop) else null;
+        errdefer if (maybe_session_desktop) |session_desktop| session.label.allocator.free(session_desktop);
 
         try session.addEnvironment(.{
             .entry_ini = entry_ini,
             .name = entry.Name,
-            .xdg_session_desktop = session_desktop,
-            .xdg_desktop_names = xdg_desktop_names,
+            .xdg_session_desktop = maybe_session_desktop,
+            .xdg_desktop_names = maybe_xdg_desktop_names,
             .cmd = entry.Exec,
             .specifier = switch (display_server) {
                 .wayland => lang.wayland,
                 .x11 => lang.x11,
+                .custom => lang.custom,
                 else => lang.other,
             },
             .display_server = display_server,
+            .is_terminal = entry.Terminal orelse false,
         });
     }
+}
+
+fn getAllUsernames(allocator: std.mem.Allocator, login_defs_path: []const u8) !StringList {
+    const uid_range = try getUserIdRange(allocator, login_defs_path);
+
+    var usernames: StringList = .empty;
+    var maybe_entry = interop.pwd.getpwent();
+
+    while (maybe_entry != null) {
+        const entry = maybe_entry.*;
+
+        // We check if the UID is equal to 0 because we always want to add root
+        // as a username (even if you can't log into it)
+        if (entry.pw_uid >= uid_range.uid_min and entry.pw_uid <= uid_range.uid_max or entry.pw_uid == 0) {
+            const pw_name_slice = entry.pw_name[0..std.mem.len(entry.pw_name)];
+            const username = try allocator.dupe(u8, pw_name_slice);
+
+            try usernames.append(allocator, username);
+        }
+
+        maybe_entry = interop.pwd.getpwent();
+    }
+
+    interop.pwd.endpwent();
+    return usernames;
+}
+
+// This is very bad parsing, but we only need to get 2 values... and the format
+// of the file doesn't seem to be standard? So this should be fine...
+fn getUserIdRange(allocator: std.mem.Allocator, login_defs_path: []const u8) !UidRange {
+    const login_defs_file = try std.fs.cwd().openFile(login_defs_path, .{});
+    defer login_defs_file.close();
+
+    const login_defs_buffer = try login_defs_file.readToEndAlloc(allocator, std.math.maxInt(u16));
+    defer allocator.free(login_defs_buffer);
+
+    var iterator = std.mem.splitScalar(u8, login_defs_buffer, '\n');
+    var uid_range = UidRange{};
+
+    while (iterator.next()) |line| {
+        const trimmed_line = std.mem.trim(u8, line, " \n\r\t");
+
+        if (std.mem.startsWith(u8, trimmed_line, "UID_MIN")) {
+            uid_range.uid_min = try parseValue(std.c.uid_t, "UID_MIN", trimmed_line);
+        } else if (std.mem.startsWith(u8, trimmed_line, "UID_MAX")) {
+            uid_range.uid_max = try parseValue(std.c.uid_t, "UID_MAX", trimmed_line);
+        }
+    }
+
+    return uid_range;
+}
+
+fn parseValue(comptime T: type, name: []const u8, buffer: []const u8) !T {
+    var iterator = std.mem.splitAny(u8, buffer, " \t");
+    var maybe_value: ?T = null;
+
+    while (iterator.next()) |slice| {
+        // Skip the slice if it's empty (whitespace) or is the name of the
+        // property (e.g. UID_MIN or UID_MAX)
+        if (slice.len == 0 or std.mem.eql(u8, slice, name)) continue;
+        maybe_value = std.fmt.parseInt(T, slice, 10) catch continue;
+    }
+
+    return maybe_value orelse error.ValueNotFound;
 }
 
 fn adjustBrightness(allocator: std.mem.Allocator, cmd: []const u8) !void {

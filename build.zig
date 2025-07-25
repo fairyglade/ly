@@ -139,6 +139,12 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
         std.debug.print("warn: {s} already exists as a directory.\n", .{ly_config_directory});
     };
 
+    const ly_custom_sessions_directory = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/ly/custom-sessions" });
+
+    std.fs.cwd().makePath(ly_custom_sessions_directory) catch {
+        std.debug.print("warn: {s} already exists as a directory.\n", .{ly_custom_sessions_directory});
+    };
+
     const ly_lang_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/ly/lang" });
     std.fs.cwd().makePath(ly_lang_path) catch {
         std.debug.print("warn: {s} already exists as a directory.\n", .{ly_lang_path});
@@ -169,6 +175,14 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
 
         const patched_setup = try patchFile(allocator, "res/setup.sh", patch_map);
         try installText(patched_setup, config_dir, ly_config_directory, "setup.sh", .{ .mode = 0o755 });
+    }
+
+    {
+        var custom_sessions_dir = std.fs.cwd().openDir(ly_custom_sessions_directory, .{}) catch unreachable;
+        defer custom_sessions_dir.close();
+
+        const patched_readme = try patchFile(allocator, "res/custom-sessions/README", patch_map);
+        try installText(patched_readme, custom_sessions_dir, ly_custom_sessions_directory, "README", .{});
     }
 
     {

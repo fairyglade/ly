@@ -208,9 +208,9 @@ pub fn drawColorLabel(text: []const u8, x: usize, y: usize, fg: u32, bg: u32) vo
     const utf8view = std.unicode.Utf8View.init(text) catch return;
     var utf8 = utf8view.iterator();
 
-    var i = x;
-    while (utf8.nextCodepoint()) |codepoint| : (i += 1) {
-        _ = termbox.tb_set_cell(@intCast(i), yc, codepoint, fg, bg);
+    var i: c_int = @intCast(x);
+    while (utf8.nextCodepoint()) |codepoint| : (i += termbox.tb_wcwidth(codepoint)) {
+        _ = termbox.tb_set_cell(i, yc, codepoint, fg, bg);
     }
 }
 
@@ -219,10 +219,10 @@ pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: usize, y: us
     const utf8view = std.unicode.Utf8View.init(text) catch return;
     var utf8 = utf8view.iterator();
 
-    var i: usize = 0;
-    while (utf8.nextCodepoint()) |codepoint| : (i += 1) {
-        if (i >= max_length) break;
-        _ = termbox.tb_set_cell(@intCast(i + x), yc, codepoint, self.fg, self.bg);
+    var i: c_int = @intCast(x);
+    while (utf8.nextCodepoint()) |codepoint| : (i += termbox.tb_wcwidth(codepoint)) {
+        if (i - @as(c_int, @intCast(x)) >= max_length) break;
+        _ = termbox.tb_set_cell(i, yc, codepoint, self.fg, self.bg);
     }
 }
 
@@ -236,7 +236,8 @@ pub fn drawCharMultiple(self: TerminalBuffer, char: u32, x: usize, y: usize, len
 pub fn strWidth(str: []const u8) !u8 {
     const utf8view = try std.unicode.Utf8View.init(str);
     var utf8 = utf8view.iterator();
-    var i: u8 = 0;
-    while (utf8.nextCodepoint()) |_| i += 1;
-    return i;
+    var i: c_int = 0;
+    while (utf8.nextCodepoint()) |codepoint| i += termbox.tb_wcwidth(codepoint);
+
+    return @intCast(i);
 }
