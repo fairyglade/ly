@@ -68,13 +68,17 @@ pub fn build(b: *std.Build) !void {
     const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("clap", clap.module("clap"));
 
-    exe.addIncludePath(b.path("include"));
+    const termbox_dep = b.dependency("termbox2", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     exe.linkSystemLibrary("pam");
     if (enable_x11_support) exe.linkSystemLibrary("xcb");
     exe.linkLibC();
 
     const translate_c = b.addTranslateC(.{
-        .root_source_file = b.path("include/termbox2.h"),
+        .root_source_file = termbox_dep.path("termbox2.h"),
         .target = target,
         .optimize = optimize,
     });
