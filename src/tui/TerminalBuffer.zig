@@ -2,7 +2,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 const interop = @import("../interop.zig");
 const Cell = @import("Cell.zig");
-const termbox_extras = @import("termbox_extras.zig");
 
 const Random = std.Random;
 
@@ -114,8 +113,8 @@ pub fn cascade(self: TerminalBuffer) bool {
             var cell: termbox.tb_cell = undefined;
             var cell_under: termbox.tb_cell = undefined;
 
-            _ = termbox_extras.tb_get_cell(@intCast(x), @intCast(y - 1), 1, &cell);
-            _ = termbox_extras.tb_get_cell(@intCast(x), @intCast(y), 1, &cell_under);
+            _ = termbox.tb_get_cell(@intCast(x), @intCast(y - 1), 1, &cell);
+            _ = termbox.tb_get_cell(@intCast(x), @intCast(y), 1, &cell_under);
 
             const char: u8 = @truncate(cell.ch);
             if (std.ascii.isWhitespace(char)) continue;
