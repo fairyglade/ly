@@ -13,6 +13,7 @@ const Doom = @import("animations/Doom.zig");
 const Dummy = @import("animations/Dummy.zig");
 const Matrix = @import("animations/Matrix.zig");
 const GameOfLife = @import("animations/GameOfLife.zig");
+const Ascii = @import("animations/Ascii.zig");
 const Animation = @import("tui/Animation.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const Session = @import("tui/components/Session.zig");
@@ -399,6 +400,10 @@ pub fn main() !void {
         .gameoflife => {
             var game_of_life = try GameOfLife.init(allocator, &buffer, config.gameoflife_fg, config.gameoflife_entropy_interval, config.gameoflife_frame_delay, config.gameoflife_initial_density);
             animation = game_of_life.animation();
+        },
+        .ascii => {
+            var ascii = try Ascii.init(&buffer, config.ascii_filename, config.ascii_fg, config.ascii_x, config.ascii_y);
+            animation = ascii.animation();
         },
     }
     defer animation.deinit();
