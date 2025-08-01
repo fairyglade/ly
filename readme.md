@@ -21,6 +21,10 @@ Join us on Matrix over at [#ly:envs.net](https://matrix.to/#/#ly:envs.net)!
   - shutdown
   - brightnessctl
 
+## Packaging status
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ly.svg)](https://repology.org/project/ly/versions)
+
 ### Debian
 
 ```
