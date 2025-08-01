@@ -211,7 +211,7 @@ fn setXdgEnv(tty_str: [:0]u8, environment: Environment) !void {
     // directory.
     if (builtin.os.tag != .freebsd) {
         const uid = interop.unistd.getuid();
-        var uid_buffer: [10 + @sizeOf(u32) + 1]u8 = undefined;
+        var uid_buffer: [32]u8 = undefined; // No UID can be larger than this
         const uid_str = try std.fmt.bufPrintZ(&uid_buffer, "/run/user/{d}", .{uid});
 
         _ = interop.stdlib.setenv("XDG_RUNTIME_DIR", uid_str, 0);
