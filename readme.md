@@ -111,7 +111,9 @@ execute the following command:
 # systemctl disable getty@tty2.service
 ```
 
-You can change the TTY Ly will run on by editing the `tty` option in the configuration file.
+You can change the TTY Ly will run on by editing the `tty` option in the
+configuration file **and** change which TTY is used in the corresponding
+service file..
 
 ### OpenRC
 
