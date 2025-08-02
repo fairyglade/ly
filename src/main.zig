@@ -230,6 +230,9 @@ pub fn main() !void {
     _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
     _ = termbox.tb_clear();
 
+    // Let's take some precautions here and clear the back buffer as well
+    try ttyClearScreen();
+
     // Needed to reset termbox after auth
     const tb_termios = try std.posix.tcgetattr(std.posix.STDIN_FILENO);
 
@@ -683,11 +686,9 @@ pub fn main() !void {
                 }
             },
             termbox.TB_KEY_CTRL_C => run = false,
-            termbox.TB_KEY_CTRL_U => {
-                if (active_input == .password) {
-                    password.clear();
-                    update = true;
-                }
+            termbox.TB_KEY_CTRL_U => if (active_input == .password) {
+                password.clear();
+                update = true;
             },
             termbox.TB_KEY_CTRL_K, termbox.TB_KEY_ARROW_UP => {
                 active_input = switch (active_input) {
@@ -721,7 +722,6 @@ pub fn main() !void {
                     .login => .session,
                     .password => .login,
                 };
-
                 update = true;
             },
             termbox.TB_KEY_ENTER => authenticate: {
@@ -819,15 +819,14 @@ pub fn main() !void {
                     try info_line.addMessage(lang.logout, config.bg, config.fg);
                 }
 
-                // Clear the TTY because termbox2 doesn't properly do it
-                const capability = termbox.global.caps[termbox.TB_CAP_CLEAR_SCREEN];
-                const capability_slice = capability[0..std.mem.len(capability)];
-                _ = try std.posix.write(termbox.global.ttyfd, capability_slice);
-
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
-                if (auth_fails < config.auth_fails) _ = termbox.tb_clear();
 
-                update = true;
+                if (auth_fails < config.auth_fails) {
+                    _ = termbox.tb_clear();
+                    try ttyClearScreen();
+
+                    update = true;
+                }
 
                 // Restore the cursor
                 _ = termbox.tb_set_cursor(0, 0);
@@ -875,6 +874,13 @@ pub fn main() !void {
             },
         }
     }
+}
+
+fn ttyClearScreen() !void {
+    // Clear the TTY because termbox2 doesn't seem to do it properly
+    const capability = termbox.global.caps[termbox.TB_CAP_CLEAR_SCREEN];
+    const capability_slice = capability[0..std.mem.len(capability)];
+    _ = try std.posix.write(termbox.global.ttyfd, capability_slice);
 }
 
 fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplayServer, exec: ?[]const u8) !void {
