@@ -101,6 +101,7 @@ pub fn main() !void {
     var lang: Lang = undefined;
     var save: Save = undefined;
     var config_load_failed = false;
+    var can_draw_clock = true;
 
     if (res.args.help != 0) {
         try clap.help(stderr, clap.Help, &params, .{});
@@ -426,15 +427,13 @@ pub fn main() !void {
 
                 buffer.drawLabel(ly_top_str, 0, 0);
 
-                if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) draw_big_clock: {
+                if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) {
                     const format = "%H:%M";
                     const xo = buffer.width / 2 - @min(buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
                     const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
 
                     var clock_buf: [format.len + 1:0]u8 = undefined;
-                    const clock_str = interop.timeAsString(&clock_buf, format) catch {
-                        break :draw_big_clock;
-                    };
+                    const clock_str = interop.timeAsString(&clock_buf, format);
 
                     for (clock_str, 0..) |c, i| {
                         const clock_cell = bigclock.clockCell(animate, c, buffer.fg, buffer.bg, config.bigclock);
@@ -466,12 +465,17 @@ pub fn main() !void {
                 }
 
                 if (config.clock) |clock| draw_clock: {
-                    var clock_buf: [32:0]u8 = undefined;
-                    const clock_str = interop.timeAsString(&clock_buf, clock) catch {
-                        break :draw_clock;
-                    };
+                    if (!can_draw_clock) break :draw_clock;
 
-                    if (clock_str.len == 0) return error.FormattedTimeEmpty;
+                    var clock_buf: [64:0]u8 = undefined;
+                    const clock_str = interop.timeAsString(&clock_buf, clock);
+
+                    if (clock_str.len == 0) {
+                        // Backport: I've decided not to localize the error message
+                        try info_line.addMessage("clock string too long", config.error_bg, config.error_fg);
+                        can_draw_clock = false;
+                        break :draw_clock;
+                    }
 
                     buffer.drawLabel(clock_str, buffer.width - @min(buffer.width, clock_str.len), 0);
                 }
