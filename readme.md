@@ -1,17 +1,19 @@
-# Ly - a TUI display manager
+# The Ly display manager
 
 ![Ly screenshot](.github/screenshot.png "Ly screenshot")
 
-Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD.
+Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD,
+designed with portability in mind (e.g. it does not require systemd to run).
 
 Join us on Matrix over at [#ly:envs.net](https://matrix.to/#/#ly:envs.net)!
 
-**Note**: Development happens on [Codeberg](https://codeberg.org/AnErrupTion/ly) with a mirror on [GitHub](https://github.com/fairyglade/ly).
+**Note**: Development happens on [Codeberg](https://codeberg.org/AnErrupTion/ly)
+with a mirror on [GitHub](https://github.com/fairyglade/ly).
 
 ## Dependencies
 
 - Compile-time:
-  - zig 0.14.0
+  - zig 0.14.x
   - libc
   - pam
   - xcb (optional, required by default; needed for X11 support)
@@ -21,14 +23,10 @@ Join us on Matrix over at [#ly:envs.net](https://matrix.to/#/#ly:envs.net)!
   - shutdown
   - brightnessctl
 
-## Packaging status
-
-[![Packaging status](https://repology.org/badge/vertical-allrepos/ly.svg?exclude_unsupported=1)](https://repology.org/project/ly/versions)
-
 ### Debian
 
 ```
-# apt install build-essential libpam0g-dev libxcb-xkb-dev
+# apt install build-essential libpam0g-dev libxcb-xkb-dev xauth xserver-xorg brightnessctl
 ```
 
 ### Fedora
@@ -37,136 +35,102 @@ Join us on Matrix over at [#ly:envs.net](https://matrix.to/#/#ly:envs.net)!
 It is recommended to add a rule for Ly as it currently does not ship one.
 
 ```
-# dnf install kernel-devel pam-devel libxcb-devel zig
+# dnf install kernel-devel pam-devel libxcb-devel zig xorg-x11-xauth xorg-x11-server brightnessctl
 ```
+
+## Packaging status
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ly.svg?exclude_unsupported=1)](https://repology.org/project/ly/versions)
 
 ## Support
 
-The following desktop environments were tested with success:
+Ly has been tested with a wide variety of desktop environments and window
+managers, all of which you can find in the sections below:
 
-[Wayland Environments](#supported-wayland-environments)
+[Wayland environments](#supported-wayland-environments)
 
-[X11 Environments](#supported-x11-environments)
+[X11 environments](#supported-x11-environments)
 
-Ly should work with any X desktop environment, and provides
-basic wayland support (sway works very well, for example).
+## Manually building
 
-## systemd?
-
-Unlike what you may have heard, Ly does not require `systemd`,
-and was even specifically designed not to depend on `logind`.
-You should be able to make it work easily with a better init,
-changing the source code won't be necessary :)
-
-## Cloning and Compiling
-
-Clone the repository
+The procedure for manually building Ly is pretty standard:
 
 ```
 $ git clone https://codeberg.org/AnErrupTion/ly
-```
-
-Change the directory to ly
-
-```
 $ cd ly
-```
-
-Compile
-
-```
 $ zig build
 ```
 
-Test in the configured tty (tty2 by default)
-or a terminal emulator (but authentication won't work)
+After building, you can (optionally) test Ly in a terminal emulator, although
+authentication will **not** work:
 
 ```
 $ zig build run
 ```
 
-**Important**: Running Ly in a terminal emulator as root is _not_ recommended. If you
-want to properly test Ly, please enable its service (as described below) and reboot
-your machine.
+**Important**: While you can also run Ly in a terminal emulator as root, it is
+**not** recommended either. If you want to properly test Ly, please enable its
+service (as described below) and reboot your machine.
 
-Install Ly for systemd-based systems (the default)
+The following sections show how to install Ly for a particular init system.
+Because the procedure is very similar for all of them, the commands will only
+be detailed for the first section (which is about systemd).
+
+**Note**: All following sections will assume you are using LightDM for
+convenience sake.
+
+### systemd
+
+Now, you can install Ly on your system:
 
 ```
-# zig build installexe
+# zig build installexe -Dinit_system=systemd
 ```
 
-Instead of DISPLAY_MANAGER you need to add your DM:
+**Note**: The `init_system` parameter is optional and defaults to `systemd`.
 
-- gdm.service
-- sddm.service
-- lightdm.service
+Note that you also need to disable your current display manager. For example,
+if LightDM is the current display manager, you can execute the following
+command:
 
 ```
-# systemctl disable DISPLAY_MANAGER
+# systemctl disable lightdm.service
 ```
 
-Enable the service
+Then, similarly to the previous command, you need to enable the Ly service:
 
 ```
 # systemctl enable ly.service
 ```
 
-If you need to switch between ttys after Ly's start you also have to
-disable getty on Ly's tty to prevent "login" from spawning on top of it
+**Important**: Because Ly runs in a TTY, you **must** disable the TTY service
+that Ly will run on, otherwise bad things will happen. For example, to disable `getty` spawning on TTY 2 (the default TTY on which Ly spawns), you need to
+execute the following command:
 
 ```
 # systemctl disable getty@tty2.service
 ```
 
+You can change the TTY Ly will run on by editing the `tty` option in the configuration file.
+
 ### OpenRC
-
-**NOTE 1**: On Gentoo, Ly will disable the `display-manager-init` service in order to run.
-
-Clone, compile and test.
-
-Install Ly and the provided OpenRC service
 
 ```
 # zig build installexe -Dinit_system=openrc
-```
-
-Enable the service
-
-```
+# rc-update del lightdm
 # rc-update add ly
-```
-
-You can edit which tty Ly will start on by editing the `tty` option in the configuration file.
-
-If you choose a tty that already has a login/getty running (has a basic login prompt),
-then you have to disable getty, so it doesn't respawn on top of ly
-
-```
 # rc-update del agetty.tty2
 ```
 
-**NOTE 2**: To avoid a console spawning on top on Ly, comment out the appropriate line from /etc/inittab (default is 2).
+**Note**: On Gentoo specifically, you also **must** comment out the appropriate
+line for the TTY in /etc/inittab.
 
 ### runit
 
 ```
 # zig build installexe -Dinit_system=runit
+# rm /var/service/lightdm
 # ln -s /etc/sv/ly /var/service/
-```
-
-By default, ly will run on tty2. To change the tty it must be set in `/etc/ly/config.ini`
-
-You should as well disable your existing display manager service if needed, e.g.:
-
-```
-# rm /var/service/lxdm
-```
-
-The agetty service for the tty console where you are running ly should be disabled.
-For instance, if you are running ly on tty2 (that's the default, check your `/etc/ly/config.ini`)
-you should disable the agetty-tty2 service like this:
-
-```
 # rm /var/service/agetty-tty2
 ```
 
@@ -174,95 +138,60 @@ you should disable the agetty-tty2 service like this:
 
 ```
 # zig build installexe -Dinit_system=s6
-```
-
-Then, edit `/etc/s6/config/ttyX.conf` and set `SPAWN="no"`, where X is the TTY ID (e.g. `2`).
-
-Finally, enable the service:
-
-```
+# s6-rc -d change lightdm
 # s6-service add default ly-srv
 # s6-db-reload
 # s6-rc -u change ly-srv
 ```
 
+To disable TTY 2, edit `/etc/s6/config/tty2.conf` and set `SPAWN="no"`.
+
 ### dinit
 
 ```
 # zig build installexe -Dinit_system=dinit
+# dinitctl disable lightdm
 # dinitctl enable ly
 ```
 
-In addition to the steps above, you will also have to keep a TTY free within `/etc/dinit.d/config/console.conf`.
-
-To do that, change `ACTIVE_CONSOLES` so that the tty that ly should use in `/etc/ly/config.ini` is free.
+To disable TTY 2, go to `/etc/dinit.d/config/console.conf` and modify
+`ACTIVE_CONSOLES`.
 
 ### Updating
 
-You can also install Ly without overrding the current configuration file. That's called
-_updating_. To update, simply run:
+You can also install Ly without overrding the current configuration file. This
+is called **updating**. To update, simply run:
 
 ```
 # zig build installnoconf
 ```
 
-You can, of course, still select the init system of your choice when using this command.
-
-## Arch Linux Installation
-
-You can install ly from the [`[extra]` repos](https://archlinux.org/packages/extra/x86_64/ly/):
-
-```
-# pacman -S ly
-```
-
-## Gentoo Installation
-
-You can install ly from the GURU repository:
-
-Note: If the package is masked, you may need to unmask it using ~amd64 keyword:
-
-```bash
-# echo 'x11-misc/ly ~amd64' >> /etc/portage/package.accept_keywords
-```
-
-1. Enable the GURU repository:
-
-```bash
-# eselect repository enable guru
-```
-
-2. Sync the GURU repository:
-
-```bash
-# emaint sync -r guru
-```
-
-3. Install ly from source:
-
-```bash
-# emerge --ask x11-misc/ly
-```
+You can, of course, still select the init system of your choice when using this
+command.
 
 ## Configuration
 
-You can find all the configuration in `/etc/ly/config.ini`.
-The file is commented, and includes the default values.
+You can find all the configuration in `/etc/ly/config.ini`. The file is fully
+commented, and includes the default values.
 
 ## Controls
 
-Use the up and down arrow keys to change the current field, and the
-left and right arrow keys to change the target desktop environment
-while on the desktop field (above the login field).
+Use the Up/Down arrow keys to change the current field, and the Left/Right
+arrow keys to scroll through the different fields (whether it be the info line,
+the desktop environment, or the username). The info line is where messages and
+errors are displayed.
 
-## .xinitrc
+## A note on .xinitrc
 
-If your .xinitrc doesn't work make sure it is executable and includes a shebang.
-This file is supposed to be a shell script! Quoting from xinit's man page:
+If your `.xinitrc` file doesn't work ,make sure it is executable and includes a
+shebang. This file is supposed to be a shell script! Quoting from `xinit`'s man
+page:
 
-> If no specific client program is given on the command line, xinit will look for a file in the user's home directory called .xinitrc to run as a shell script to start up client programs.
+> If no specific client program is given on the command line, xinit will look
+> for a file in the user's home directory called .xinitrc to run as a shell
+> script to start up client programs.
 
-On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
+A typical shebang for a shell script looks like this:
 
 ```
 #!/bin/sh
@@ -272,10 +201,10 @@ On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
 
 - The numlock and capslock state is printed in the top-right corner.
 - Use the F1 and F2 keys to respectively shutdown and reboot.
-- Take a look at your .xsession if X doesn't start, as it can interfere
+- Take a look at your `.xsession` file if X doesn't start, as it can interfere
   (this file is launched with X to configure the display properly).
 
-## Supported Wayland Environments
+## Supported Wayland environments
 
 - budgie
 - cosmic
@@ -290,7 +219,7 @@ On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
 - sway
 - weston
 
-## Supported X11 Environments
+## Supported X11 environments
 
 - awesome
 - bspwm
@@ -311,7 +240,7 @@ On Arch Linux, the example .xinitrc (/etc/X11/xinit/xinitrc) starts like this:
 - xfce
 - xmonad
 
-## Additional Information
+## A final note
 
-The name "Ly" is a tribute to the fairy from the game Rayman.
-Ly was tested by oxodao, who is some seriously awesome dude.
+The name "Ly" is a tribute to the fairy from the game Rayman. Ly was tested by
+oxodao, who is some seriously awesome dude.
