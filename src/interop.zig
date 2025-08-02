@@ -65,12 +65,10 @@ const set_led_state = if (builtin.os.tag.isBSD()) kbio.KDSETLED else kd.KDSKBLED
 const numlock_led = if (builtin.os.tag.isBSD()) kbio.LED_NUM else kd.K_NUMLOCK;
 const capslock_led = if (builtin.os.tag.isBSD()) kbio.LED_CAP else kd.K_CAPSLOCK;
 
-pub fn timeAsString(buf: [:0]u8, format: [:0]const u8) ![]u8 {
+pub fn timeAsString(buf: [:0]u8, format: [:0]const u8) []u8 {
     const timer = std.time.timestamp();
     const tm_info = time.localtime(&timer);
-
     const len = time.strftime(buf, buf.len, format, tm_info);
-    if (len < 0) return error.CannotGetFormattedTime;
 
     return buf[0..len];
 }
