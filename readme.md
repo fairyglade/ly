@@ -23,7 +23,7 @@ Join us on Matrix over at [#ly:envs.net](https://matrix.to/#/#ly:envs.net)!
 
 ## Packaging status
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/ly.svg)](https://repology.org/project/ly/versions)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ly.svg?exclude_unsupported=1)](https://repology.org/project/ly/versions)
 
 ### Debian
 
