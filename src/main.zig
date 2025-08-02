@@ -457,150 +457,7 @@ pub fn main() !void {
 
         if (update) {
             // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
-            if (auth_fails < config.auth_fails) {
-                _ = termbox.tb_clear();
-
-                var length: usize = 0;
-
-                if (!animation_timed_out) animation.draw();
-
-                if (!config.hide_version_string) {
-                    buffer.drawLabel(ly_top_str, length, 0);
-                    length += ly_top_str.len + 1;
-                }
-
-                if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) {
-                    const format = "%H:%M";
-                    const xo = buffer.width / 2 - @min(buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
-                    const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
-
-                    var clock_buf: [format.len + 1:0]u8 = undefined;
-                    const clock_str = interop.timeAsString(&clock_buf, format);
-
-                    for (clock_str, 0..) |c, i| {
-                        const clock_cell = bigclock.clockCell(animate, c, buffer.fg, buffer.bg, config.bigclock);
-                        bigclock.alphaBlit(xo + i * (bigclock.WIDTH + 1), yo, buffer.width, buffer.height, clock_cell);
-                    }
-                }
-
-                buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
-
-                if (resolution_changed) {
-                    const coordinates = buffer.calculateComponentCoordinates();
-                    info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length, null);
-                    session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length, config.text_in_center);
-                    login.label.position(coordinates.x, coordinates.y + 4, coordinates.visible_length, config.text_in_center);
-                    password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
-
-                    resolution_changed = false;
-                }
-
-                switch (active_input) {
-                    .info_line => info_line.label.handle(null, insert_mode),
-                    .session => session.label.handle(null, insert_mode),
-                    .login => login.label.handle(null, insert_mode),
-                    .password => password.handle(null, insert_mode) catch {
-                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    },
-                }
-
-                if (config.clock) |clock| draw_clock: {
-                    if (!can_draw_clock) break :draw_clock;
-
-                    var clock_buf: [64:0]u8 = undefined;
-                    const clock_str = interop.timeAsString(&clock_buf, clock);
-
-                    if (clock_str.len == 0) {
-                        try info_line.addMessage(lang.err_clock_too_long, config.error_bg, config.error_fg);
-                        can_draw_clock = false;
-                        break :draw_clock;
-                    }
-
-                    buffer.drawLabel(clock_str, buffer.width - @min(buffer.width, clock_str.len), 0);
-                }
-
-                const label_x = buffer.box_x + buffer.margin_box_h;
-                const label_y = buffer.box_y + buffer.margin_box_v;
-
-                buffer.drawLabel(lang.login, label_x, label_y + 4);
-                buffer.drawLabel(lang.password, label_x, label_y + 6);
-
-                info_line.label.draw();
-
-                if (!config.hide_key_hints) {
-                    buffer.drawLabel(config.shutdown_key, length, 0);
-                    length += config.shutdown_key.len + 1;
-                    buffer.drawLabel(" ", length - 1, 0);
-
-                    buffer.drawLabel(lang.shutdown, length, 0);
-                    length += shutdown_len + 1;
-
-                    buffer.drawLabel(config.restart_key, length, 0);
-                    length += config.restart_key.len + 1;
-                    buffer.drawLabel(" ", length - 1, 0);
-
-                    buffer.drawLabel(lang.restart, length, 0);
-                    length += restart_len + 1;
-
-                    if (config.sleep_cmd != null) {
-                        buffer.drawLabel(config.sleep_key, length, 0);
-                        length += config.sleep_key.len + 1;
-                        buffer.drawLabel(" ", length - 1, 0);
-
-                        buffer.drawLabel(lang.sleep, length, 0);
-                        length += sleep_len + 1;
-                    }
-
-                    if (config.brightness_down_key) |key| {
-                        buffer.drawLabel(key, length, 0);
-                        length += key.len + 1;
-                        buffer.drawLabel(" ", length - 1, 0);
-
-                        buffer.drawLabel(lang.brightness_down, length, 0);
-                        length += brightness_down_len + 1;
-                    }
-
-                    if (config.brightness_up_key) |key| {
-                        buffer.drawLabel(key, length, 0);
-                        length += key.len + 1;
-                        buffer.drawLabel(" ", length - 1, 0);
-
-                        buffer.drawLabel(lang.brightness_up, length, 0);
-                        length += brightness_up_len + 1;
-                    }
-                }
-
-                if (config.box_title) |title| {
-                    buffer.drawConfinedLabel(title, buffer.box_x, buffer.box_y - 1, buffer.box_width);
-                }
-
-                if (config.vi_mode) {
-                    const label_txt = if (insert_mode) lang.insert else lang.normal;
-                    buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
-                }
-
-                if (can_get_lock_state) draw_lock_state: {
-                    const lock_state = interop.getLockState() catch {
-                        try info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
-                        can_get_lock_state = false;
-                        break :draw_lock_state;
-                    };
-
-                    var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
-                    const lock_state_y: usize = if (config.clock != null) 1 else 0;
-
-                    if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
-
-                    if (lock_state_x >= lang.capslock.len + 1) {
-                        lock_state_x -= lang.capslock.len + 1;
-                        if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
-                    }
-                }
-
-                session.label.draw();
-                login.label.draw();
-                password.draw();
-            } else {
+            if (auth_fails >= config.auth_fails) {
                 std.Thread.sleep(std.time.ns_per_ms * 10);
                 update = buffer.cascade();
 
@@ -608,7 +465,153 @@ pub fn main() !void {
                     std.Thread.sleep(std.time.ns_per_s * 7);
                     auth_fails = 0;
                 }
+
+                _ = termbox.tb_present();
+                continue;
             }
+
+            _ = termbox.tb_clear();
+
+            var length: usize = 0;
+
+            if (!animation_timed_out) animation.draw();
+
+            if (!config.hide_version_string) {
+                buffer.drawLabel(ly_top_str, length, 0);
+                length += ly_top_str.len + 1;
+            }
+
+            if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) {
+                const format = "%H:%M";
+                const xo = buffer.width / 2 - @min(buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
+                const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
+
+                var clock_buf: [format.len + 1:0]u8 = undefined;
+                const clock_str = interop.timeAsString(&clock_buf, format);
+
+                for (clock_str, 0..) |c, i| {
+                    const clock_cell = bigclock.clockCell(animate, c, buffer.fg, buffer.bg, config.bigclock);
+                    bigclock.alphaBlit(xo + i * (bigclock.WIDTH + 1), yo, buffer.width, buffer.height, clock_cell);
+                }
+            }
+
+            buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
+
+            if (resolution_changed) {
+                const coordinates = buffer.calculateComponentCoordinates();
+                info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length, null);
+                session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length, config.text_in_center);
+                login.label.position(coordinates.x, coordinates.y + 4, coordinates.visible_length, config.text_in_center);
+                password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
+
+                resolution_changed = false;
+            }
+
+            switch (active_input) {
+                .info_line => info_line.label.handle(null, insert_mode),
+                .session => session.label.handle(null, insert_mode),
+                .login => login.label.handle(null, insert_mode),
+                .password => password.handle(null, insert_mode) catch {
+                    try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                },
+            }
+
+            if (config.clock) |clock| draw_clock: {
+                if (!can_draw_clock) break :draw_clock;
+
+                var clock_buf: [64:0]u8 = undefined;
+                const clock_str = interop.timeAsString(&clock_buf, clock);
+
+                if (clock_str.len == 0) {
+                    try info_line.addMessage(lang.err_clock_too_long, config.error_bg, config.error_fg);
+                    can_draw_clock = false;
+                    break :draw_clock;
+                }
+
+                buffer.drawLabel(clock_str, buffer.width - @min(buffer.width, clock_str.len), 0);
+            }
+
+            const label_x = buffer.box_x + buffer.margin_box_h;
+            const label_y = buffer.box_y + buffer.margin_box_v;
+
+            buffer.drawLabel(lang.login, label_x, label_y + 4);
+            buffer.drawLabel(lang.password, label_x, label_y + 6);
+
+            info_line.label.draw();
+
+            if (!config.hide_key_hints) {
+                buffer.drawLabel(config.shutdown_key, length, 0);
+                length += config.shutdown_key.len + 1;
+                buffer.drawLabel(" ", length - 1, 0);
+
+                buffer.drawLabel(lang.shutdown, length, 0);
+                length += shutdown_len + 1;
+
+                buffer.drawLabel(config.restart_key, length, 0);
+                length += config.restart_key.len + 1;
+                buffer.drawLabel(" ", length - 1, 0);
+
+                buffer.drawLabel(lang.restart, length, 0);
+                length += restart_len + 1;
+
+                if (config.sleep_cmd != null) {
+                    buffer.drawLabel(config.sleep_key, length, 0);
+                    length += config.sleep_key.len + 1;
+                    buffer.drawLabel(" ", length - 1, 0);
+
+                    buffer.drawLabel(lang.sleep, length, 0);
+                    length += sleep_len + 1;
+                }
+
+                if (config.brightness_down_key) |key| {
+                    buffer.drawLabel(key, length, 0);
+                    length += key.len + 1;
+                    buffer.drawLabel(" ", length - 1, 0);
+
+                    buffer.drawLabel(lang.brightness_down, length, 0);
+                    length += brightness_down_len + 1;
+                }
+
+                if (config.brightness_up_key) |key| {
+                    buffer.drawLabel(key, length, 0);
+                    length += key.len + 1;
+                    buffer.drawLabel(" ", length - 1, 0);
+
+                    buffer.drawLabel(lang.brightness_up, length, 0);
+                    length += brightness_up_len + 1;
+                }
+            }
+
+            if (config.box_title) |title| {
+                buffer.drawConfinedLabel(title, buffer.box_x, buffer.box_y - 1, buffer.box_width);
+            }
+
+            if (config.vi_mode) {
+                const label_txt = if (insert_mode) lang.insert else lang.normal;
+                buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
+            }
+
+            if (can_get_lock_state) draw_lock_state: {
+                const lock_state = interop.getLockState() catch {
+                    try info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
+                    can_get_lock_state = false;
+                    break :draw_lock_state;
+                };
+
+                var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
+                const lock_state_y: usize = if (config.clock != null) 1 else 0;
+
+                if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
+
+                if (lock_state_x >= lang.capslock.len + 1) {
+                    lock_state_x -= lang.capslock.len + 1;
+                    if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
+                }
+            }
+
+            session.label.draw();
+            login.label.draw();
+            password.draw();
 
             _ = termbox.tb_present();
         }
