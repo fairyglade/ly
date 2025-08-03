@@ -7,7 +7,7 @@ designed with portability in mind (e.g. it does not require systemd to run).
 
 Join us on Matrix over at [#ly:envs.net](https://matrix.to/#/#ly:envs.net)!
 
-**Note**: Development happens on [Codeberg](https://codeberg.org/AnErrupTion/ly)
+**Note**: Development happens on [Codeberg](https://codeberg.org/fairyglade/ly)
 with a mirror on [GitHub](https://github.com/fairyglade/ly).
 
 ## Dependencies
@@ -56,7 +56,7 @@ managers, all of which you can find in the sections below:
 The procedure for manually building Ly is pretty standard:
 
 ```
-$ git clone https://codeberg.org/AnErrupTion/ly
+$ git clone https://codeberg.org/fairyglade/ly.git
 $ cd ly
 $ zig build
 ```
