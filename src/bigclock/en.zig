@@ -90,5 +90,26 @@ pub const locale_chars = LocaleChars{
         O,O,O,O,O,
         O,O,O,O,O,
     },
+    .P = [_]u21{
+        X,X,X,X,X,
+        X,X,O,X,X,
+        X,X,X,X,X,
+        X,X,O,O,O,
+        X,X,O,O,O,
+    },
+    .A = [_]u21{
+        X,X,X,X,X,
+        X,X,O,X,X,
+        X,X,X,X,X,
+        X,X,O,X,X,
+        X,X,O,X,X,
+    },
+    .M = [_]u21{
+        X,X,X,X,X,
+        X,O,X,O,X,
+        X,O,X,O,X,
+        X,O,O,O,X,
+        X,O,O,O,X,
+    },
 };
 // zig fmt: on

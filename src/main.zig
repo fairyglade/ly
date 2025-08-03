@@ -482,11 +482,19 @@ pub fn main() !void {
             }
 
             if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) {
-                const format = "%H:%M";
+                var format_buf: [16:0]u8 = undefined; 
+                var clock_buf: [32:0]u8 = undefined;
+                // We need the slice/c-string returned by `bufPrintZ`.
+                const format: [:0]const u8 = try std.fmt.bufPrintZ(&format_buf, "{s}{s}{s}{s}",
+                    .{
+                        if (config.bigclock_12hr) "%I" else "%H",
+                        ":%M",
+                        if (config.bigclock_seconds) ":%S" else "",
+                        if (config.bigclock_12hr) "%P" else ""
+                    });
                 const xo = buffer.width / 2 - @min(buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
                 const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
 
-                var clock_buf: [format.len + 1:0]u8 = undefined;
                 const clock_str = interop.timeAsString(&clock_buf, format);
 
                 for (clock_str, 0..) |c, i| {

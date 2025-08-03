@@ -76,6 +76,27 @@ pub const locale_chars = LocaleChars{
         O,O,O,X,O,
         O,O,O,X,O,
     },
+    .P = [_]u21{
+        O,O,O,O,O,
+        O,O,O,O,O,
+        O,O,O,O,O,
+        O,O,O,O,O,
+        O,O,O,O,O,
+    },
+    .A = [_]u21{
+        O,O,O,O,O,
+        O,O,O,O,O,
+        O,O,O,O,O,
+        O,O,O,O,O,
+        O,O,O,O,O,
+    },
+    .M = [_]u21{
+        O,O,O,O,O,
+        O,O,O,O,O,
+        O,O,O,O,O,
+        O,O,O,O,O,
+        O,O,O,O,O,
+    },
     .S = [_]u21{
         O,O,O,O,O,
         O,O,X,O,O,

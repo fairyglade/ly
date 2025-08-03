@@ -51,6 +51,9 @@ fn toBigNumber(char: u8, bigclock: Bigclock) [SIZE]u21 {
         '7' => locale_chars.SEVEN,
         '8' => locale_chars.EIGHT,
         '9' => locale_chars.NINE,
+        'p', 'P' => locale_chars.P,
+        'a', 'A' => locale_chars.A,
+        'm', 'M' => locale_chars.M,
         ':' => locale_chars.S,
         else => locale_chars.E,
     };

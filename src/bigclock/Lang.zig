@@ -21,5 +21,8 @@ pub const LocaleChars = struct {
     NINE:   [SIZE]u21,
     S:      [SIZE]u21,
     E:      [SIZE]u21,
+    P:      [SIZE]u21,
+    A:      [SIZE]u21,
+    M:      [SIZE]u21,
 };
 // zig fmt: on
