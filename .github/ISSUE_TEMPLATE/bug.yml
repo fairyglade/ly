@@ -58,8 +58,8 @@ body:
     attributes:
       label: Relevant logs
       description: |
-        Please copy and paste any relevant logs, error messages or any other output. This will be automatically formatted into code, so no need for backticks. Screenshots are accepted if they make life easier for you.
-        If it exists, ncluding your session log (found at /var/log/ly-session.log unless modified) is a good idea. (But make sure it's relevant!)
+        Please copy and paste (or attach) any relevant logs, error messages or any other output. This will be automatically formatted into code, so no need for backticks. Screenshots are accepted if they make life easier for you.
+        Moreover, it is almost always a good idea to include your session log and your general log files (found at ~/ly-session.log and /var/log/ly.log respectively by default) as it usually contains relevant information about the problem.
       render: shell
   - type: textarea
     id: moreinfo

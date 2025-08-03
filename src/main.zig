@@ -201,6 +201,25 @@ pub fn main() !void {
         migrator.lateConfigFieldHandler(&config.animation);
     }
 
+    var log_file: std.fs.File = undefined;
+    defer log_file.close();
+
+    var could_open_log_file = true;
+    open_log_file: {
+        log_file = std.fs.cwd().openFile(config.ly_log, .{ .mode = .write_only }) catch std.fs.cwd().createFile(config.ly_log, .{ .mode = 0o666 }) catch {
+            // If we could neither open an existing log file nor create a new
+            // one, abort.
+            could_open_log_file = false;
+            break :open_log_file;
+        };
+    }
+
+    if (!could_open_log_file) {
+        log_file = try std.fs.openFileAbsolute("/dev/null", .{ .mode = .write_only });
+    }
+
+    const log_writer = log_file.writer();
+
     // if (migrator.mapped_config_fields) save_migrated_config: {
     //     var file = try std.fs.cwd().createFile(config_path, .{});
     //     defer file.close();
@@ -217,8 +236,12 @@ pub fn main() !void {
     restart_cmd = try temporary_allocator.dupe(u8, config.restart_cmd);
 
     // Initialize termbox
+    try log_writer.writeAll("initializing termbox2\n");
     _ = termbox.tb_init();
-    defer _ = termbox.tb_shutdown();
+    defer {
+        log_writer.writeAll("shutting down termbox2\n") catch {};
+        _ = termbox.tb_shutdown();
+    }
 
     const act = std.posix.Sigaction{
         .handler = .{ .handler = &signalHandler },
@@ -255,6 +278,8 @@ pub fn main() !void {
     };
     var buffer = TerminalBuffer.init(buffer_options, labels_max_length, random);
 
+    try log_writer.print("screen resolution is {d}x{d}\n", .{ buffer.width, buffer.height });
+
     // Initialize components
     var info_line = InfoLine.init(allocator, &buffer);
     defer info_line.deinit();
@@ -262,27 +287,37 @@ pub fn main() !void {
     if (config_load_failed) {
         // We can't localize this since the config failed to load so we'd fallback to the default language anyway
         try info_line.addMessage("unable to parse config file", config.error_bg, config.error_fg);
+        try log_writer.writeAll("unable to parse config file\n");
     }
 
-    interop.setNumlock(config.numlock) catch {
+    if (!could_open_log_file) {
+        try info_line.addMessage(lang.err_log, config.error_bg, config.error_fg);
+        try log_writer.writeAll("failed to open log file\n");
+    }
+
+    interop.setNumlock(config.numlock) catch |err| {
         try info_line.addMessage(lang.err_numlock, config.error_bg, config.error_fg);
+        try log_writer.print("failed to set numlock: {s}\n", .{@errorName(err)});
     };
 
     var session = Session.init(allocator, &buffer);
     defer session.deinit();
 
-    addOtherEnvironment(&session, lang, .shell, null) catch {
+    addOtherEnvironment(&session, lang, .shell, null) catch |err| {
         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+        try log_writer.print("failed to add shell environment: {s}\n", .{@errorName(err)});
     };
 
     if (build_options.enable_x11_support) {
         if (config.xinitrc) |xinitrc_cmd| {
-            addOtherEnvironment(&session, lang, .xinitrc, xinitrc_cmd) catch {
+            addOtherEnvironment(&session, lang, .xinitrc, xinitrc_cmd) catch |err| {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                try log_writer.print("failed to add xinitrc environment: {s}\n", .{@errorName(err)});
             };
         }
     } else {
         try info_line.addMessage(lang.no_x11_support, config.bg, config.fg);
+        try log_writer.writeAll("x11 support disabled at compile-time\n");
     }
 
     if (config.initial_info_text) |text| {
@@ -290,8 +325,9 @@ pub fn main() !void {
     } else get_host_name: {
         // Initialize information line with host name
         var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
-        const hostname = std.posix.gethostname(&name_buf) catch {
+        const hostname = std.posix.gethostname(&name_buf) catch |err| {
             try info_line.addMessage(lang.err_hostname, config.error_bg, config.error_fg);
+            try log_writer.print("failed to get hostname: {s}\n", .{@errorName(err)});
             break :get_host_name;
         };
         try info_line.addMessage(hostname, config.bg, config.fg);
@@ -327,6 +363,7 @@ pub fn main() !void {
         // accounts *and* no root account...but at this point, if that's the
         // case, you have bigger problems to deal with in the first place. :D
         try info_line.addMessage(lang.err_no_users, config.error_bg, config.error_fg);
+        try log_writer.writeAll("no users found\n");
     }
 
     var login = try UserList.init(allocator, &buffer, usernames);
@@ -374,8 +411,9 @@ pub fn main() !void {
             .info_line => info_line.label.handle(null, insert_mode),
             .session => session.label.handle(null, insert_mode),
             .login => login.label.handle(null, insert_mode),
-            .password => password.handle(null, insert_mode) catch {
+            .password => password.handle(null, insert_mode) catch |err| {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                try log_writer.print("failed to handle password input: {s}\n", .{@errorName(err)});
             },
         }
     }
@@ -426,8 +464,9 @@ pub fn main() !void {
     var auth_fails: u64 = 0;
 
     // Switch to selected TTY
-    interop.switchTty(config.tty) catch {
+    interop.switchTty(config.tty) catch |err| {
         try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
+        try log_writer.print("failed to switch tty: {s}\n", .{@errorName(err)});
     };
 
     while (run) {
@@ -442,12 +481,14 @@ pub fn main() !void {
 
             if (width != buffer.width or height != buffer.height) {
                 // If it did change, then update the cell buffer, reallocate the current animation's buffers, and force a draw update
+                try log_writer.print("screen resolution updated to {d}x{d}\n", .{ width, height });
 
                 buffer.width = width;
                 buffer.height = height;
 
-                animation.realloc() catch {
+                animation.realloc() catch |err| {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                    try log_writer.print("failed to reallocate animation buffers: {s}\n", .{@errorName(err)});
                 };
 
                 update = true;
@@ -518,8 +559,9 @@ pub fn main() !void {
                 .info_line => info_line.label.handle(null, insert_mode),
                 .session => session.label.handle(null, insert_mode),
                 .login => login.label.handle(null, insert_mode),
-                .password => password.handle(null, insert_mode) catch {
+                .password => password.handle(null, insert_mode) catch |err| {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                    try log_writer.print("failed to handle password input: {s}\n", .{@errorName(err)});
                 },
             }
 
@@ -532,6 +574,7 @@ pub fn main() !void {
                 if (clock_str.len == 0) {
                     try info_line.addMessage(lang.err_clock_too_long, config.error_bg, config.error_fg);
                     can_draw_clock = false;
+                    try log_writer.writeAll("clock string too long\n");
                     break :draw_clock;
                 }
 
@@ -599,9 +642,10 @@ pub fn main() !void {
             }
 
             if (can_get_lock_state) draw_lock_state: {
-                const lock_state = interop.getLockState() catch {
+                const lock_state = interop.getLockState() catch |err| {
                     try info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
                     can_get_lock_state = false;
+                    try log_writer.print("failed to get lock state: {s}\n", .{@errorName(err)});
                     break :draw_lock_state;
                 };
 
@@ -682,16 +726,19 @@ pub fn main() !void {
                             };
                             if (process_result.Exited != 0) {
                                 try info_line.addMessage(lang.err_sleep, config.error_bg, config.error_fg);
+                                try log_writer.print("failed to execute sleep command: exit code {d}\n", .{process_result.Exited});
                             }
                         }
                     }
                 } else if (brightness_down_key != null and pressed_key == brightness_down_key.?) {
-                    adjustBrightness(allocator, config.brightness_down_cmd) catch {
+                    adjustBrightness(allocator, config.brightness_down_cmd) catch |err| {
                         try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
+                        try log_writer.print("failed to change brightness: {s}\n", .{@errorName(err)});
                     };
                 } else if (brightness_up_key != null and pressed_key == brightness_up_key.?) {
-                    adjustBrightness(allocator, config.brightness_up_cmd) catch {
+                    adjustBrightness(allocator, config.brightness_up_cmd) catch |err| {
                         try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
+                        try log_writer.print("failed to change brightness: {s}\n", .{@errorName(err)});
                     };
                 }
             },
@@ -735,10 +782,14 @@ pub fn main() !void {
                 update = true;
             },
             termbox.TB_KEY_ENTER => authenticate: {
+                try log_writer.writeAll("authenticating...");
+
                 if (!config.allow_empty_password and password.text.items.len == 0) {
+                    // Let's not log this message for security reasons
                     try info_line.addMessage(lang.err_empty_password, config.error_bg, config.error_fg);
-                    InfoLine.clearRendered(allocator, buffer) catch {
+                    InfoLine.clearRendered(allocator, buffer) catch |err| {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                        try log_writer.print("failed to clear info line: {s}\n", .{@errorName(err)});
                     };
                     info_line.label.draw();
                     _ = termbox.tb_present();
@@ -746,8 +797,9 @@ pub fn main() !void {
                 }
 
                 try info_line.addMessage(lang.authenticating, config.bg, config.fg);
-                InfoLine.clearRendered(allocator, buffer) catch {
+                InfoLine.clearRendered(allocator, buffer) catch |err| {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                    try log_writer.print("failed to clear info line: {s}\n", .{@errorName(err)});
                 };
                 info_line.label.draw();
                 _ = termbox.tb_present();
@@ -820,7 +872,10 @@ pub fn main() !void {
                 if (auth_err) |err| {
                     auth_fails += 1;
                     active_input = .password;
+
                     try info_line.addMessage(getAuthErrorMsg(err, lang), config.error_bg, config.error_fg);
+                    try log_writer.print("failed to authenticate: {s}\n", .{@errorName(err)});
+
                     if (config.clear_password or err != error.PamAuthError) password.clear();
                 } else {
                     if (config.logout_cmd) |logout_cmd| {
@@ -830,6 +885,7 @@ pub fn main() !void {
 
                     password.clear();
                     try info_line.addMessage(lang.logout, config.bg, config.fg);
+                    try log_writer.writeAll("logged out");
                 }
 
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
