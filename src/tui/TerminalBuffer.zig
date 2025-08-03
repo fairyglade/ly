@@ -31,14 +31,22 @@ pub const Styling = struct {
 
 pub const Color = struct {
     pub const DEFAULT = 0x00000000;
-    pub const BLACK = Styling.HI_BLACK;
-    pub const RED = 0x00FF0000;
-    pub const GREEN = 0x0000FF00;
-    pub const YELLOW = 0x00FFFF00;
-    pub const BLUE = 0x000000FF;
-    pub const MAGENTA = 0x00FF00FF;
-    pub const CYAN = 0x0000FFFF;
-    pub const WHITE = 0x00FFFFFF;
+    pub const TRUE_BLACK = Styling.HI_BLACK;
+    pub const TRUE_RED = 0x00FF0000;
+    pub const TRUE_GREEN = 0x0000FF00;
+    pub const TRUE_YELLOW = 0x00FFFF00;
+    pub const TRUE_BLUE = 0x000000FF;
+    pub const TRUE_MAGENTA = 0x00FF00FF;
+    pub const TRUE_CYAN = 0x0000FFFF;
+    pub const TRUE_WHITE = 0x00FFFFFF;
+    pub const ECOL_BLACK = 1;
+    pub const ECOL_RED = 2;
+    pub const ECOL_GREEN = 3;
+    pub const ECOL_YELLOW = 4;
+    pub const ECOL_BLUE = 5;
+    pub const ECOL_MAGENTA = 6;
+    pub const ECOL_CYAN = 7;
+    pub const ECOL_WHITE = 8;
 };
 
 random: Random,

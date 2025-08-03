@@ -11,8 +11,6 @@ pub const FRAME_DELAY: usize = 8;
 // Characters change mid-scroll
 pub const MID_SCROLL_CHANGE = true;
 
-const DOT_HEAD_COLOR: u32 = @intCast(TerminalBuffer.Color.WHITE | TerminalBuffer.Styling.BOLD);
-
 const Matrix = @This();
 
 pub const Dot = struct {
@@ -33,11 +31,12 @@ lines: []Line,
 frame: usize,
 count: usize,
 fg: u32,
+head_col: u32,
 min_codepoint: u16,
 max_codepoint: u16,
 default_cell: Cell,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg: u32, min_codepoint: u16, max_codepoint: u16) !Matrix {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg: u32, head_col: u32, min_codepoint: u16, max_codepoint: u16) !Matrix {
     const dots = try allocator.alloc(Dot, terminal_buffer.width * (terminal_buffer.height + 1));
     const lines = try allocator.alloc(Line, terminal_buffer.width);
 
@@ -51,6 +50,7 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg: u32, min
         .frame = 3,
         .count = 0,
         .fg = fg,
+        .head_col = head_col,
         .min_codepoint = min_codepoint,
         .max_codepoint = max_codepoint - min_codepoint,
         .default_cell = .{ .ch = ' ', .fg = fg, .bg = terminal_buffer.bg },
@@ -157,11 +157,13 @@ fn draw(self: *Matrix) void {
             const dot = self.dots[buf_width * y + x];
             const cell = if (dot.value == null or dot.value == ' ') self.default_cell else Cell{
                 .ch = @intCast(dot.value.?),
-                .fg = if (dot.is_head) DOT_HEAD_COLOR else self.fg,
+                .fg = if (dot.is_head) self.head_col else self.fg,
                 .bg = self.terminal_buffer.bg,
             };
 
             cell.put(x, y - 1);
+            // Fill background in between columns
+            self.default_cell.put(x + 1, y - 1);
         }
     }
 }

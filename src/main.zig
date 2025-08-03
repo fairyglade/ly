@@ -170,7 +170,9 @@ pub fn main() !void {
             }) catch migrator.tryMigrateSaveFile(&user_buf);
         }
 
-        migrator.lateConfigFieldHandler(&config.animation);
+        if (!config_load_failed) {
+            migrator.lateConfigFieldHandler(&config);
+        }
     } else {
         const config_path = build_options.config_directory ++ "/ly/config.ini";
 
@@ -198,7 +200,9 @@ pub fn main() !void {
             }) catch migrator.tryMigrateSaveFile(&user_buf);
         }
 
-        migrator.lateConfigFieldHandler(&config.animation);
+        if (!config_load_failed) {
+            migrator.lateConfigFieldHandler(&config);
+        }
     }
 
     var log_file: std.fs.File = undefined;
@@ -250,7 +254,13 @@ pub fn main() !void {
     };
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
-    _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
+    if (config.full_color) {
+        _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
+        try log_writer.writeAll("termbox2 set to 24-bit color output mode\n");
+    } else {
+        try log_writer.writeAll("termbox2 set to eight-color output mode\n");
+    }
+
     _ = termbox.tb_clear();
 
     // Let's take some precautions here and clear the back buffer as well
@@ -431,7 +441,7 @@ pub fn main() !void {
             animation = doom.animation();
         },
         .matrix => {
-            var matrix = try Matrix.init(allocator, &buffer, config.cmatrix_fg, config.cmatrix_min_codepoint, config.cmatrix_max_codepoint);
+            var matrix = try Matrix.init(allocator, &buffer, config.cmatrix_fg, config.cmatrix_head_col, config.cmatrix_min_codepoint, config.cmatrix_max_codepoint);
             animation = matrix.animation();
         },
         .colormix => {
@@ -866,7 +876,10 @@ pub fn main() !void {
 
                 // Take back control of the TTY
                 _ = termbox.tb_init();
-                _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
+
+                if (config.full_color) {
+                    _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
+                }
 
                 const auth_err = shared_err.readError();
                 if (auth_err) |err| {

@@ -1,9 +1,15 @@
-// The migrator ensures compatibility with <=0.6.0 configuration files
+// The migrator ensures compatibility with older configuration files
+// Properties removed or changed since 0.6.0
+// Color codes interpreted differently since 1.1.0
 
 const std = @import("std");
 const ini = @import("zigini");
+const Config = @import("Config.zig");
 const Save = @import("Save.zig");
-const enums = @import("../enums.zig");
+const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+
+const Color = TerminalBuffer.Color;
+const Styling = TerminalBuffer.Styling;
 
 const color_properties = [_][]const u8{
     "bg",
@@ -16,6 +22,10 @@ const color_properties = [_][]const u8{
     "error_fg",
     "fg",
 };
+
+var set_color_properties =
+    [_]bool{ false, false, false, false, false, false, false, false, false };
+
 const removed_properties = [_][]const u8{
     "wayland_specifier",
     "max_desktop_len",
@@ -31,6 +41,8 @@ const removed_properties = [_][]const u8{
 
 var temporary_allocator = std.heap.page_allocator;
 var buffer = std.mem.zeroes([10 * color_properties.len]u8);
+
+pub var auto_eight_colors: bool = true;
 
 pub var maybe_animate: ?bool = null;
 pub var maybe_save_file: ?[]const u8 = null;
@@ -62,15 +74,26 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         return mapped_field;
     }
 
-    inline for (color_properties) |property| {
+    inline for (color_properties, &set_color_properties) |property, *status| {
         if (std.mem.eql(u8, field.key, property)) {
-            // These options now uses a 32-bit RGB value instead of an arbitrary 16-bit integer
-            const color = std.fmt.parseInt(u16, field.value, 0) catch return field;
-            var mapped_field = field;
+            // Color has been set; it won't be overwritten if we default to eight-color output
+            status.* = true;
 
-            mapped_field.value = mapColor(color) catch return field;
-            mapped_config_fields = true;
-            return mapped_field;
+            // These options now uses a 32-bit RGB value instead of an arbitrary 16-bit integer
+            // If they're all using eight-color codes, we start in eight-color mode
+            const color = std.fmt.parseInt(u16, field.value, 0) catch {
+                auto_eight_colors = false;
+                return field;
+            };
+
+            const color_no_styling = color & 0x00FF;
+            const styling_only = color & 0xFF00;
+
+            // If color is "greater" than TB_WHITE, or the styling is "greater" than TB_DIM,
+            // we have an invalid color, so do not use eight-color mode
+            if (color_no_styling > 0x0008 or styling_only > 0x8000) auto_eight_colors = false;
+
+            return field;
         }
     }
 
@@ -131,14 +154,45 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         return mapped_field;
     }
 
+    if (std.mem.eql(u8, field.key, "full_color")) {
+        // If color mode is defined, definitely don't set it automatically
+        auto_eight_colors = false;
+        return field;
+    }
+
     return field;
 }
 
 // This is the stuff we only handle after reading the config.
 // For example, the "animate" field could come after "animation"
-pub fn lateConfigFieldHandler(animation: *enums.Animation) void {
+pub fn lateConfigFieldHandler(config: *Config) void {
     if (maybe_animate) |animate| {
-        if (!animate) animation.* = .none;
+        if (!animate) config.*.animation = .none;
+    }
+
+    if (auto_eight_colors) {
+        // Valid config file predates true-color mode
+        // Will use eight-color output instead
+        config.full_color = false;
+
+        // We cannot rely on Config defaults when in eight-color mode,
+        // because they will appear as undesired colors.
+        // Instead set color properties to matching eight-color codes
+        config.doom_top_color = Color.ECOL_RED;
+        config.doom_middle_color = Color.ECOL_YELLOW;
+        config.doom_bottom_color = Color.ECOL_WHITE;
+        config.cmatrix_head_col = Styling.BOLD | Color.ECOL_WHITE;
+
+        // These may be in the config, so only change those which were not set
+        if (!set_color_properties[0]) config.bg = Color.DEFAULT;
+        if (!set_color_properties[1]) config.border_fg = Color.ECOL_WHITE;
+        if (!set_color_properties[2]) config.cmatrix_fg = Color.ECOL_GREEN;
+        if (!set_color_properties[3]) config.colormix_col1 = Color.ECOL_RED;
+        if (!set_color_properties[4]) config.colormix_col2 = Color.ECOL_BLUE;
+        if (!set_color_properties[5]) config.colormix_col3 = Color.ECOL_BLACK;
+        if (!set_color_properties[6]) config.error_bg = Color.DEFAULT;
+        if (!set_color_properties[7]) config.error_fg = Styling.BOLD | Color.ECOL_RED;
+        if (!set_color_properties[8]) config.fg = Color.ECOL_WHITE;
     }
 }
 
@@ -171,34 +225,4 @@ pub fn tryMigrateSaveFile(user_buf: *[32]u8) Save {
     }
 
     return save;
-}
-
-fn mapColor(color: u16) ![]const u8 {
-    const color_no_styling = color & 0x00FF;
-    const styling_only = color & 0xFF00;
-
-    // If color is "greater" than TB_WHITE, or the styling is "greater" than TB_DIM,
-    // we have an invalid color, so return an error
-    if (color_no_styling > 0x0008 or styling_only > 0x8000) return error.InvalidColor;
-
-    var new_color: u32 = switch (color_no_styling) {
-        0x0000 => 0x00000000, // Default
-        0x0001 => 0x20000000, // "Hi-black" styling
-        0x0002 => 0x00FF0000, // Red
-        0x0003 => 0x0000FF00, // Green
-        0x0004 => 0x00FFFF00, // Yellow
-        0x0005 => 0x000000FF, // Blue
-        0x0006 => 0x00FF00FF, // Magenta
-        0x0007 => 0x0000FFFF, // Cyan
-        0x0008 => 0x00FFFFFF, // White
-        else => unreachable,
-    };
-
-    // Only applying styling if color isn't black and styling isn't also black
-    if (!(new_color == 0x20000000 and styling_only == 0x20000000)) {
-        // Shift styling by 16 to the left to apply it to the new 32-bit color
-        new_color |= @as(u32, @intCast(styling_only)) << 16;
-    }
-
-    return try std.fmt.bufPrint(&buffer, "0x{X}", .{new_color});
 }

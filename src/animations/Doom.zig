@@ -23,11 +23,11 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u
 
     const levels =
         [_]Cell{
-            Cell.init(' ', TerminalBuffer.Color.DEFAULT, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2591, top_color, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2592, top_color, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2593, top_color, TerminalBuffer.Color.DEFAULT),
-            Cell.init(0x2588, top_color, TerminalBuffer.Color.DEFAULT),
+            Cell.init(' ', terminal_buffer.bg, terminal_buffer.bg),
+            Cell.init(0x2591, top_color, terminal_buffer.bg),
+            Cell.init(0x2592, top_color, terminal_buffer.bg),
+            Cell.init(0x2593, top_color, terminal_buffer.bg),
+            Cell.init(0x2588, top_color, terminal_buffer.bg),
             Cell.init(0x2591, middle_color, top_color),
             Cell.init(0x2592, middle_color, top_color),
             Cell.init(0x2593, middle_color, top_color),
