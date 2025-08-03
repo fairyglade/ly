@@ -107,7 +107,7 @@ pub fn authenticate(options: AuthOptions, current_environment: Environment, logi
     {
         // If an error occurs here, we can send SIGTERM to the session
         errdefer cleanup: {
-            _ = std.posix.kill(child_pid, std.posix.SIG.TERM) catch break :cleanup;
+            std.posix.kill(child_pid, std.posix.SIG.TERM) catch break :cleanup;
             _ = std.posix.waitpid(child_pid, 0);
         }
 
@@ -169,7 +169,7 @@ fn startSession(
     std.posix.chdirZ(pwd.pw_dir.?) catch return error.ChangeDirectoryFailed;
 
     // Signal to the session process to give up control on the TTY
-    _ = std.posix.kill(options.session_pid, std.posix.SIG.CHLD) catch return error.TtyControlTransferFailed;
+    std.posix.kill(options.session_pid, std.posix.SIG.CHLD) catch return error.TtyControlTransferFailed;
 
     // Execute what the user requested
     switch (current_environment.display_server) {
