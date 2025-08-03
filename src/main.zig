@@ -806,6 +806,9 @@ pub fn main() !void {
                     }
 
                     _ = std.posix.waitpid(session_pid, 0);
+                    // HACK: It seems like the session process is not exiting immediately after the waitpid call.
+                    // This is a workaround to ensure the session process has exited before re-initializing the TTY.
+                    std.Thread.sleep(std.time.ns_per_s * 1);
                     session_pid = -1;
                 }
 
