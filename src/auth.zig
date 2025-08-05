@@ -459,8 +459,9 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptio
     _ = std.posix.waitpid(xorg_pid, 0);
     interop.xcb.xcb_disconnect(xcb);
 
-    std.posix.kill(x_pid, 0) catch return;
-    std.posix.kill(x_pid, std.posix.SIG.KILL) catch {};
+    std.posix.kill(x_pid, std.posix.SIG.TERM) catch {};
+    std.Thread.sleep(std.time.ns_per_s * 1); // Wait 1 second before sending SIGKILL
+    std.posix.kill(x_pid, std.posix.SIG.KILL) catch return;
 
     var status: c_int = 0;
     _ = std.c.waitpid(x_pid, &status, 0);
