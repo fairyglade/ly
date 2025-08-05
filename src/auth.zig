@@ -15,7 +15,7 @@ pub const AuthOptions = struct {
     tty: u8,
     service_name: [:0]const u8,
     path: ?[:0]const u8,
-    session_log: []const u8,
+    session_log: ?[]const u8,
     xauth_cmd: []const u8,
     setup_cmd: []const u8,
     login_cmd: ?[]const u8,
@@ -399,8 +399,11 @@ fn executeShellCmd(shell: [*:0]const u8, options: AuthOptions) !void {
 }
 
 fn executeWaylandCmd(shell: [*:0]const u8, options: AuthOptions, desktop_cmd: []const u8) !void {
-    const log_file = try redirectStandardStreams(options.session_log, true);
-    defer log_file.close();
+    var maybe_log_file: ?std.fs.File = null;
+    if (options.session_log) |log_path| {
+        maybe_log_file = try redirectStandardStreams(log_path, true);
+    }
+    defer if (maybe_log_file) |log_file| log_file.close();
 
     var cmd_buffer: [1024]u8 = undefined;
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", desktop_cmd });
@@ -470,7 +473,9 @@ fn executeCustomCmd(shell: [*:0]const u8, options: AuthOptions, is_terminal: boo
         // For custom desktop entries, the "Terminal" value here determines if
         // we redirect standard output & error or not. That is, we redirect only
         // if it's equal to false (so if it's not running in a TTY).
-        maybe_log_file = try redirectStandardStreams(options.session_log, true);
+        if (options.session_log) |log_path| {
+            maybe_log_file = try redirectStandardStreams(log_path, true);
+        }
     }
     defer if (maybe_log_file) |log_file| log_file.close();
 
