@@ -66,10 +66,10 @@ pub fn main() !void {
         // If we can't shutdown or restart due to an error, we print it to standard error. If that fails, just bail out
         if (shutdown) {
             const shutdown_error = std.process.execv(temporary_allocator, &[_][]const u8{ "/bin/sh", "-c", shutdown_cmd });
-            stderr.print("error: couldn't shutdown: {any}\n", .{shutdown_error}) catch std.process.exit(1);
+            stderr.print("error: couldn't shutdown: {s}\n", .{@errorName(shutdown_error)}) catch std.process.exit(1);
         } else if (restart) {
             const restart_error = std.process.execv(temporary_allocator, &[_][]const u8{ "/bin/sh", "-c", restart_cmd });
-            stderr.print("error: couldn't restart: {any}\n", .{restart_error}) catch std.process.exit(1);
+            stderr.print("error: couldn't restart: {s}\n", .{@errorName(restart_error)}) catch std.process.exit(1);
         } else {
             // The user has quit Ly using Ctrl+C
             temporary_allocator.free(shutdown_cmd);
