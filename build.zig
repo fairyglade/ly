@@ -10,7 +10,7 @@ const InitSystem = enum {
     dinit,
 };
 
-const min_zig_string = "0.14.0";
+const min_zig_string = "0.15.0";
 const current_zig = builtin.zig_version;
 
 // Implementing zig version detection through compile time
@@ -55,9 +55,11 @@ pub fn build(b: *std.Build) !void {
 
     const exe = b.addExecutable(.{
         .name = "ly",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     const zigini = b.dependency("zigini", .{ .target = target, .optimize = optimize });
@@ -360,7 +362,7 @@ fn getVersionStr(b: *std.Build, name: []const u8, version: std.SemanticVersion) 
 
             const ancestor_ver = try std.SemanticVersion.parse(tagged_ancestor);
             if (version.order(ancestor_ver) != .gt) {
-                std.debug.print("{s} version '{}' must be greater than tagged ancestor '{}'\n", .{ name, version, ancestor_ver });
+                std.debug.print("{s} version '{f}' must be greater than tagged ancestor '{f}'\n", .{ name, version, ancestor_ver });
                 std.process.exit(1);
             }
 
@@ -395,8 +397,11 @@ fn patchFile(allocator: std.mem.Allocator, source_file: []const u8, patch_map: P
     var file = try std.fs.cwd().openFile(source_file, .{});
     defer file.close();
 
-    const reader = file.reader();
-    var text = try reader.readAllAlloc(allocator, std.math.maxInt(u16));
+    const stat = try file.stat();
+
+    var buffer: [4096]u8 = undefined;
+    var reader = file.reader(&buffer);
+    var text = try reader.interface.readAlloc(allocator, stat.size);
 
     var iterator = patch_map.iterator();
     while (iterator.next()) |kv| {
@@ -418,8 +423,10 @@ fn installText(
     var file = try destination_directory.createFile(destination_file, options);
     defer file.close();
 
-    const writer = file.writer();
-    try writer.writeAll(text);
+    var buffer: [1024]u8 = undefined;
+    var writer = file.writer(&buffer);
+    try writer.interface.writeAll(text);
+    try writer.interface.flush();
 
     std.debug.print("info: installed {s}/{s}\n", .{ destination_directory_path, destination_file });
 }

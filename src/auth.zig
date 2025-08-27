@@ -24,12 +24,12 @@ pub const AuthOptions = struct {
 };
 
 var xorg_pid: std.posix.pid_t = 0;
-pub fn xorgSignalHandler(i: c_int) callconv(.C) void {
+pub fn xorgSignalHandler(i: c_int) callconv(.c) void {
     if (xorg_pid > 0) _ = std.c.kill(xorg_pid, i);
 }
 
 var child_pid: std.posix.pid_t = 0;
-pub fn sessionSignalHandler(i: c_int) callconv(.C) void {
+pub fn sessionSignalHandler(i: c_int) callconv(.c) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
@@ -114,7 +114,7 @@ pub fn authenticate(options: AuthOptions, current_environment: Environment, logi
         // If we receive SIGTERM, forward it to child_pid
         const act = std.posix.Sigaction{
             .handler = .{ .handler = &sessionSignalHandler },
-            .mask = std.posix.empty_sigset,
+            .mask = std.posix.sigemptyset(),
             .flags = 0,
         };
         std.posix.sigaction(std.posix.SIG.TERM, &act, null);
@@ -230,7 +230,7 @@ fn loginConv(
     msg: ?[*]?*const interop.pam.pam_message,
     resp: ?*?[*]interop.pam.pam_response,
     appdata_ptr: ?*anyopaque,
-) callconv(.C) c_int {
+) callconv(.c) c_int {
     const message_count: u32 = @intCast(num_msg);
     const messages = msg.?;
 
@@ -299,13 +299,15 @@ fn getXPid(display_num: u8) !i32 {
     const file = try std.fs.openFileAbsolute(file_name, .{});
     defer file.close();
 
-    var file_buf: [20]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&file_buf);
+    var file_buffer: [32]u8 = undefined;
+    var file_reader = file.reader(&file_buffer);
+    var reader = &file_reader.interface;
 
-    _ = try file.reader().streamUntilDelimiter(fbs.writer(), '\n', 20);
-    const line = fbs.getWritten();
+    var buffer: [20]u8 = undefined;
+    var writer = std.Io.Writer.fixed(&buffer);
 
-    return std.fmt.parseInt(i32, std.mem.trim(u8, line, " "), 10);
+    const written = try reader.streamDelimiter(&writer, '\n');
+    return std.fmt.parseInt(i32, std.mem.trim(u8, buffer[0..written], " "), 10);
 }
 
 fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
@@ -452,7 +454,7 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptio
     // If we receive SIGTERM, clean up by killing the xorg_pid process
     const act = std.posix.Sigaction{
         .handler = .{ .handler = &xorgSignalHandler },
-        .mask = std.posix.empty_sigset,
+        .mask = std.posix.sigemptyset(),
         .flags = 0,
     };
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);

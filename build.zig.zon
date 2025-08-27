@@ -2,15 +2,15 @@
     .name = .ly,
     .version = "1.2.0",
     .fingerprint = 0xa148ffcc5dc2cb59,
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.0",
     .dependencies = .{
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.10.0.tar.gz",
-            .hash = "clap-0.10.0-oBajB434AQBDh-Ei3YtoKIRxZacVPF1iSwp3IX_ZB8f0",
+            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.11.0.tar.gz",
+            .hash = "clap-0.11.0-oBajB-HnAQDPCKYzwF7rO3qDFwRcD39Q0DALlTSz5H7e",
         },
         .zigini = .{
-            .url = "https://github.com/Kawaii-Ash/zigini/archive/2ed3d417f17fab5b0ee8cad8a63c6d62d7ac1042.tar.gz",
-            .hash = "zigini-0.3.1-BSkB7XJGAAB2E-sKyzhTaQCBlYBL8yqzE4E_jmSY99sC",
+            .url = "https://github.com/AnErrupTion/zigini/archive/d580d42f1b1051c0a35d63ab0f5704c6340e0bd3.tar.gz",
+            .hash = "zigini-0.3.2-BSkB7aVHAADhxwo0aEdWtNzaVXer3d8RwXMuZd-q-spO",
         },
         .termbox2 = .{
             .url = "git+https://github.com/AnErrupTion/termbox2?ref=get_cell#e975d250ee6567773400e9d5b0b5c2f175349c57",

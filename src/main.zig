@@ -36,7 +36,7 @@ const temporary_allocator = std.heap.page_allocator;
 const ly_top_str = "Ly version " ++ build_options.version;
 
 var session_pid: std.posix.pid_t = -1;
-fn signalHandler(i: c_int) callconv(.C) void {
+fn signalHandler(i: c_int) callconv(.c) void {
     if (session_pid == 0) return;
 
     // Forward signal to session to clean up
@@ -50,7 +50,7 @@ fn signalHandler(i: c_int) callconv(.C) void {
     std.c.exit(i);
 }
 
-fn ttyControlTransferSignalHandler(_: c_int) callconv(.C) void {
+fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
     _ = termbox.tb_shutdown();
 }
 
@@ -60,16 +60,20 @@ pub fn main() !void {
     var shutdown_cmd: []const u8 = undefined;
     var restart_cmd: []const u8 = undefined;
 
-    const stderr = std.io.getStdErr().writer();
+    var stderr_buffer: [128]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    var stderr = &stderr_writer.interface;
 
     defer {
         // If we can't shutdown or restart due to an error, we print it to standard error. If that fails, just bail out
         if (shutdown) {
             const shutdown_error = std.process.execv(temporary_allocator, &[_][]const u8{ "/bin/sh", "-c", shutdown_cmd });
             stderr.print("error: couldn't shutdown: {s}\n", .{@errorName(shutdown_error)}) catch std.process.exit(1);
+            stderr.flush() catch std.process.exit(1);
         } else if (restart) {
             const restart_error = std.process.execv(temporary_allocator, &[_][]const u8{ "/bin/sh", "-c", restart_cmd });
             stderr.print("error: couldn't restart: {s}\n", .{@errorName(restart_error)}) catch std.process.exit(1);
+            stderr.flush() catch std.process.exit(1);
         } else {
             // The user has quit Ly using Ctrl+C
             temporary_allocator.free(shutdown_cmd);
@@ -97,6 +101,7 @@ pub fn main() !void {
     var diag = clap.Diagnostic{};
     var res = clap.parse(clap.Help, &params, clap.parsers.default, .{ .diagnostic = &diag, .allocator = allocator }) catch |err| {
         diag.report(stderr, err) catch {};
+        try stderr.flush();
         return err;
     };
     defer res.deinit();
@@ -112,10 +117,12 @@ pub fn main() !void {
         try clap.help(stderr, clap.Help, &params, .{});
 
         _ = try stderr.write("Note: if you want to configure Ly, please check the config file, which is located at " ++ build_options.config_directory ++ "/ly/config.ini.\n");
+        try stderr.flush();
         std.process.exit(0);
     }
     if (res.args.version != 0) {
         _ = try stderr.write("Ly version " ++ build_options.version ++ "\n");
+        try stderr.flush();
         std.process.exit(0);
     }
 
@@ -222,17 +229,9 @@ pub fn main() !void {
         log_file = try std.fs.openFileAbsolute("/dev/null", .{ .mode = .write_only });
     }
 
-    const log_writer = log_file.writer();
-
-    // if (migrator.mapped_config_fields) save_migrated_config: {
-    //     var file = try std.fs.cwd().createFile(config_path, .{});
-    //     defer file.close();
-
-    //     const writer = file.writer();
-    //     ini.writeFromStruct(config, writer, null, true, .{}) catch {
-    //         break :save_migrated_config;
-    //     };
-    // }
+    var log_buffer: [1024]u8 = undefined;
+    var log_file_writer = log_file.writer(&log_buffer);
+    var log_writer = &log_file_writer.interface;
 
     // These strings only end up getting freed if the user quits Ly using Ctrl+C, which is fine since in the other cases
     // we end up shutting down or restarting the system
@@ -249,7 +248,7 @@ pub fn main() !void {
 
     const act = std.posix.Sigaction{
         .handler = .{ .handler = &signalHandler },
-        .mask = std.posix.empty_sigset,
+        .mask = std.posix.sigemptyset(),
         .flags = 0,
     };
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
@@ -818,11 +817,16 @@ pub fn main() !void {
                     var file = std.fs.cwd().createFile(save_path, .{}) catch break :save_last_settings;
                     defer file.close();
 
+                    var file_buffer: [64]u8 = undefined;
+                    var file_writer = file.writer(&file_buffer);
+                    var writer = &file_writer.interface;
+
                     const save_data = Save{
                         .user = login.getCurrentUser(),
                         .session_index = session.label.current,
                     };
-                    ini.writeFromStruct(save_data, file.writer(), null, .{}) catch break :save_last_settings;
+                    ini.writeFromStruct(save_data, writer, null, .{}) catch break :save_last_settings;
+                    try writer.flush();
 
                     // Delete previous save file if it exists
                     if (migrator.maybe_save_file) |path| std.fs.cwd().deleteFile(path) catch {};
@@ -855,7 +859,7 @@ pub fn main() !void {
                         // Signal action to give up control on the TTY
                         const tty_control_transfer_act = std.posix.Sigaction{
                             .handler = .{ .handler = &ttyControlTransferSignalHandler },
-                            .mask = std.posix.empty_sigset,
+                            .mask = std.posix.sigemptyset(),
                             .flags = 0,
                         };
                         std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);

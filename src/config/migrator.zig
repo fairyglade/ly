@@ -40,7 +40,6 @@ const removed_properties = [_][]const u8{
 };
 
 var temporary_allocator = std.heap.page_allocator;
-var buffer = std.mem.zeroes([10 * color_properties.len]u8);
 
 pub var auto_eight_colors: bool = true;
 
@@ -205,21 +204,21 @@ pub fn tryMigrateSaveFile(user_buf: *[32]u8) Save {
         var file = std.fs.openFileAbsolute(path, .{}) catch return save;
         defer file.close();
 
-        const reader = file.reader();
+        var file_buffer: [64]u8 = undefined;
+        var file_reader = file.reader(&file_buffer);
+        var reader = &file_reader.interface;
 
-        var user_fbs = std.io.fixedBufferStream(user_buf);
-        reader.streamUntilDelimiter(user_fbs.writer(), '\n', user_buf.len) catch return save;
-        const user = user_fbs.getWritten();
-        if (user.len > 0) save.user = user;
+        var user_writer = std.Io.Writer.fixed(user_buf);
+        var written = reader.streamDelimiter(&user_writer, '\n') catch return save;
+        if (written > 0) save.user = user_buf[0..written];
 
         var session_buf: [20]u8 = undefined;
-        var session_fbs = std.io.fixedBufferStream(&session_buf);
-        reader.streamUntilDelimiter(session_fbs.writer(), '\n', session_buf.len) catch return save;
+        var session_writer = std.Io.Writer.fixed(&session_buf);
+        written = reader.streamDelimiter(&session_writer, '\n') catch return save;
 
-        const session_index_str = session_fbs.getWritten();
         var session_index: ?usize = null;
-        if (session_index_str.len > 0) {
-            session_index = std.fmt.parseUnsigned(usize, session_index_str, 10) catch return save;
+        if (written > 0) {
+            session_index = std.fmt.parseUnsigned(usize, session_buf[0..written], 10) catch return save;
         }
         save.session_index = session_index;
     }

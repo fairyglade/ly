@@ -13,7 +13,7 @@ with a mirror on [GitHub](https://github.com/fairyglade/ly).
 ## Dependencies
 
 - Compile-time:
-  - zig 0.14.x
+  - zig 0.15.x
   - libc
   - pam
   - xcb (optional, required by default; needed for X11 support)
