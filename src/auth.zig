@@ -14,7 +14,7 @@ const Utmp = utmp.utmpx;
 pub const AuthOptions = struct {
     tty: u8,
     service_name: [:0]const u8,
-    path: ?[:0]const u8,
+    path: ?[]const u8,
     session_log: ?[]const u8,
     xauth_cmd: []const u8,
     setup_cmd: []const u8,
@@ -33,15 +33,15 @@ pub fn sessionSignalHandler(i: c_int) callconv(.c) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(options: AuthOptions, current_environment: Environment, login: [:0]const u8, password: [:0]const u8) !void {
+pub fn authenticate(allocator: std.mem.Allocator, options: AuthOptions, current_environment: Environment, login: [:0]const u8, password: [:0]const u8) !void {
     var tty_buffer: [3]u8 = undefined;
-    const tty_str = try std.fmt.bufPrintZ(&tty_buffer, "{d}", .{options.tty});
+    const tty_str = try std.fmt.bufPrint(&tty_buffer, "{d}", .{options.tty});
 
     var pam_tty_buffer: [6]u8 = undefined;
     const pam_tty_str = try std.fmt.bufPrintZ(&pam_tty_buffer, "tty{d}", .{options.tty});
 
     // Set the XDG environment variables
-    try setXdgEnv(tty_str, current_environment);
+    try setXdgEnv(allocator, tty_str, current_environment);
 
     // Open the PAM session
     var credentials = [_:null]?[*:0]const u8{ login, password };
@@ -75,27 +75,23 @@ pub fn authenticate(options: AuthOptions, current_environment: Environment, logi
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer status = interop.pam.pam_close_session(handle, 0);
 
-    var pwd: *interop.pwd.passwd = undefined;
+    var user_entry: interop.UsernameEntry = undefined;
     {
-        defer interop.pwd.endpwent();
+        defer interop.closePasswordDatabase();
 
         // Get password structure from username
-        pwd = interop.pwd.getpwnam(login) orelse return error.GetPasswordNameFailed;
+        user_entry = interop.getUsernameEntry(login) orelse return error.GetPasswordNameFailed;
     }
 
     // Set user shell if it hasn't already been set
-    if (pwd.pw_shell == null) {
-        interop.unistd.setusershell();
-        pwd.pw_shell = interop.unistd.getusershell();
-        interop.unistd.endusershell();
-    }
+    if (user_entry.shell == null) interop.setUserShell(&user_entry);
 
     var shared_err = try SharedError.init();
     defer shared_err.deinit();
 
     child_pid = try std.posix.fork();
     if (child_pid == 0) {
-        startSession(options, tty_str, pwd, handle, current_environment) catch |e| {
+        startSession(allocator, options, tty_str, user_entry, handle, current_environment) catch |e| {
             shared_err.writeError(e);
             std.process.exit(1);
         };
@@ -119,7 +115,7 @@ pub fn authenticate(options: AuthOptions, current_environment: Environment, logi
         };
         std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
-        try addUtmpEntry(&entry, pwd.pw_name.?, child_pid);
+        try addUtmpEntry(&entry, user_entry.username.?, child_pid);
     }
     // Wait for the session to stop
     _ = std.posix.waitpid(child_pid, 0);
@@ -130,99 +126,89 @@ pub fn authenticate(options: AuthOptions, current_environment: Environment, logi
 }
 
 fn startSession(
+    allocator: std.mem.Allocator,
     options: AuthOptions,
-    tty_str: [:0]u8,
-    pwd: *interop.pwd.passwd,
+    tty_str: []u8,
+    user_entry: interop.UsernameEntry,
     handle: ?*interop.pam.pam_handle,
     current_environment: Environment,
 ) !void {
-    if (builtin.os.tag == .freebsd) {
-        // FreeBSD has initgroups() in unistd
-        const status = interop.unistd.initgroups(pwd.pw_name, pwd.pw_gid);
-        if (status != 0) return error.GroupInitializationFailed;
-
-        // FreeBSD sets the GID and UID with setusercontext()
-        const result = interop.pwd.setusercontext(null, pwd, pwd.pw_uid, interop.pwd.LOGIN_SETALL);
-        if (result != 0) return error.SetUserUidFailed;
-    } else {
-        const status = interop.grp.initgroups(pwd.pw_name, pwd.pw_gid);
-        if (status != 0) return error.GroupInitializationFailed;
-
-        std.posix.setgid(pwd.pw_gid) catch return error.SetUserGidFailed;
-        std.posix.setuid(pwd.pw_uid) catch return error.SetUserUidFailed;
-    }
+    // Set the user's GID & PID
+    try interop.setUserContext(allocator, user_entry);
 
     // Set up the environment
-    try initEnv(pwd, options.path);
+    try initEnv(allocator, user_entry, options.path);
 
     // Reset the XDG environment variables
-    try setXdgEnv(tty_str, current_environment);
+    try setXdgEnv(allocator, tty_str, current_environment);
 
     // Set the PAM variables
     const pam_env_vars: ?[*:null]?[*:0]u8 = interop.pam.pam_getenvlist(handle);
     if (pam_env_vars == null) return error.GetEnvListFailed;
 
     const env_list = std.mem.span(pam_env_vars.?);
-    for (env_list) |env_var| _ = interop.stdlib.putenv(env_var);
+    for (env_list) |env_var| try interop.putEnvironmentVariable(env_var);
 
     // Change to the user's home directory
-    std.posix.chdirZ(pwd.pw_dir.?) catch return error.ChangeDirectoryFailed;
+    std.posix.chdir(user_entry.home.?) catch return error.ChangeDirectoryFailed;
 
     // Signal to the session process to give up control on the TTY
     std.posix.kill(options.session_pid, std.posix.SIG.CHLD) catch return error.TtyControlTransferFailed;
 
     // Execute what the user requested
     switch (current_environment.display_server) {
-        .wayland => try executeWaylandCmd(pwd.pw_shell.?, options, current_environment.cmd),
-        .shell => try executeShellCmd(pwd.pw_shell.?, options),
+        .wayland => try executeWaylandCmd(allocator, user_entry.shell.?, options, current_environment.cmd),
+        .shell => try executeShellCmd(allocator, user_entry.shell.?, options),
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{options.tty});
-            try executeX11Cmd(pwd.pw_shell.?, pwd.pw_dir.?, options, current_environment.cmd, vt);
+            try executeX11Cmd(allocator, user_entry.shell.?, user_entry.home.?, options, current_environment.cmd, vt);
         },
-        .custom => try executeCustomCmd(pwd.pw_shell.?, options, current_environment.is_terminal, current_environment.cmd),
+        .custom => try executeCustomCmd(allocator, user_entry.shell.?, options, current_environment.is_terminal, current_environment.cmd),
     }
 }
 
-fn initEnv(pwd: *interop.pwd.passwd, path_env: ?[:0]const u8) !void {
-    _ = interop.stdlib.setenv("HOME", pwd.pw_dir, 1);
-    _ = interop.stdlib.setenv("PWD", pwd.pw_dir, 1);
-    _ = interop.stdlib.setenv("SHELL", pwd.pw_shell, 1);
-    _ = interop.stdlib.setenv("USER", pwd.pw_name, 1);
-    _ = interop.stdlib.setenv("LOGNAME", pwd.pw_name, 1);
+fn initEnv(allocator: std.mem.Allocator, entry: interop.UsernameEntry, path_env: ?[]const u8) !void {
+    if (entry.home) |home| {
+        try interop.setEnvironmentVariable(allocator, "HOME", home, true);
+        try interop.setEnvironmentVariable(allocator, "PWD", home, true);
+    } else return error.NoHomeDirectory;
+
+    try interop.setEnvironmentVariable(allocator, "SHELL", entry.shell.?, true);
+    try interop.setEnvironmentVariable(allocator, "USER", entry.username.?, true);
+    try interop.setEnvironmentVariable(allocator, "LOGNAME", entry.username.?, true);
 
     if (path_env) |path| {
-        const status = interop.stdlib.setenv("PATH", path, 1);
-        if (status != 0) return error.SetPathFailed;
+        interop.setEnvironmentVariable(allocator, "PATH", path, true) catch return error.SetPathFailed;
     }
 }
 
-fn setXdgEnv(tty_str: [:0]u8, environment: Environment) !void {
-    _ = interop.stdlib.setenv("XDG_SESSION_TYPE", switch (environment.display_server) {
+fn setXdgEnv(allocator: std.mem.Allocator, tty_str: []u8, environment: Environment) !void {
+    try interop.setEnvironmentVariable(allocator, "XDG_SESSION_TYPE", switch (environment.display_server) {
         .wayland => "wayland",
         .shell => "tty",
         .xinitrc, .x11 => "x11",
         .custom => "unspecified",
-    }, 0);
+    }, false);
 
     // The "/run/user/%d" directory is not available on FreeBSD. It is much
     // better to stick to the defaults and let applications using
     // XDG_RUNTIME_DIR to fall back to directories inside user's home
     // directory.
     if (builtin.os.tag != .freebsd) {
-        const uid = interop.unistd.getuid();
+        const uid = std.posix.getuid();
         var uid_buffer: [32]u8 = undefined; // No UID can be larger than this
-        const uid_str = try std.fmt.bufPrintZ(&uid_buffer, "/run/user/{d}", .{uid});
+        const uid_str = try std.fmt.bufPrint(&uid_buffer, "/run/user/{d}", .{uid});
 
-        _ = interop.stdlib.setenv("XDG_RUNTIME_DIR", uid_str, 0);
+        try interop.setEnvironmentVariable(allocator, "XDG_RUNTIME_DIR", uid_str, false);
     }
 
-    if (environment.xdg_desktop_names) |xdg_desktop_names| _ = interop.stdlib.setenv("XDG_CURRENT_DESKTOP", xdg_desktop_names, 0);
-    _ = interop.stdlib.setenv("XDG_SESSION_CLASS", "user", 0);
-    _ = interop.stdlib.setenv("XDG_SESSION_ID", "1", 0);
-    if (environment.xdg_session_desktop) |desktop_name| _ = interop.stdlib.setenv("XDG_SESSION_DESKTOP", desktop_name, 0);
-    _ = interop.stdlib.setenv("XDG_SEAT", "seat0", 0);
-    _ = interop.stdlib.setenv("XDG_VTNR", tty_str, 0);
+    if (environment.xdg_desktop_names) |xdg_desktop_names| try interop.setEnvironmentVariable(allocator, "XDG_CURRENT_DESKTOP", xdg_desktop_names, false);
+    try interop.setEnvironmentVariable(allocator, "XDG_SESSION_CLASS", "user", false);
+    try interop.setEnvironmentVariable(allocator, "XDG_SESSION_ID", "1", false);
+    if (environment.xdg_session_desktop) |desktop_name| try interop.setEnvironmentVariable(allocator, "XDG_SESSION_DESKTOP", desktop_name, false);
+    try interop.setEnvironmentVariable(allocator, "XDG_SEAT", "seat0", false);
+    try interop.setEnvironmentVariable(allocator, "XDG_VTNR", tty_str, false);
 }
 
 fn loginConv(
@@ -274,8 +260,8 @@ fn loginConv(
     if (status != interop.pam.PAM_SUCCESS) {
         // Memory is freed by pam otherwise
         allocator.free(response);
-        if (username != null) allocator.free(username.?);
-        if (password != null) allocator.free(password.?);
+        if (username) |str| allocator.free(str);
+        if (password) |str| allocator.free(str);
     } else {
         resp.?.* = response.ptr;
     }
@@ -310,7 +296,7 @@ fn getXPid(display_num: u8) !i32 {
     return std.fmt.parseInt(i32, std.mem.trim(u8, buffer[0..written], " "), 10);
 }
 
-fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
+fn createXauthFile(pwd: [:0]const u8) ![]const u8 {
     var xauth_buf: [100]u8 = undefined;
     var xauth_dir: [:0]const u8 = undefined;
     const xdg_rt_dir = std.posix.getenv("XDG_RUNTIME_DIR");
@@ -351,8 +337,8 @@ fn createXauthFile(pwd: [:0]const u8) ![:0]const u8 {
     const trimmed_xauth_dir = xauth_dir[0 .. i + 1];
 
     var buf: [256]u8 = undefined;
-    const xauthority: [:0]u8 = try std.fmt.bufPrintZ(&buf, "{s}/{s}", .{ trimmed_xauth_dir, xauth_file });
-    const file = try std.fs.createFileAbsoluteZ(xauthority, .{});
+    const xauthority: []u8 = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ trimmed_xauth_dir, xauth_file });
+    const file = try std.fs.createFileAbsolute(xauthority, .{});
     file.close();
 
     return xauthority;
@@ -368,13 +354,13 @@ fn mcookie() [Md5.digest_length * 2]u8 {
     return std.fmt.bytesToHex(&out, .lower);
 }
 
-fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptions) !void {
+fn xauth(allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptions) !void {
     var pwd_buf: [100]u8 = undefined;
     const pwd = try std.fmt.bufPrintZ(&pwd_buf, "{s}", .{pw_dir});
 
     const xauthority = try createXauthFile(pwd);
-    _ = interop.stdlib.setenv("XAUTHORITY", xauthority, 1);
-    _ = interop.stdlib.setenv("DISPLAY", display_name, 1);
+    try interop.setEnvironmentVariable(allocator, "XAUTHORITY", xauthority, true);
+    try interop.setEnvironmentVariable(allocator, "DISPLAY", display_name, true);
 
     const magic_cookie = mcookie();
 
@@ -391,40 +377,53 @@ fn xauth(display_name: [:0]u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, opti
     if (status.status != 0) return error.XauthFailed;
 }
 
-fn executeShellCmd(shell: [*:0]const u8, options: AuthOptions) !void {
+fn executeShellCmd(allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions) !void {
     // We don't want to redirect stdout and stderr in a shell session
+
+    const shell_z = try allocator.dupeZ(u8, shell);
+    defer allocator.free(shell_z);
 
     var cmd_buffer: [1024]u8 = undefined;
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", shell });
-    const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
-    return std.posix.execveZ(shell, &args, std.c.environ);
+    const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
+    return std.posix.execveZ(shell_z, &args, std.c.environ);
 }
 
-fn executeWaylandCmd(shell: [*:0]const u8, options: AuthOptions, desktop_cmd: []const u8) !void {
+fn executeWaylandCmd(allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, desktop_cmd: []const u8) !void {
     var maybe_log_file: ?std.fs.File = null;
     if (options.session_log) |log_path| {
         maybe_log_file = try redirectStandardStreams(log_path, true);
     }
     defer if (maybe_log_file) |log_file| log_file.close();
 
+    const shell_z = try allocator.dupeZ(u8, shell);
+    defer allocator.free(shell_z);
+
     var cmd_buffer: [1024]u8 = undefined;
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", desktop_cmd });
-    const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
-    return std.posix.execveZ(shell, &args, std.c.environ);
+    const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
+    return std.posix.execveZ(shell_z, &args, std.c.environ);
 }
 
-fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
+fn executeX11Cmd(allocator: std.mem.Allocator, shell: []const u8, home: []const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
     const display_num = try getFreeDisplay();
     var buf: [5]u8 = undefined;
-    const display_name = try std.fmt.bufPrintZ(&buf, ":{d}", .{display_num});
-    try xauth(display_name, shell, pw_dir, options);
+    const display_name = try std.fmt.bufPrint(&buf, ":{d}", .{display_num});
+
+    const shell_z = try allocator.dupeZ(u8, shell);
+    defer allocator.free(shell_z);
+
+    const home_z = try allocator.dupeZ(u8, home);
+    defer allocator.free(home_z);
+
+    try xauth(allocator, display_name, shell_z, home_z, options);
 
     const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.x_cmd, display_name, vt }) catch std.process.exit(1);
-        const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
-        std.posix.execveZ(shell, &args, std.c.environ) catch {};
+        const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
+        std.posix.execveZ(shell_z, &args, std.c.environ) catch {};
         std.process.exit(1);
     }
 
@@ -446,8 +445,8 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptio
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", desktop_cmd }) catch std.process.exit(1);
-        const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
-        std.posix.execveZ(shell, &args, std.c.environ) catch {};
+        const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
+        std.posix.execveZ(shell_z, &args, std.c.environ) catch {};
         std.process.exit(1);
     }
 
@@ -467,11 +466,10 @@ fn executeX11Cmd(shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptio
     std.Thread.sleep(std.time.ns_per_s * 1); // Wait 1 second before sending SIGKILL
     std.posix.kill(x_pid, std.posix.SIG.KILL) catch return;
 
-    var status: c_int = 0;
-    _ = std.c.waitpid(x_pid, &status, 0);
+    _ = std.posix.waitpid(x_pid, 0);
 }
 
-fn executeCustomCmd(shell: [*:0]const u8, options: AuthOptions, is_terminal: bool, exec_cmd: []const u8) !void {
+fn executeCustomCmd(allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, is_terminal: bool, exec_cmd: []const u8) !void {
     var maybe_log_file: ?std.fs.File = null;
     if (!is_terminal) {
         // For custom desktop entries, the "Terminal" value here determines if
@@ -483,10 +481,13 @@ fn executeCustomCmd(shell: [*:0]const u8, options: AuthOptions, is_terminal: boo
     }
     defer if (maybe_log_file) |log_file| log_file.close();
 
+    const shell_z = try allocator.dupeZ(u8, shell);
+    defer allocator.free(shell_z);
+
     var cmd_buffer: [1024]u8 = undefined;
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", exec_cmd });
-    const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
-    return std.posix.execveZ(shell, &args, std.c.environ);
+    const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
+    return std.posix.execveZ(shell_z, &args, std.c.environ);
 }
 
 fn redirectStandardStreams(session_log: []const u8, create: bool) !std.fs.File {
@@ -498,7 +499,7 @@ fn redirectStandardStreams(session_log: []const u8, create: bool) !std.fs.File {
     return log_file;
 }
 
-fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
+fn addUtmpEntry(entry: *Utmp, username: []const u8, pid: c_int) !void {
     entry.ut_type = utmp.USER_PROCESS;
     entry.ut_pid = pid;
 
@@ -520,12 +521,11 @@ fn addUtmpEntry(entry: *Utmp, username: [*:0]const u8, pid: c_int) !void {
     host[0] = 0;
     entry.ut_host = host;
 
-    var tv: interop.system_time.timeval = undefined;
-    _ = interop.system_time.gettimeofday(&tv, null);
+    const time = try interop.getTimeOfDay();
 
     entry.ut_tv = .{
-        .tv_sec = @intCast(tv.tv_sec),
-        .tv_usec = @intCast(tv.tv_usec),
+        .tv_sec = @intCast(time.seconds),
+        .tv_usec = @intCast(time.microseconds),
     };
     entry.ut_addr_v6[0] = 0;
 

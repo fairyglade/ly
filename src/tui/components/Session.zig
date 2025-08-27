@@ -23,7 +23,6 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer) Session {
 pub fn deinit(self: *Session) void {
     for (self.label.list.items) |*environment| {
         if (environment.entry_ini) |*entry_ini| entry_ini.deinit();
-        if (environment.xdg_session_desktop) |session_desktop| self.label.allocator.free(session_desktop);
     }
 
     self.label.deinit();

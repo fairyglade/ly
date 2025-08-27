@@ -1,5 +1,4 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const interop = @import("../interop.zig");
 const Cell = @import("Cell.zig");
 
@@ -82,7 +81,7 @@ pub fn init(options: InitOptions, labels_max_length: usize, random: Random) Term
         .fg = options.fg,
         .bg = options.bg,
         .border_fg = options.border_fg,
-        .box_chars = if (builtin.os.tag == .linux or builtin.os.tag.isBSD()) .{
+        .box_chars = if (interop.supportsUnicode()) .{
             .left_up = 0x250C,
             .left_down = 0x2514,
             .right_up = 0x2510,

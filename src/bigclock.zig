@@ -11,13 +11,11 @@ pub const WIDTH = Lang.WIDTH;
 pub const HEIGHT = Lang.HEIGHT;
 pub const SIZE = Lang.SIZE;
 
-pub fn clockCell(animate: bool, char: u8, fg: u32, bg: u32, bigclock: Bigclock) [SIZE]Cell {
+pub fn clockCell(animate: bool, char: u8, fg: u32, bg: u32, bigclock: Bigclock) ![SIZE]Cell {
     var cells: [SIZE]Cell = undefined;
 
-    var tv: interop.system_time.timeval = undefined;
-    _ = interop.system_time.gettimeofday(&tv, null);
-
-    const clock_chars = toBigNumber(if (animate and char == ':' and @divTrunc(tv.tv_usec, 500000) != 0) ' ' else char, bigclock);
+    const time = try interop.getTimeOfDay();
+    const clock_chars = toBigNumber(if (animate and char == ':' and @divTrunc(time.microseconds, 500000) != 0) ' ' else char, bigclock);
     for (0..cells.len) |i| cells[i] = Cell.init(clock_chars[i], fg, bg);
 
     return cells;

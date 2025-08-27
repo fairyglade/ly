@@ -31,7 +31,6 @@ const Ini = ini.Ini;
 const DisplayServer = enums.DisplayServer;
 const Entry = Environment.Entry;
 const termbox = interop.termbox;
-const unistd = interop.unistd;
 const temporary_allocator = std.heap.page_allocator;
 const ly_top_str = "Ly version " ++ build_options.version;
 
@@ -85,8 +84,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
 
     // Allows stopping an animation after some time
-    var tv_zero: interop.system_time.timeval = undefined;
-    _ = interop.system_time.gettimeofday(&tv_zero, null);
+    const time_start = try interop.getTimeOfDay();
     var animation_timed_out: bool = false;
 
     const allocator = gpa.allocator();
@@ -547,7 +545,8 @@ pub fn main() !void {
                 const clock_str = interop.timeAsString(&clock_buf, format);
 
                 for (clock_str, 0..) |c, i| {
-                    const clock_cell = bigclock.clockCell(animate, c, buffer.fg, buffer.bg, config.bigclock);
+                    // TODO: Show error
+                    const clock_cell = try bigclock.clockCell(animate, c, buffer.fg, buffer.bg, config.bigclock);
                     bigclock.alphaBlit(xo + i * (bigclock.WIDTH + 1), yo, buffer.width, buffer.height, clock_cell);
                 }
             }
@@ -682,24 +681,21 @@ pub fn main() !void {
         if (animate and !animation_timed_out) {
             timeout = config.min_refresh_delta;
 
-            // check how long we have been running so we can turn off the animation
-            var tv: interop.system_time.timeval = undefined;
-            _ = interop.system_time.gettimeofday(&tv, null);
+            // Check how long we've been running so we can turn off the animation
+            const time = try interop.getTimeOfDay();
 
-            if (config.animation_timeout_sec > 0 and tv.tv_sec - tv_zero.tv_sec > config.animation_timeout_sec) {
+            if (config.animation_timeout_sec > 0 and time.seconds - time_start.seconds > config.animation_timeout_sec) {
                 animation_timed_out = true;
                 animation.deinit();
             }
         } else if (config.bigclock != .none and config.clock == null) {
-            var tv: interop.system_time.timeval = undefined;
-            _ = interop.system_time.gettimeofday(&tv, null);
+            const time = try interop.getTimeOfDay();
 
-            timeout = @intCast((60 - @rem(tv.tv_sec, 60)) * 1000 - @divTrunc(tv.tv_usec, 1000) + 1);
+            timeout = @intCast((60 - @rem(time.seconds, 60)) * 1000 - @divTrunc(time.microseconds, 1000) + 1);
         } else if (config.clock != null or auth_fails >= config.auth_fails) {
-            var tv: interop.system_time.timeval = undefined;
-            _ = interop.system_time.gettimeofday(&tv, null);
+            const time = try interop.getTimeOfDay();
 
-            timeout = @intCast(1000 - @divTrunc(tv.tv_usec, 1000) + 1);
+            timeout = @intCast(1000 - @divTrunc(time.microseconds, 1000) + 1);
         }
 
         const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
@@ -864,7 +860,7 @@ pub fn main() !void {
                         };
                         std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);
 
-                        auth.authenticate(auth_options, current_environment, login_text, password_text) catch |err| {
+                        auth.authenticate(allocator, auth_options, current_environment, login_text, password_text) catch |err| {
                             shared_err.writeError(err);
                             std.process.exit(1);
                         };
@@ -1016,7 +1012,7 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
 
         // Prepare the XDG_CURRENT_DESKTOP environment variable here
         const entry = entry_ini.data.@"Desktop Entry";
-        var maybe_xdg_desktop_names: ?[:0]const u8 = null;
+        var maybe_xdg_desktop_names: ?[]const u8 = null;
         if (entry.DesktopNames) |desktop_names| {
             for (desktop_names) |*c| {
                 if (c.* == ';') c.* = ':';
@@ -1024,13 +1020,10 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
             maybe_xdg_desktop_names = desktop_names;
         }
 
-        const maybe_session_desktop = if (maybe_xdg_session_desktop) |xdg_session_desktop| try session.label.allocator.dupeZ(u8, xdg_session_desktop) else null;
-        errdefer if (maybe_session_desktop) |session_desktop| session.label.allocator.free(session_desktop);
-
         try session.addEnvironment(.{
             .entry_ini = entry_ini,
             .name = entry.Name,
-            .xdg_session_desktop = maybe_session_desktop,
+            .xdg_session_desktop = maybe_xdg_session_desktop,
             .xdg_desktop_names = maybe_xdg_desktop_names,
             .cmd = entry.Exec,
             .specifier = switch (display_server) {
@@ -1049,24 +1042,20 @@ fn getAllUsernames(allocator: std.mem.Allocator, login_defs_path: []const u8) !S
     const uid_range = try getUserIdRange(allocator, login_defs_path);
 
     var usernames: StringList = .empty;
-    var maybe_entry = interop.pwd.getpwent();
+    var maybe_entry = interop.getNextUsernameEntry();
 
-    while (maybe_entry != null) {
-        const entry = maybe_entry.*;
-
+    while (maybe_entry) |entry| {
         // We check if the UID is equal to 0 because we always want to add root
         // as a username (even if you can't log into it)
-        if (entry.pw_uid >= uid_range.uid_min and entry.pw_uid <= uid_range.uid_max or entry.pw_uid == 0) {
-            const pw_name_slice = entry.pw_name[0..std.mem.len(entry.pw_name)];
-            const username = try allocator.dupe(u8, pw_name_slice);
-
+        if (entry.uid >= uid_range.uid_min and entry.uid <= uid_range.uid_max or entry.uid == 0 and entry.username != null) {
+            const username = try allocator.dupe(u8, entry.username.?);
             try usernames.append(allocator, username);
         }
 
-        maybe_entry = interop.pwd.getpwent();
+        maybe_entry = interop.getNextUsernameEntry();
     }
 
-    interop.pwd.endpwent();
+    interop.closePasswordDatabase();
     return usernames;
 }
 
@@ -1086,9 +1075,9 @@ fn getUserIdRange(allocator: std.mem.Allocator, login_defs_path: []const u8) !Ui
         const trimmed_line = std.mem.trim(u8, line, " \n\r\t");
 
         if (std.mem.startsWith(u8, trimmed_line, "UID_MIN")) {
-            uid_range.uid_min = try parseValue(std.c.uid_t, "UID_MIN", trimmed_line);
+            uid_range.uid_min = try parseValue(std.posix.uid_t, "UID_MIN", trimmed_line);
         } else if (std.mem.startsWith(u8, trimmed_line, "UID_MAX")) {
-            uid_range.uid_max = try parseValue(std.c.uid_t, "UID_MAX", trimmed_line);
+            uid_range.uid_max = try parseValue(std.posix.uid_t, "UID_MAX", trimmed_line);
         }
     }
 

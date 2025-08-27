@@ -1,10 +1,10 @@
-const builtin = @import("builtin");
+const interop = @import("../interop.zig");
 
 pub const WIDTH = 5;
 pub const HEIGHT = 5;
 pub const SIZE = WIDTH * HEIGHT;
 
-pub const X: u32 = if (builtin.os.tag == .linux or builtin.os.tag.isBSD()) 0x2593 else '#';
+pub const X: u32 = if (interop.supportsUnicode()) 0x2593 else '#';
 pub const O: u32 = 0;
 
 // zig fmt: off
