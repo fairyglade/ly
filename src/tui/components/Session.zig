@@ -1,13 +1,11 @@
 const std = @import("std");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const enums = @import("../../enums.zig");
-const ini = @import("zigini");
 const Environment = @import("../../Environment.zig");
 const generic = @import("generic.zig");
 
 const Allocator = std.mem.Allocator;
 const DisplayServer = enums.DisplayServer;
-const Ini = ini.Ini;
 const EnvironmentLabel = generic.CyclableLabel(Environment);
 
 const Session = @This();
