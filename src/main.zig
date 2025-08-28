@@ -164,7 +164,7 @@ pub fn main() !void {
             .comment_characters = comment_characters,
         }) catch Lang{};
 
-        if (config.load) {
+        if (config.save) {
             save_path = try std.fmt.allocPrint(allocator, "{s}{s}save.ini", .{ s, trailing_slash });
             save_path_alloc = true;
 
@@ -197,7 +197,7 @@ pub fn main() !void {
             .comment_characters = comment_characters,
         }) catch Lang{};
 
-        if (config.load) {
+        if (config.save) {
             var user_buf: [32]u8 = undefined;
             save = save_ini.readFileToStruct(save_path, .{
                 .fieldHandler = null,
@@ -383,7 +383,7 @@ pub fn main() !void {
     var insert_mode = !config.vi_mode or config.vi_default_mode == .insert;
 
     // Load last saved username and desktop selection, if any
-    if (config.load) {
+    if (config.save) {
         if (save.user) |user| {
             // Find user with saved name, and switch over to it
             // If it doesn't exist (anymore), we don't change the value
