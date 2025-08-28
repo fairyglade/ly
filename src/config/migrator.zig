@@ -37,6 +37,7 @@ const removed_properties = [_][]const u8{
     "x_cmd_setup",
     "wayland_cmd",
     "console_dev",
+    "load",
 };
 
 var temporary_allocator = std.heap.page_allocator;
@@ -46,14 +47,11 @@ pub var auto_eight_colors: bool = true;
 pub var maybe_animate: ?bool = null;
 pub var maybe_save_file: ?[]const u8 = null;
 
-pub var mapped_config_fields = false;
-
 pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniField {
     if (std.mem.eql(u8, field.key, "animate")) {
         // The option doesn't exist anymore, but we save its value for "animation"
         maybe_animate = std.mem.eql(u8, field.value, "true");
 
-        mapped_config_fields = true;
         return null;
     }
 
@@ -69,7 +67,6 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
             else => "none",
         };
 
-        mapped_config_fields = true;
         return mapped_field;
     }
 
@@ -101,7 +98,6 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         var mapped_field = field;
         mapped_field.key = "clear_password";
 
-        mapped_config_fields = true;
         return mapped_field;
     }
 
@@ -117,7 +113,6 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
             else => "login",
         };
 
-        mapped_config_fields = true;
         return mapped_field;
     }
 
@@ -125,14 +120,12 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         // The option doesn't exist anymore, but we save its value for migration later on
         maybe_save_file = temporary_allocator.dupe(u8, field.value) catch return null;
 
-        mapped_config_fields = true;
         return null;
     }
 
     inline for (removed_properties) |property| {
         if (std.mem.eql(u8, field.key, property)) {
             // The options don't exist anymore
-            mapped_config_fields = true;
             return null;
         }
     }
@@ -144,10 +137,8 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
 
         if (std.mem.eql(u8, field.value, "true")) {
             mapped_field.value = "en";
-            mapped_config_fields = true;
         } else if (std.mem.eql(u8, field.value, "false")) {
             mapped_field.value = "none";
-            mapped_config_fields = true;
         }
 
         return mapped_field;
