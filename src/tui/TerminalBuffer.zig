@@ -117,24 +117,28 @@ pub fn cascade(self: TerminalBuffer) bool {
 
     while (y > 0) : (y -= 1) {
         for (0..self.width) |x| {
-            var cell: termbox.tb_cell = undefined;
-            var cell_under: termbox.tb_cell = undefined;
+            var cell: ?*termbox.tb_cell = undefined;
+            var cell_under: ?*termbox.tb_cell = undefined;
 
             _ = termbox.tb_get_cell(@intCast(x), @intCast(y - 1), 1, &cell);
             _ = termbox.tb_get_cell(@intCast(x), @intCast(y), 1, &cell_under);
 
-            const char: u8 = @truncate(cell.ch);
+            // This shouldn't happen under normal circumstances, but because
+            // this is a *secret* animation, there's no need to care that much
+            if (cell == null or cell_under == null) continue;
+
+            const char: u8 = @truncate(cell.?.ch);
             if (std.ascii.isWhitespace(char)) continue;
 
-            const char_under: u8 = @truncate(cell_under.ch);
+            const char_under: u8 = @truncate(cell_under.?.ch);
             if (!std.ascii.isWhitespace(char_under)) continue;
 
             changed = true;
 
             if ((self.random.int(u16) % 10) > 7) continue;
 
-            _ = termbox.tb_set_cell(@intCast(x), @intCast(y), cell.ch, cell.fg, cell.bg);
-            _ = termbox.tb_set_cell(@intCast(x), @intCast(y - 1), ' ', cell_under.fg, cell_under.bg);
+            _ = termbox.tb_set_cell(@intCast(x), @intCast(y), cell.?.ch, cell.?.fg, cell.?.bg);
+            _ = termbox.tb_set_cell(@intCast(x), @intCast(y - 1), ' ', cell_under.?.fg, cell_under.?.bg);
         }
     }
 

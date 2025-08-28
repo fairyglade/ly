@@ -13,8 +13,8 @@
             .hash = "zigini-0.3.2-BSkB7aVHAADhxwo0aEdWtNzaVXer3d8RwXMuZd-q-spO",
         },
         .termbox2 = .{
-            .url = "git+https://github.com/AnErrupTion/termbox2?ref=get_cell#e975d250ee6567773400e9d5b0b5c2f175349c57",
-            .hash = "N-V-__8AAMruBACJ7xT-O64hnS7lNeTiZQMketHdkHKrR1A8",
+            .url = "git+https://github.com/AnErrupTion/termbox2?ref=master#290ac6b8225aacfd16851224682b851b65fcb918",
+            .hash = "N-V-__8AAGcUBQAa5vov1Yi_9AXEffFQ1e2KsXaK4dgygRKq",
         },
     },
     .paths = .{""},
