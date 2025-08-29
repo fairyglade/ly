@@ -175,6 +175,9 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
             try installText(patched_config, config_dir, ly_config_directory, "config.ini", .{});
         }
 
+        const patched_example_config = try patchFile(allocator, "res/config.ini", patch_map);
+        try installText(patched_example_config, config_dir, ly_config_directory, "config.ini.example", .{});
+
         const patched_setup = try patchFile(allocator, "res/setup.sh", patch_map);
         try installText(patched_setup, config_dir, ly_config_directory, "setup.sh", .{ .mode = 0o755 });
     }
