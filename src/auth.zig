@@ -6,7 +6,6 @@ const Environment = @import("Environment.zig");
 const interop = @import("interop.zig");
 const SharedError = @import("SharedError.zig");
 
-const Allocator = std.mem.Allocator;
 const Md5 = std.crypto.hash.Md5;
 const utmp = interop.utmp;
 const Utmp = utmp.utmpx;
