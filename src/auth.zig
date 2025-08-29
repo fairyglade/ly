@@ -32,7 +32,7 @@ pub fn sessionSignalHandler(i: c_int) callconv(.c) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, options: AuthOptions, current_environment: Environment, login: [:0]const u8, password: [:0]const u8) !void {
+pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, options: AuthOptions, current_environment: Environment, login: []const u8, password: []const u8) !void {
     var tty_buffer: [3]u8 = undefined;
     const tty_str = try std.fmt.bufPrint(&tty_buffer, "{d}", .{options.tty});
 
@@ -43,7 +43,13 @@ pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, op
     try setXdgEnv(allocator, tty_str, current_environment);
 
     // Open the PAM session
-    var credentials = [_:null]?[*:0]const u8{ login, password };
+    const login_z = try allocator.dupeZ(u8, login);
+    defer allocator.free(login_z);
+
+    const password_z = try allocator.dupeZ(u8, password);
+    defer allocator.free(password_z);
+
+    var credentials = [_:null]?[*:0]const u8{ login_z, password_z };
 
     const conv = interop.pam.pam_conv{
         .conv = loginConv,
@@ -79,7 +85,7 @@ pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, op
         defer interop.closePasswordDatabase();
 
         // Get password structure from username
-        user_entry = interop.getUsernameEntry(login) orelse return error.GetPasswordNameFailed;
+        user_entry = interop.getUsernameEntry(login_z) orelse return error.GetPasswordNameFailed;
     }
 
     // Set user shell if it hasn't already been set

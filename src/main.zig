@@ -839,11 +839,6 @@ pub fn main() !void {
                 defer shared_err.deinit();
 
                 {
-                    const login_text = try allocator.dupeZ(u8, login.getCurrentUser());
-                    defer allocator.free(login_text);
-                    const password_text = try allocator.dupeZ(u8, password.text.items);
-                    defer allocator.free(password_text);
-
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
                         const current_environment = session.label.list.items[session.label.current];
@@ -867,7 +862,7 @@ pub fn main() !void {
                         };
                         std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);
 
-                        auth.authenticate(allocator, log_writer, auth_options, current_environment, login_text, password_text) catch |err| {
+                        auth.authenticate(allocator, log_writer, auth_options, current_environment, login.getCurrentUser(), password.text.items) catch |err| {
                             shared_err.writeError(err);
                             std.process.exit(1);
                         };
