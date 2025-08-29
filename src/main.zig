@@ -860,7 +860,7 @@ pub fn main() !void {
                         };
                         std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);
 
-                        auth.authenticate(allocator, auth_options, current_environment, login_text, password_text) catch |err| {
+                        auth.authenticate(allocator, log_writer, auth_options, current_environment, login_text, password_text) catch |err| {
                             shared_err.writeError(err);
                             std.process.exit(1);
                         };

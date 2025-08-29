@@ -33,7 +33,7 @@ pub fn sessionSignalHandler(i: c_int) callconv(.c) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(allocator: std.mem.Allocator, options: AuthOptions, current_environment: Environment, login: [:0]const u8, password: [:0]const u8) !void {
+pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, options: AuthOptions, current_environment: Environment, login: [:0]const u8, password: [:0]const u8) !void {
     var tty_buffer: [3]u8 = undefined;
     const tty_str = try std.fmt.bufPrint(&tty_buffer, "{d}", .{options.tty});
 
@@ -91,7 +91,9 @@ pub fn authenticate(allocator: std.mem.Allocator, options: AuthOptions, current_
 
     child_pid = try std.posix.fork();
     if (child_pid == 0) {
-        startSession(allocator, options, tty_str, user_entry, handle, current_environment) catch |e| {
+        try log_writer.writeAll("starting session");
+
+        startSession(log_writer, allocator, options, tty_str, user_entry, handle, current_environment) catch |e| {
             shared_err.writeError(e);
             std.process.exit(1);
         };
@@ -126,6 +128,7 @@ pub fn authenticate(allocator: std.mem.Allocator, options: AuthOptions, current_
 }
 
 fn startSession(
+    log_writer: *std.Io.Writer,
     allocator: std.mem.Allocator,
     options: AuthOptions,
     tty_str: []u8,
@@ -157,14 +160,14 @@ fn startSession(
 
     // Execute what the user requested
     switch (current_environment.display_server) {
-        .wayland => try executeWaylandCmd(allocator, user_entry.shell.?, options, current_environment.cmd),
+        .wayland => try executeWaylandCmd(log_writer, allocator, user_entry.shell.?, options, current_environment.cmd),
         .shell => try executeShellCmd(allocator, user_entry.shell.?, options),
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{options.tty});
-            try executeX11Cmd(allocator, user_entry.shell.?, user_entry.home.?, options, current_environment.cmd, vt);
+            try executeX11Cmd(log_writer, allocator, user_entry.shell.?, user_entry.home.?, options, current_environment.cmd, vt);
         },
-        .custom => try executeCustomCmd(allocator, user_entry.shell.?, options, current_environment.is_terminal, current_environment.cmd),
+        .custom => try executeCustomCmd(log_writer, allocator, user_entry.shell.?, options, current_environment.is_terminal, current_environment.cmd),
     }
 }
 
@@ -354,7 +357,7 @@ fn mcookie() [Md5.digest_length * 2]u8 {
     return std.fmt.bytesToHex(&out, .lower);
 }
 
-fn xauth(allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptions) !void {
+fn xauth(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptions) !void {
     var pwd_buf: [100]u8 = undefined;
     const pwd = try std.fmt.bufPrintZ(&pwd_buf, "{s}", .{pw_dir});
 
@@ -374,7 +377,10 @@ fn xauth(allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8,
     }
 
     const status = std.posix.waitpid(pid, 0);
-    if (status.status != 0) return error.XauthFailed;
+    if (status.status != 0) {
+        try log_writer.print("xauth command failed with status {d}", .{status.status});
+        return error.XauthFailed;
+    }
 }
 
 fn executeShellCmd(allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions) !void {
@@ -389,10 +395,10 @@ fn executeShellCmd(allocator: std.mem.Allocator, shell: []const u8, options: Aut
     return std.posix.execveZ(shell_z, &args, std.c.environ);
 }
 
-fn executeWaylandCmd(allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, desktop_cmd: []const u8) !void {
+fn executeWaylandCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, desktop_cmd: []const u8) !void {
     var maybe_log_file: ?std.fs.File = null;
     if (options.session_log) |log_path| {
-        maybe_log_file = try redirectStandardStreams(log_path, true);
+        maybe_log_file = try redirectStandardStreams(log_writer, log_path, true);
     }
     defer if (maybe_log_file) |log_file| log_file.close();
 
@@ -405,9 +411,9 @@ fn executeWaylandCmd(allocator: std.mem.Allocator, shell: []const u8, options: A
     return std.posix.execveZ(shell_z, &args, std.c.environ);
 }
 
-fn executeX11Cmd(allocator: std.mem.Allocator, shell: []const u8, home: []const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
+fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, home: []const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
     const display_num = try getFreeDisplay();
-    var buf: [5]u8 = undefined;
+    var buf: [4]u8 = undefined;
     const display_name = try std.fmt.bufPrint(&buf, ":{d}", .{display_num});
 
     const shell_z = try allocator.dupeZ(u8, shell);
@@ -416,7 +422,7 @@ fn executeX11Cmd(allocator: std.mem.Allocator, shell: []const u8, home: []const 
     const home_z = try allocator.dupeZ(u8, home);
     defer allocator.free(home_z);
 
-    try xauth(allocator, display_name, shell_z, home_z, options);
+    try xauth(log_writer, allocator, display_name, shell_z, home_z, options);
 
     const pid = try std.posix.fork();
     if (pid == 0) {
@@ -469,14 +475,14 @@ fn executeX11Cmd(allocator: std.mem.Allocator, shell: []const u8, home: []const 
     _ = std.posix.waitpid(x_pid, 0);
 }
 
-fn executeCustomCmd(allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, is_terminal: bool, exec_cmd: []const u8) !void {
+fn executeCustomCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, is_terminal: bool, exec_cmd: []const u8) !void {
     var maybe_log_file: ?std.fs.File = null;
     if (!is_terminal) {
         // For custom desktop entries, the "Terminal" value here determines if
         // we redirect standard output & error or not. That is, we redirect only
         // if it's equal to false (so if it's not running in a TTY).
         if (options.session_log) |log_path| {
-            maybe_log_file = try redirectStandardStreams(log_path, true);
+            maybe_log_file = try redirectStandardStreams(log_writer, log_path, true);
         }
     }
     defer if (maybe_log_file) |log_file| log_file.close();
@@ -490,8 +496,14 @@ fn executeCustomCmd(allocator: std.mem.Allocator, shell: []const u8, options: Au
     return std.posix.execveZ(shell_z, &args, std.c.environ);
 }
 
-fn redirectStandardStreams(session_log: []const u8, create: bool) !std.fs.File {
-    const log_file = if (create) (try std.fs.cwd().createFile(session_log, .{ .mode = 0o666 })) else (try std.fs.cwd().openFile(session_log, .{ .mode = .read_write }));
+fn redirectStandardStreams(log_writer: *std.Io.Writer, session_log: []const u8, create: bool) !std.fs.File {
+    const log_file = if (create) (std.fs.cwd().createFile(session_log, .{ .mode = 0o666 }) catch |err| {
+        try log_writer.print("failed to create new session log file: {s}\n", .{@errorName(err)});
+        return err;
+    }) else (std.fs.cwd().openFile(session_log, .{ .mode = .read_write }) catch |err| {
+        try log_writer.print("failed to open existing session log file: {s}\n", .{@errorName(err)});
+        return err;
+    });
 
     try std.posix.dup2(std.posix.STDOUT_FILENO, std.posix.STDERR_FILENO);
     try std.posix.dup2(log_file.handle, std.posix.STDOUT_FILENO);
