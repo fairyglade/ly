@@ -229,6 +229,13 @@ pub fn main() !void {
 
     var log_buffer: [1024]u8 = undefined;
     var log_file_writer = log_file.writer(&log_buffer);
+
+    // Seek to the end of the log file
+    if (could_open_log_file) {
+        const stat = try log_file.stat();
+        try log_file_writer.seekTo(stat.size);
+    }
+
     var log_writer = &log_file_writer.interface;
 
     // These strings only end up getting freed if the user quits Ly using Ctrl+C, which is fine since in the other cases
@@ -787,7 +794,7 @@ pub fn main() !void {
                 update = true;
             },
             termbox.TB_KEY_ENTER => authenticate: {
-                try log_writer.writeAll("authenticating...");
+                try log_writer.writeAll("authenticating...\n");
 
                 if (!config.allow_empty_password and password.text.items.len == 0) {
                     // Let's not log this message for security reasons
@@ -898,7 +905,7 @@ pub fn main() !void {
 
                     password.clear();
                     try info_line.addMessage(lang.logout, config.bg, config.fg);
-                    try log_writer.writeAll("logged out");
+                    try log_writer.writeAll("logged out\n");
                 }
 
                 try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
@@ -955,6 +962,8 @@ pub fn main() !void {
                 update = true;
             },
         }
+
+        try log_writer.flush();
     }
 }
 

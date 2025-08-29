@@ -90,7 +90,8 @@ pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, op
 
     child_pid = try std.posix.fork();
     if (child_pid == 0) {
-        try log_writer.writeAll("starting session");
+        try log_writer.writeAll("starting session\n");
+        try log_writer.flush();
 
         startSession(log_writer, allocator, options, tty_str, user_entry, handle, current_environment) catch |e| {
             shared_err.writeError(e);
@@ -377,7 +378,7 @@ fn xauth(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, display_name:
 
     const status = std.posix.waitpid(pid, 0);
     if (status.status != 0) {
-        try log_writer.print("xauth command failed with status {d}", .{status.status});
+        try log_writer.print("xauth command failed with status {d}\n", .{status.status});
         return error.XauthFailed;
     }
 }
