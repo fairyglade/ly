@@ -1,8 +1,8 @@
 type            = process
 restart         = true
 smooth-recovery = true
-command         = $PREFIX_DIRECTORY/bin/$EXE_NAME
+command         = $PREFIX_DIRECTORY/bin/$EXECUTABLE_NAME
 depends-on      = login.target
 termsignal      = HUP
-# ly needs access to the console while loginready already occupies it
+# ly needs access to the console while login.target already occupies it
 options         = shares-console

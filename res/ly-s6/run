@@ -1,2 +1,2 @@
 #!/bin/execlineb -P
-exec agetty -L -8 -n -l $PREFIX_DIRECTORY/bin/$EXE_NAME tty$DEFAULT_TTY 115200
+exec agetty -L -8 -n -l $PREFIX_DIRECTORY/bin/$EXECUTABLE_NAME tty$DEFAULT_TTY 115200
