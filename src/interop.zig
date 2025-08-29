@@ -1,19 +1,5 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Allocator = std.mem.Allocator;
-
-pub const TimeOfDay = struct {
-    seconds: i64,
-    microseconds: i64,
-};
-
-pub const UsernameEntry = struct {
-    username: ?[]const u8,
-    uid: std.posix.uid_t,
-    gid: std.posix.gid_t,
-    home: ?[]const u8,
-    shell: ?[]const u8,
-};
 
 pub const termbox = @import("termbox2");
 
@@ -57,29 +43,83 @@ const time = @cImport({
     @cInclude("time.h");
 });
 
-// BSD-specific headers
-const kbio = @cImport({
-    @cInclude("sys/kbio.h");
-});
+pub const TimeOfDay = struct {
+    seconds: i64,
+    microseconds: i64,
+};
 
-// Linux-specific headers
-const kd = @cImport({
-    @cInclude("sys/kd.h");
-});
+pub const UsernameEntry = struct {
+    username: ?[]const u8,
+    uid: std.posix.uid_t,
+    gid: std.posix.gid_t,
+    home: ?[]const u8,
+    shell: ?[]const u8,
+    passwd_struct: [*c]pwd.passwd,
+};
 
-const vt = @cImport({
-    @cInclude("sys/vt.h");
-});
+// Contains the platform-specific code
+fn PlatformStruct() type {
+    return switch (builtin.os.tag) {
+        .linux => struct {
+            pub const kd = @cImport({
+                @cInclude("sys/kd.h");
+            });
 
-// Used for getting & setting the lock state
-const LedState = if (builtin.os.tag.isBSD()) c_int else c_char;
-const get_led_state = if (builtin.os.tag.isBSD()) kbio.KDGETLED else kd.KDGKBLED;
-const set_led_state = if (builtin.os.tag.isBSD()) kbio.KDSETLED else kd.KDSKBLED;
-const numlock_led = if (builtin.os.tag.isBSD()) kbio.LED_NUM else kd.K_NUMLOCK;
-const capslock_led = if (builtin.os.tag.isBSD()) kbio.LED_CAP else kd.K_CAPSLOCK;
+            pub const vt = @cImport({
+                @cInclude("sys/vt.h");
+            });
+
+            pub const LedState = c_char;
+            pub const get_led_state = kd.KDGKBLED;
+            pub const set_led_state = kd.KDSKBLED;
+            pub const numlock_led = kd.K_NUMLOCK;
+            pub const capslock_led = kd.K_CAPSLOCK;
+            pub const vt_activate = vt.VT_ACTIVATE;
+            pub const vt_waitactive = vt.VT_WAITACTIVE;
+
+            pub fn setUserContextImpl(username: [*:0]const u8, entry: UsernameEntry) !void {
+                const status = grp.initgroups(username, @intCast(entry.gid));
+                if (status != 0) return error.GroupInitializationFailed;
+
+                std.posix.setgid(@intCast(entry.gid)) catch return error.SetUserGidFailed;
+                std.posix.setuid(@intCast(entry.uid)) catch return error.SetUserUidFailed;
+            }
+        },
+        .freebsd => struct {
+            pub const kbio = @cImport({
+                @cInclude("sys/kbio.h");
+            });
+
+            pub const consio = @cImport({
+                @cInclude("sys/consio.h");
+            });
+
+            pub const LedState = c_int;
+            pub const get_led_state = kbio.KDGETLED;
+            pub const set_led_state = kbio.KDSETLED;
+            pub const numlock_led = kbio.LED_NUM;
+            pub const capslock_led = kbio.LED_CAP;
+            pub const vt_activate = consio.VT_ACTIVATE;
+            pub const vt_waitactive = consio.VT_WAITACTIVE;
+
+            pub fn setUserContextImpl(username: [*:0]const u8, entry: UsernameEntry) !void {
+                // FreeBSD has initgroups() in unistd
+                const status = unistd.initgroups(username, @intCast(entry.gid));
+                if (status != 0) return error.GroupInitializationFailed;
+
+                // FreeBSD sets the GID and UID with setusercontext()
+                const result = pwd.setusercontext(null, entry.passwd_struct, @intCast(entry.uid), pwd.LOGIN_SETALL);
+                if (result != 0) return error.SetUserUidFailed;
+            }
+        },
+        else => @compileError("Unsupported target: " ++ builtin.os.tag),
+    };
+}
+
+const platform_struct = PlatformStruct();
 
 pub fn supportsUnicode() bool {
-    return builtin.os.tag == .linux or builtin.os.tag.isBSD();
+    return builtin.os.tag == .linux or builtin.os.tag == .freebsd;
 }
 
 pub fn timeAsString(buf: [:0]u8, format: [:0]const u8) []u8 {
@@ -103,10 +143,10 @@ pub fn getTimeOfDay() !TimeOfDay {
 }
 
 pub fn switchTty(tty: u8) !void {
-    var status = std.c.ioctl(std.posix.STDIN_FILENO, vt.VT_ACTIVATE, tty);
+    var status = std.c.ioctl(std.posix.STDIN_FILENO, platform_struct.vt_activate, tty);
     if (status != 0) return error.FailedToActivateTty;
 
-    status = std.c.ioctl(std.posix.STDIN_FILENO, vt.VT_WAITACTIVE, tty);
+    status = std.c.ioctl(std.posix.STDIN_FILENO, platform_struct.vt_waitactive, tty);
     if (status != 0) return error.FailedToWaitForActiveTty;
 }
 
@@ -114,24 +154,24 @@ pub fn getLockState() !struct {
     numlock: bool,
     capslock: bool,
 } {
-    var led: LedState = undefined;
-    const status = std.c.ioctl(std.posix.STDIN_FILENO, get_led_state, &led);
+    var led: platform_struct.LedState = undefined;
+    const status = std.c.ioctl(std.posix.STDIN_FILENO, platform_struct.get_led_state, &led);
     if (status != 0) return error.FailedToGetLockState;
 
     return .{
-        .numlock = (led & numlock_led) != 0,
-        .capslock = (led & capslock_led) != 0,
+        .numlock = (led & platform_struct.numlock_led) != 0,
+        .capslock = (led & platform_struct.capslock_led) != 0,
     };
 }
 
 pub fn setNumlock(val: bool) !void {
-    var led: LedState = undefined;
-    var status = std.c.ioctl(std.posix.STDIN_FILENO, get_led_state, &led);
+    var led: platform_struct.LedState = undefined;
+    var status = std.c.ioctl(std.posix.STDIN_FILENO, platform_struct.get_led_state, &led);
     if (status != 0) return error.FailedToGetNumlock;
 
-    const numlock = (led & numlock_led) != 0;
+    const numlock = (led & platform_struct.numlock_led) != 0;
     if (numlock != val) {
-        status = std.c.ioctl(std.posix.STDIN_FILENO, set_led_state, led ^ numlock_led);
+        status = std.c.ioctl(std.posix.STDIN_FILENO, platform_struct.set_led_state, led ^ platform_struct.numlock_led);
         if (status != 0) return error.FailedToSetNumlock;
     }
 }
@@ -140,22 +180,7 @@ pub fn setUserContext(allocator: std.mem.Allocator, entry: UsernameEntry) !void 
     const username_z = try allocator.dupeZ(u8, entry.username.?);
     defer allocator.free(username_z);
 
-    if (builtin.os.tag == .freebsd) {
-        // FreeBSD has initgroups() in unistd
-        const status = unistd.initgroups(username_z.ptr, @intCast(entry.gid));
-        if (status != 0) return error.GroupInitializationFailed;
-
-        // FreeBSD sets the GID and UID with setusercontext()
-        // TODO
-        const result = pwd.setusercontext(null, entry, @intCast(entry.uid), pwd.LOGIN_SETALL);
-        if (result != 0) return error.SetUserUidFailed;
-    } else {
-        const status = grp.initgroups(username_z.ptr, @intCast(entry.gid));
-        if (status != 0) return error.GroupInitializationFailed;
-
-        std.posix.setgid(@intCast(entry.gid)) catch return error.SetUserGidFailed;
-        std.posix.setuid(@intCast(entry.uid)) catch return error.SetUserUidFailed;
-    }
+    return platform_struct.setUserContextImpl(username_z.ptr, entry);
 }
 
 pub fn setUserShell(entry: *UsernameEntry) void {
@@ -193,6 +218,7 @@ pub fn getNextUsernameEntry() ?UsernameEntry {
         .gid = @intCast(entry.*.pw_gid),
         .home = if (entry.*.pw_dir) |dir| dir[0..std.mem.len(dir)] else null,
         .shell = if (entry.*.pw_shell) |shell| shell[0..std.mem.len(shell)] else null,
+        .passwd_struct = entry,
     };
 }
 
@@ -206,6 +232,7 @@ pub fn getUsernameEntry(username: [:0]const u8) ?UsernameEntry {
         .gid = @intCast(entry.*.pw_gid),
         .home = if (entry.*.pw_dir) |dir| dir[0..std.mem.len(dir)] else null,
         .shell = if (entry.*.pw_shell) |shell| shell[0..std.mem.len(shell)] else null,
+        .passwd_struct = entry,
     };
 }
 
