@@ -305,7 +305,7 @@ fn getXPid(display_num: u8) !i32 {
     return std.fmt.parseInt(i32, std.mem.trim(u8, buffer[0..written], " "), 10);
 }
 
-fn createXauthFile(pwd: [:0]const u8) ![]const u8 {
+fn createXauthFile(pwd: []const u8) ![]const u8 {
     var xauth_buf: [100]u8 = undefined;
     var xauth_dir: []const u8 = undefined;
     const xdg_rt_dir = std.posix.getenv("XDG_RUNTIME_DIR");
@@ -365,11 +365,8 @@ fn mcookie() [Md5.digest_length * 2]u8 {
     return std.fmt.bytesToHex(&out, .lower);
 }
 
-fn xauth(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, pw_dir: [*:0]const u8, options: AuthOptions) !void {
-    var pwd_buf: [100]u8 = undefined;
-    const pwd = try std.fmt.bufPrintZ(&pwd_buf, "{s}", .{pw_dir});
-
-    const xauthority = try createXauthFile(pwd);
+fn xauth(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, home: []const u8, options: AuthOptions) !void {
+    const xauthority = try createXauthFile(home);
     try interop.setEnvironmentVariable(allocator, "XAUTHORITY", xauthority, true);
     try interop.setEnvironmentVariable(allocator, "DISPLAY", display_name, true);
 
@@ -379,6 +376,7 @@ fn xauth(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, display_name:
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . {s}", .{ options.xauth_cmd, display_name, magic_cookie }) catch std.process.exit(1);
+
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
@@ -399,6 +397,7 @@ fn executeShellCmd(allocator: std.mem.Allocator, shell: []const u8, options: Aut
 
     var cmd_buffer: [1024]u8 = undefined;
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", shell });
+
     const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
     return std.posix.execveZ(shell_z, &args, std.c.environ);
 }
@@ -415,6 +414,7 @@ fn executeWaylandCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, s
 
     var cmd_buffer: [1024]u8 = undefined;
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", desktop_cmd });
+
     const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
     return std.posix.execveZ(shell_z, &args, std.c.environ);
 }
@@ -427,15 +427,13 @@ fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell
     const shell_z = try allocator.dupeZ(u8, shell);
     defer allocator.free(shell_z);
 
-    const home_z = try allocator.dupeZ(u8, home);
-    defer allocator.free(home_z);
-
-    try xauth(log_writer, allocator, display_name, shell_z, home_z, options);
+    try xauth(log_writer, allocator, display_name, shell_z, home, options);
 
     const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.x_cmd, display_name, vt }) catch std.process.exit(1);
+
         const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
         std.posix.execveZ(shell_z, &args, std.c.environ) catch {};
         std.process.exit(1);
@@ -459,6 +457,7 @@ fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", desktop_cmd }) catch std.process.exit(1);
+
         const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
         std.posix.execveZ(shell_z, &args, std.c.environ) catch {};
         std.process.exit(1);
@@ -500,6 +499,7 @@ fn executeCustomCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, sh
 
     var cmd_buffer: [1024]u8 = undefined;
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", exec_cmd });
+
     const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
     return std.posix.execveZ(shell_z, &args, std.c.environ);
 }

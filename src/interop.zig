@@ -187,7 +187,7 @@ pub fn setUserShell(entry: *UsernameEntry) void {
     unistd.setusershell();
 
     const shell = unistd.getusershell();
-    entry.shell = shell[0..std.mem.len(shell)];
+    entry.shell = std.mem.span(shell);
 
     unistd.endusershell();
 }
@@ -213,11 +213,11 @@ pub fn getNextUsernameEntry() ?UsernameEntry {
     if (entry == null) return null;
 
     return .{
-        .username = if (entry.*.pw_name) |name| name[0..std.mem.len(name)] else null,
+        .username = if (entry.*.pw_name) |name| std.mem.span(name) else null,
         .uid = @intCast(entry.*.pw_uid),
         .gid = @intCast(entry.*.pw_gid),
-        .home = if (entry.*.pw_dir) |dir| dir[0..std.mem.len(dir)] else null,
-        .shell = if (entry.*.pw_shell) |shell| shell[0..std.mem.len(shell)] else null,
+        .home = if (entry.*.pw_dir) |dir| std.mem.span(dir) else null,
+        .shell = if (entry.*.pw_shell) |shell| std.mem.span(shell) else null,
         .passwd_struct = entry,
     };
 }
@@ -227,11 +227,11 @@ pub fn getUsernameEntry(username: [:0]const u8) ?UsernameEntry {
     if (entry == null) return null;
 
     return .{
-        .username = if (entry.*.pw_name) |name| name[0..std.mem.len(name)] else null,
+        .username = if (entry.*.pw_name) |name| std.mem.span(name) else null,
         .uid = @intCast(entry.*.pw_uid),
         .gid = @intCast(entry.*.pw_gid),
-        .home = if (entry.*.pw_dir) |dir| dir[0..std.mem.len(dir)] else null,
-        .shell = if (entry.*.pw_shell) |shell| shell[0..std.mem.len(shell)] else null,
+        .home = if (entry.*.pw_dir) |dir| std.mem.span(dir) else null,
+        .shell = if (entry.*.pw_shell) |shell| std.mem.span(shell) else null,
         .passwd_struct = entry,
     };
 }

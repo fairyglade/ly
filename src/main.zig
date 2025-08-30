@@ -965,7 +965,7 @@ pub fn main() !void {
 fn ttyClearScreen() !void {
     // Clear the TTY because termbox2 doesn't seem to do it properly
     const capability = termbox.global.caps[termbox.TB_CAP_CLEAR_SCREEN];
-    const capability_slice = capability[0..std.mem.len(capability)];
+    const capability_slice = std.mem.span(capability);
     _ = try std.posix.write(termbox.global.ttyfd, capability_slice);
 }
 
