@@ -307,35 +307,37 @@ fn getXPid(display_num: u8) !i32 {
 
 fn createXauthFile(pwd: [:0]const u8) ![]const u8 {
     var xauth_buf: [100]u8 = undefined;
-    var xauth_dir: [:0]const u8 = undefined;
+    var xauth_dir: []const u8 = undefined;
     const xdg_rt_dir = std.posix.getenv("XDG_RUNTIME_DIR");
     var xauth_file: []const u8 = "lyxauth";
 
-    if (xdg_rt_dir == null) {
+    if (xdg_rt_dir == null) no_rt_dir: {
         const xdg_cfg_home = std.posix.getenv("XDG_CONFIG_HOME");
-        var sb: std.c.Stat = undefined;
-        if (xdg_cfg_home == null) {
-            xauth_dir = try std.fmt.bufPrintZ(&xauth_buf, "{s}/.config", .{pwd});
-            _ = std.c.stat(xauth_dir, &sb);
-            const mode = sb.mode & std.posix.S.IFMT;
-            if (mode == std.posix.S.IFDIR) {
-                xauth_dir = try std.fmt.bufPrintZ(&xauth_buf, "{s}/ly", .{xauth_dir});
-            } else {
+        if (xdg_cfg_home == null) no_cfg_home: {
+            xauth_dir = try std.fmt.bufPrint(&xauth_buf, "{s}/.config", .{pwd});
+
+            var dir = std.fs.cwd().openDir(xauth_dir, .{}) catch {
+                // xauth_dir isn't a directory
                 xauth_dir = pwd;
                 xauth_file = ".lyxauth";
-            }
+                break :no_cfg_home;
+            };
+            dir.close();
+
+            // xauth_dir is a directory, use it to store Xauthority
+            xauth_dir = try std.fmt.bufPrint(&xauth_buf, "{s}/ly", .{xauth_dir});
         } else {
-            xauth_dir = try std.fmt.bufPrintZ(&xauth_buf, "{s}/ly", .{xdg_cfg_home.?});
+            xauth_dir = try std.fmt.bufPrint(&xauth_buf, "{s}/ly", .{xdg_cfg_home.?});
         }
 
-        _ = std.c.stat(xauth_dir, &sb);
-        const mode = sb.mode & std.posix.S.IFMT;
-        if (mode != std.posix.S.IFDIR) {
-            std.posix.mkdir(xauth_dir, 777) catch {
-                xauth_dir = pwd;
-                xauth_file = ".lyxauth";
-            };
-        }
+        const file = std.fs.cwd().openFile(xauth_dir, .{}) catch break :no_rt_dir;
+        file.close();
+
+        // xauth_dir is a file, create the parent directory
+        std.posix.mkdir(xauth_dir, 777) catch {
+            xauth_dir = pwd;
+            xauth_file = ".lyxauth";
+        };
     } else {
         xauth_dir = xdg_rt_dir.?;
     }

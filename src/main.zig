@@ -540,7 +540,7 @@ pub fn main() !void {
                 var format_buf: [16:0]u8 = undefined;
                 var clock_buf: [32:0]u8 = undefined;
                 // We need the slice/c-string returned by `bufPrintZ`.
-                const format: [:0]const u8 = try std.fmt.bufPrintZ(&format_buf, "{s}{s}{s}{s}", .{
+                const format = try std.fmt.bufPrintZ(&format_buf, "{s}{s}{s}{s}", .{
                     if (config.bigclock_12hr) "%I" else "%H",
                     ":%M",
                     if (config.bigclock_seconds) ":%S" else "",
