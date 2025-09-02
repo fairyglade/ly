@@ -11,6 +11,7 @@ StandardInput=tty
 TTYPath=/dev/tty$DEFAULT_TTY
 TTYReset=yes
 TTYVHangup=yes
+Restart=always
 
 [Install]
 Alias=display-manager.service
