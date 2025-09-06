@@ -11,6 +11,7 @@ const interop = @import("interop.zig");
 const ColorMix = @import("animations/ColorMix.zig");
 const Doom = @import("animations/Doom.zig");
 const Dummy = @import("animations/Dummy.zig");
+const Metaballs = @import("animations/Metaballs.zig");
 const Matrix = @import("animations/Matrix.zig");
 const GameOfLife = @import("animations/GameOfLife.zig");
 const Animation = @import("tui/Animation.zig");
@@ -455,6 +456,10 @@ pub fn main() !void {
         .gameoflife => {
             var game_of_life = try GameOfLife.init(allocator, &buffer, config.gameoflife_fg, config.gameoflife_entropy_interval, config.gameoflife_frame_delay, config.gameoflife_initial_density);
             animation = game_of_life.animation();
+        },
+        .metaballs => {
+            var metaballs = try Metaballs.init(allocator, &buffer);
+            animation = metaballs.animation();
         },
     }
     defer animation.deinit();
