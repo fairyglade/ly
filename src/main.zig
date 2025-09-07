@@ -58,6 +58,7 @@ pub fn main() !void {
     var restart = false;
     var shutdown_cmd: []const u8 = undefined;
     var restart_cmd: []const u8 = undefined;
+    var commands_allocated = false;
 
     var stderr_buffer: [128]u8 = undefined;
     var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
@@ -75,8 +76,11 @@ pub fn main() !void {
             stderr.flush() catch std.process.exit(1);
         } else {
             // The user has quit Ly using Ctrl+C
-            temporary_allocator.free(shutdown_cmd);
-            temporary_allocator.free(restart_cmd);
+            if (commands_allocated) {
+                // Necessary if we error out before allocating
+                temporary_allocator.free(shutdown_cmd);
+                temporary_allocator.free(restart_cmd);
+            }
         }
     }
 
@@ -242,6 +246,7 @@ pub fn main() !void {
     // we end up shutting down or restarting the system
     shutdown_cmd = try temporary_allocator.dupe(u8, config.shutdown_cmd);
     restart_cmd = try temporary_allocator.dupe(u8, config.restart_cmd);
+    commands_allocated = true;
 
     // Initialize termbox
     try log_writer.writeAll("initializing termbox2\n");
@@ -478,7 +483,8 @@ pub fn main() !void {
     var auth_fails: u64 = 0;
 
     // Switch to selected TTY
-    interop.switchTty(config.tty) catch |err| {
+    const active_tty = try interop.getActiveTty(allocator);
+    interop.switchTty(active_tty) catch |err| {
         try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
         try log_writer.print("failed to switch tty: {s}\n", .{@errorName(err)});
     };
@@ -843,7 +849,7 @@ pub fn main() !void {
                     if (session_pid == 0) {
                         const current_environment = session.label.list.items[session.label.current];
                         const auth_options = auth.AuthOptions{
-                            .tty = config.tty,
+                            .tty = active_tty,
                             .service_name = config.service_name,
                             .path = config.path,
                             .session_log = config.session_log,
