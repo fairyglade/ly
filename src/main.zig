@@ -538,8 +538,19 @@ pub fn main() !void {
             if (!animation_timed_out) animation.draw();
 
             if (!config.hide_version_string) {
-                buffer.drawLabel(ly_top_str, length, 0);
-                length += ly_top_str.len + 1;
+                switch (config.version_string_pos) {
+                    // top-right
+                    1 => buffer.drawLabel(ly_top_str, buffer.width - ly_top_str.len, 0),
+                    // bottom-left
+                    2 => buffer.drawLabel(ly_top_str, 0, buffer.height - 1),
+                    // bottom-right
+                    3 => buffer.drawLabel(ly_top_str, buffer.width - ly_top_str.len, buffer.height - 1),
+                    // top-left, default
+                    else => {
+                        buffer.drawLabel(ly_top_str, 0, 0);
+                        length += ly_top_str.len + 1;
+                    },
+                }
             }
 
             if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) {
