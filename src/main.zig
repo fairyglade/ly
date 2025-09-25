@@ -111,7 +111,7 @@ pub fn main() !void {
     var config: Config = undefined;
     var lang: Lang = undefined;
     var save: Save = undefined;
-    var config_load_failed = false;
+    var maybe_config_load_error: ?anyerror = null;
     var can_get_lock_state = true;
     var can_draw_clock = true;
 
@@ -155,9 +155,9 @@ pub fn main() !void {
         config = config_ini.readFileToStruct(config_path, .{
             .fieldHandler = migrator.configFieldHandler,
             .comment_characters = comment_characters,
-        }) catch _config: {
-            config_load_failed = true;
-            break :_config Config{};
+        }) catch |err| load_error: {
+            maybe_config_load_error = err;
+            break :load_error Config{};
         };
 
         const lang_path = try std.fmt.allocPrint(allocator, "{s}{s}lang/{s}.ini", .{ s, trailing_slash, config.lang });
@@ -179,7 +179,7 @@ pub fn main() !void {
             }) catch migrator.tryMigrateSaveFile(&user_buf);
         }
 
-        if (!config_load_failed) {
+        if (maybe_config_load_error == null) {
             migrator.lateConfigFieldHandler(&config);
         }
     } else {
@@ -188,9 +188,9 @@ pub fn main() !void {
         config = config_ini.readFileToStruct(config_path, .{
             .fieldHandler = migrator.configFieldHandler,
             .comment_characters = comment_characters,
-        }) catch _config: {
-            config_load_failed = true;
-            break :_config Config{};
+        }) catch |err| load_error: {
+            maybe_config_load_error = err;
+            break :load_error Config{};
         };
 
         const lang_path = try std.fmt.allocPrint(allocator, "{s}/ly/lang/{s}.ini", .{ build_options.config_directory, config.lang });
@@ -209,7 +209,7 @@ pub fn main() !void {
             }) catch migrator.tryMigrateSaveFile(&user_buf);
         }
 
-        if (!config_load_failed) {
+        if (maybe_config_load_error == null) {
             migrator.lateConfigFieldHandler(&config);
         }
     }
@@ -303,10 +303,10 @@ pub fn main() !void {
     var info_line = InfoLine.init(allocator, &buffer);
     defer info_line.deinit();
 
-    if (config_load_failed) {
+    if (maybe_config_load_error) |err| {
         // We can't localize this since the config failed to load so we'd fallback to the default language anyway
         try info_line.addMessage("unable to parse config file", config.error_bg, config.error_fg);
-        try log_writer.writeAll("unable to parse config file\n");
+        try log_writer.print("unable to parse config file: {s}\n", .{@errorName(err)});
     }
 
     if (!could_open_log_file) {
