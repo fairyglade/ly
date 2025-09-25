@@ -166,14 +166,12 @@ fn startSession(
 
     // Execute what the user requested
     switch (current_environment.display_server) {
-        .wayland => try executeWaylandCmd(log_writer, allocator, user_entry.shell.?, options, current_environment.cmd),
-        .shell => try executeShellCmd(allocator, user_entry.shell.?, options),
+        .wayland, .shell, .custom => try executeCmd(log_writer, allocator, user_entry.shell.?, options, current_environment.is_terminal, current_environment.cmd),
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{options.tty});
             try executeX11Cmd(log_writer, allocator, user_entry.shell.?, user_entry.home.?, options, current_environment.cmd, vt);
         },
-        .custom => try executeCustomCmd(log_writer, allocator, user_entry.shell.?, options, current_environment.is_terminal, current_environment.cmd),
     }
 }
 
@@ -197,7 +195,7 @@ fn setXdgEnv(allocator: std.mem.Allocator, tty_str: []u8, environment: Environme
         .wayland => "wayland",
         .shell => "tty",
         .xinitrc, .x11 => "x11",
-        .custom => "unspecified",
+        .custom => if (environment.is_terminal) "tty" else "unspecified",
     }, false);
 
     // The "/run/user/%d" directory is not available on FreeBSD. It is much
@@ -389,36 +387,6 @@ fn xauth(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, display_name:
     }
 }
 
-fn executeShellCmd(allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions) !void {
-    // We don't want to redirect stdout and stderr in a shell session
-
-    const shell_z = try allocator.dupeZ(u8, shell);
-    defer allocator.free(shell_z);
-
-    var cmd_buffer: [1024]u8 = undefined;
-    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", shell });
-
-    const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
-    return std.posix.execveZ(shell_z, &args, std.c.environ);
-}
-
-fn executeWaylandCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, desktop_cmd: []const u8) !void {
-    var maybe_log_file: ?std.fs.File = null;
-    if (options.session_log) |log_path| {
-        maybe_log_file = try redirectStandardStreams(log_writer, log_path, true);
-    }
-    defer if (maybe_log_file) |log_file| log_file.close();
-
-    const shell_z = try allocator.dupeZ(u8, shell);
-    defer allocator.free(shell_z);
-
-    var cmd_buffer: [1024]u8 = undefined;
-    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", desktop_cmd });
-
-    const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
-    return std.posix.execveZ(shell_z, &args, std.c.environ);
-}
-
 fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, home: []const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
     const display_num = try getFreeDisplay();
     var buf: [4]u8 = undefined;
@@ -482,7 +450,7 @@ fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell
     _ = std.posix.waitpid(x_pid, 0);
 }
 
-fn executeCustomCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, is_terminal: bool, exec_cmd: []const u8) !void {
+fn executeCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, is_terminal: bool, exec_cmd: []const u8) !void {
     var maybe_log_file: ?std.fs.File = null;
     if (!is_terminal) {
         // For custom desktop entries, the "Terminal" value here determines if

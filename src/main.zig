@@ -990,6 +990,7 @@ fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplaySer
         .cmd = exec orelse "",
         .specifier = lang.other,
         .display_server = display_server,
+        .is_terminal = display_server == .shell,
     });
 }
 
@@ -1010,24 +1011,23 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
         });
         errdefer entry_ini.deinit();
 
-        var maybe_xdg_session_desktop: ?[]const u8 = null;
-        const maybe_desktop_names = entry_ini.data.@"Desktop Entry".DesktopNames;
-        if (maybe_desktop_names) |desktop_names| {
-            maybe_xdg_session_desktop = std.mem.sliceTo(desktop_names, ';');
-        } else if (display_server != .custom) {
-            // If DesktopNames is empty, and this isn't a custom session entry,
-            // we'll take the name of the session file
-            maybe_xdg_session_desktop = std.fs.path.stem(item.name);
-        }
-
-        // Prepare the XDG_CURRENT_DESKTOP environment variable here
         const entry = entry_ini.data.@"Desktop Entry";
+        var maybe_xdg_session_desktop: ?[]const u8 = null;
         var maybe_xdg_desktop_names: ?[]const u8 = null;
+
+        // Prepare the XDG_SESSION_DESKTOP and XDG_CURRENT_DESKTOP environment
+        // variables here
         if (entry.DesktopNames) |desktop_names| {
+            maybe_xdg_session_desktop = std.mem.sliceTo(desktop_names, ';');
+
             for (desktop_names) |*c| {
                 if (c.* == ';') c.* = ':';
             }
             maybe_xdg_desktop_names = desktop_names;
+        } else if (display_server != .custom) {
+            // If DesktopNames is empty, and this isn't a custom session entry,
+            // we'll take the name of the session file
+            maybe_xdg_session_desktop = std.fs.path.stem(item.name);
         }
 
         try session.addEnvironment(.{
