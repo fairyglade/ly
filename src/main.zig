@@ -53,6 +53,14 @@ fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
     _ = termbox.tb_shutdown();
 }
 
+const ConfigError = struct {
+    type_name: []const u8,
+    key: []const u8,
+    value: []const u8,
+    error_name: []const u8,
+};
+var config_errors: std.ArrayList(ConfigError) = .empty;
+
 pub fn main() !void {
     var shutdown = false;
     var restart = false;
@@ -154,6 +162,7 @@ pub fn main() !void {
 
         config = config_ini.readFileToStruct(config_path, .{
             .fieldHandler = migrator.configFieldHandler,
+            .errorHandler = configErrorHandler,
             .comment_characters = comment_characters,
         }) catch |err| load_error: {
             maybe_config_load_error = err;
@@ -187,6 +196,7 @@ pub fn main() !void {
 
         config = config_ini.readFileToStruct(config_path, .{
             .fieldHandler = migrator.configFieldHandler,
+            .errorHandler = configErrorHandler,
             .comment_characters = comment_characters,
         }) catch |err| load_error: {
             maybe_config_load_error = err;
@@ -307,6 +317,22 @@ pub fn main() !void {
         // We can't localize this since the config failed to load so we'd fallback to the default language anyway
         try info_line.addMessage("unable to parse config file", config.error_bg, config.error_fg);
         try log_writer.print("unable to parse config file: {s}\n", .{@errorName(err)});
+
+        defer config_errors.deinit(temporary_allocator);
+
+        for (0..config_errors.items.len) |i| {
+            const config_error = config_errors.items[i];
+            defer {
+                temporary_allocator.free(config_error.type_name);
+                temporary_allocator.free(config_error.key);
+                temporary_allocator.free(config_error.value);
+            }
+
+            try log_writer.print("failed to convert value '{s}' of option '{s}' to type '{s}': {s}\n", .{ config_error.value, config_error.key, config_error.type_name, config_error.error_name });
+
+            // Flush immediately so we can free the allocated memory afterwards
+            try log_writer.flush();
+        }
     }
 
     if (!could_open_log_file) {
@@ -966,6 +992,15 @@ pub fn main() !void {
 
         try log_writer.flush();
     }
+}
+
+fn configErrorHandler(type_name: []const u8, key: []const u8, value: []const u8, err: anyerror) void {
+    config_errors.append(temporary_allocator, .{
+        .type_name = temporary_allocator.dupe(u8, type_name) catch return,
+        .key = temporary_allocator.dupe(u8, key) catch return,
+        .value = temporary_allocator.dupe(u8, value) catch return,
+        .error_name = @errorName(err),
+    }) catch return;
 }
 
 fn ttyClearScreen() !void {

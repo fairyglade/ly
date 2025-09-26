@@ -9,8 +9,8 @@
             .hash = "clap-0.11.0-oBajB-HnAQDPCKYzwF7rO3qDFwRcD39Q0DALlTSz5H7e",
         },
         .zigini = .{
-            .url = "https://github.com/AnErrupTion/zigini/archive/d580d42f1b1051c0a35d63ab0f5704c6340e0bd3.tar.gz",
-            .hash = "zigini-0.3.2-BSkB7aVHAADhxwo0aEdWtNzaVXer3d8RwXMuZd-q-spO",
+            .url = "https://github.com/AnErrupTion/zigini/archive/96ca1d9f1a7ec741f07ceb104dae2b3a7bdfd48a.tar.gz",
+            .hash = "zigini-0.3.2-BSkB7WJJAADybd5DGd9MLCp6ikGGUq9wicxsjv0HF1Qc",
         },
         .termbox2 = .{
             .url = "git+https://github.com/AnErrupTion/termbox2?ref=master#290ac6b8225aacfd16851224682b851b65fcb918",
