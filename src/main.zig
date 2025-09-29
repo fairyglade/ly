@@ -509,7 +509,11 @@ pub fn main() !void {
     var auth_fails: u64 = 0;
 
     // Switch to selected TTY
-    const active_tty = try interop.getActiveTty(allocator);
+    const active_tty = interop.getActiveTty(allocator) catch |err| no_tty_found: {
+        try info_line.addMessage(lang.err_get_active_tty, config.error_bg, config.error_fg);
+        try log_writer.print("failed to get active tty: {s}\n", .{@errorName(err)});
+        break :no_tty_found build_options.fallback_tty;
+    };
     interop.switchTty(active_tty) catch |err| {
         try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
         try log_writer.print("failed to switch tty: {s}\n", .{@errorName(err)});
