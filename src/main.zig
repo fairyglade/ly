@@ -583,7 +583,7 @@ pub fn main() !void {
                 var battery_buf: [16:0]u8 = undefined;
                 const battery_str = std.fmt.bufPrintZ(&battery_buf, "BAT: {d}%", .{battery_percentage}) catch break :draw_battery;
 
-                const battery_y: usize = 1;
+                const battery_y: usize = if (config.hide_key_hints and config.hide_version_string) 0 else 1;
                 buffer.drawLabel(battery_str, 0, battery_y);
                 battery_bar_shown = true;
             }
