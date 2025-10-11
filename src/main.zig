@@ -32,7 +32,7 @@ const DisplayServer = enums.DisplayServer;
 const Entry = Environment.Entry;
 const termbox = interop.termbox;
 const temporary_allocator = std.heap.page_allocator;
-const ly_top_str = "Ly version " ++ build_options.version;
+const ly_version_str = "Ly version " ++ build_options.version;
 
 var session_pid: std.posix.pid_t = -1;
 fn signalHandler(i: c_int) callconv(.c) void {
@@ -568,8 +568,7 @@ pub fn main() !void {
             if (!animation_timed_out) animation.draw();
 
             if (!config.hide_version_string) {
-                buffer.drawLabel(ly_top_str, length, 0);
-                length += ly_top_str.len + 1;
+                buffer.drawLabel(ly_version_str, 0, buffer.height - 1);
             }
 
             var battery_bar_shown = false;
@@ -583,7 +582,7 @@ pub fn main() !void {
                 var battery_buf: [16:0]u8 = undefined;
                 const battery_str = std.fmt.bufPrintZ(&battery_buf, "BAT: {d}%", .{battery_percentage}) catch break :draw_battery;
 
-                const battery_y: usize = if (config.hide_key_hints and config.hide_version_string) 0 else 1;
+                const battery_y: usize = if (config.hide_key_hints) 0 else 1;
                 buffer.drawLabel(battery_str, 0, battery_y);
                 battery_bar_shown = true;
             }
