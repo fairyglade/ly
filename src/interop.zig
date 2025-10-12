@@ -89,8 +89,8 @@ fn PlatformStruct() type {
             // 1. Open /proc/self/stat to retrieve the tty_nr field
             // 2. Parse the tty_nr field to extract the major and minor device
             //    numbers
-            // 3. Then, read every /sys/class/tty/[dir]/dev, where [dir] is every
-            //    sub-directory
+            // 3. Then, read every /sys/class/tty/[dir]/dev, where [dir] is
+            //    every sub-directory
             // 4. Finally, compare the major and minor device numbers with the
             //    extracted values. If they correspond, parse [dir] to get the
             //    TTY ID
@@ -177,6 +177,10 @@ fn PlatformStruct() type {
                 // FreeBSD sets the GID and UID with setusercontext()
                 const result = pwd.setusercontext(null, entry.passwd_struct, @intCast(entry.uid), pwd.LOGIN_SETALL);
                 if (result != 0) return error.SetUserUidFailed;
+            }
+
+            pub fn getActiveTtyImpl(_: std.mem.Allocator) !u8 {
+                return error.FeatureUnimplemented;
             }
         },
         else => @compileError("Unsupported target: " ++ builtin.os.tag),
