@@ -196,22 +196,31 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
         var lang_dir = std.fs.cwd().openDir(ly_lang_path, .{}) catch unreachable;
         defer lang_dir.close();
 
-        try installFile("res/lang/cat.ini", lang_dir, ly_lang_path, "cat.ini", .{});
-        try installFile("res/lang/cs.ini", lang_dir, ly_lang_path, "cs.ini", .{});
-        try installFile("res/lang/de.ini", lang_dir, ly_lang_path, "de.ini", .{});
-        try installFile("res/lang/en.ini", lang_dir, ly_lang_path, "en.ini", .{});
-        try installFile("res/lang/es.ini", lang_dir, ly_lang_path, "es.ini", .{});
-        try installFile("res/lang/fr.ini", lang_dir, ly_lang_path, "fr.ini", .{});
-        try installFile("res/lang/it.ini", lang_dir, ly_lang_path, "it.ini", .{});
-        try installFile("res/lang/pl.ini", lang_dir, ly_lang_path, "pl.ini", .{});
-        try installFile("res/lang/pt.ini", lang_dir, ly_lang_path, "pt.ini", .{});
-        try installFile("res/lang/pt_BR.ini", lang_dir, ly_lang_path, "pt_BR.ini", .{});
-        try installFile("res/lang/ro.ini", lang_dir, ly_lang_path, "ro.ini", .{});
-        try installFile("res/lang/ru.ini", lang_dir, ly_lang_path, "ru.ini", .{});
-        try installFile("res/lang/sr.ini", lang_dir, ly_lang_path, "sr.ini", .{});
-        try installFile("res/lang/sv.ini", lang_dir, ly_lang_path, "sv.ini", .{});
-        try installFile("res/lang/tr.ini", lang_dir, ly_lang_path, "tr.ini", .{});
-        try installFile("res/lang/uk.ini", lang_dir, ly_lang_path, "uk.ini", .{});
+        const languages = [_][]const u8{
+            "ar.ini",
+            "cat.ini",
+            "cs.ini",
+            "de.ini",
+            "en.ini",
+            "es.ini",
+            "fr.ini",
+            "it.ini",
+            "ja_JP.ini",
+            "pl.ini",
+            "pt.ini",
+            "pt_BR.ini",
+            "ro.ini",
+            "ru.ini",
+            "sr.ini",
+            "sv.ini",
+            "tr.ini",
+            "uk.ini",
+            "zh_CN.ini",
+        };
+
+        inline for (languages) |language| {
+            try installFile("res/lang/" ++ language, lang_dir, ly_lang_path, language, .{});
+        }
     }
 
     {
