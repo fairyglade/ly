@@ -196,6 +196,7 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
         var lang_dir = std.fs.cwd().openDir(ly_lang_path, .{}) catch unreachable;
         defer lang_dir.close();
 
+        try installFile("res/lang/ar.ini", lang_dir, ly_lang_path, "ar.ini", .{});
         try installFile("res/lang/cat.ini", lang_dir, ly_lang_path, "cat.ini", .{});
         try installFile("res/lang/cs.ini", lang_dir, ly_lang_path, "cs.ini", .{});
         try installFile("res/lang/de.ini", lang_dir, ly_lang_path, "de.ini", .{});
@@ -203,6 +204,8 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
         try installFile("res/lang/es.ini", lang_dir, ly_lang_path, "es.ini", .{});
         try installFile("res/lang/fr.ini", lang_dir, ly_lang_path, "fr.ini", .{});
         try installFile("res/lang/it.ini", lang_dir, ly_lang_path, "it.ini", .{});
+        try installFile("res/lang/ja_JP.ini", lang_dir, ly_lang_path, "ja_JP.ini", .{});
+        try installFile("res/lang/lv.ini", lang_dir, ly_lang_path, "lv.ini", .{});
         try installFile("res/lang/pl.ini", lang_dir, ly_lang_path, "pl.ini", .{});
         try installFile("res/lang/pt.ini", lang_dir, ly_lang_path, "pt.ini", .{});
         try installFile("res/lang/pt_BR.ini", lang_dir, ly_lang_path, "pt_BR.ini", .{});
@@ -212,6 +215,7 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
         try installFile("res/lang/sv.ini", lang_dir, ly_lang_path, "sv.ini", .{});
         try installFile("res/lang/tr.ini", lang_dir, ly_lang_path, "tr.ini", .{});
         try installFile("res/lang/uk.ini", lang_dir, ly_lang_path, "uk.ini", .{});
+        try installFile("res/lang/zh_CN.ini", lang_dir, ly_lang_path, "zh_CN.ini", .{});
     }
 
     {
