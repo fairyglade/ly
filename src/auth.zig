@@ -388,6 +388,9 @@ fn xauth(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, display_name:
 }
 
 fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, home: []const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
+    try log_writer.writeAll("[x11] getting free display\n");
+    try log_writer.flush();
+
     const display_num = try getFreeDisplay();
     var buf: [4]u8 = undefined;
     const display_name = try std.fmt.bufPrint(&buf, ":{d}", .{display_num});
@@ -395,7 +398,13 @@ fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell
     const shell_z = try allocator.dupeZ(u8, shell);
     defer allocator.free(shell_z);
 
+    try log_writer.writeAll("[x11] creating xauth file\n");
+    try log_writer.flush();
+
     try xauth(log_writer, allocator, display_name, shell_z, home, options);
+
+    try log_writer.writeAll("[x11] starting x server\n");
+    try log_writer.flush();
 
     const pid = try std.posix.fork();
     if (pid == 0) {
@@ -417,9 +426,15 @@ fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell
         };
     }
 
+    try log_writer.writeAll("[x11] getting x server pid\n");
+    try log_writer.flush();
+
     // X Server detaches from the process.
     // PID can be fetched from /tmp/X{d}.lock
     const x_pid = try getXPid(display_num);
+
+    try log_writer.writeAll("[x11] launching environment\n");
+    try log_writer.flush();
 
     xorg_pid = try std.posix.fork();
     if (xorg_pid == 0) {
