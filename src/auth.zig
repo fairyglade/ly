@@ -170,7 +170,7 @@ fn startSession(
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{options.tty});
-            try executeX11Cmd(log_writer, allocator, user_entry.shell.?, user_entry.home.?, options, current_environment.cmd, vt);
+            try executeX11Cmd(log_writer, allocator, user_entry.shell.?, user_entry.home.?, options, current_environment.cmd orelse "", vt);
         },
     }
 }
@@ -450,7 +450,7 @@ fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell
     _ = std.posix.waitpid(x_pid, 0);
 }
 
-fn executeCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, is_terminal: bool, exec_cmd: []const u8) !void {
+fn executeCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, is_terminal: bool, exec_cmd: ?[]const u8) !void {
     var maybe_log_file: ?std.fs.File = null;
     if (!is_terminal) {
         // For custom desktop entries, the "Terminal" value here determines if
@@ -466,7 +466,7 @@ fn executeCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: [
     defer allocator.free(shell_z);
 
     var cmd_buffer: [1024]u8 = undefined;
-    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", exec_cmd });
+    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", exec_cmd orelse shell });
 
     const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
     return std.posix.execveZ(shell_z, &args, std.c.environ);
