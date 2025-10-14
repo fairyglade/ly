@@ -62,6 +62,8 @@ pub fn build(b: *std.Build) !void {
             .target = target,
             .optimize = optimize,
         }),
+        // Here until the native backend matures in terms of performance
+        .use_llvm = true,
     });
 
     const zigini = b.dependency("zigini", .{ .target = target, .optimize = optimize });
