@@ -105,7 +105,7 @@ fn PlatformStruct() type {
 
                     var reader = file.reader(&file_buffer);
                     var buffer: [1024]u8 = undefined;
-                    const read = try reader.read(&buffer);
+                    const read = try readBuffer(&reader.interface, &buffer);
 
                     var iterator = std.mem.splitScalar(u8, buffer[0..read], ' ');
                     var fields: [52][]const u8 = undefined;
@@ -134,7 +134,7 @@ fn PlatformStruct() type {
 
                     var reader = file.reader(&file_buffer);
                     var buffer: [16]u8 = undefined;
-                    const read = try reader.read(&buffer);
+                    const read = try readBuffer(&reader.interface, &buffer);
 
                     var device_iterator = std.mem.splitScalar(u8, buffer[0..(read - 1)], ':');
                     const device_major_str = device_iterator.next() orelse continue;
@@ -150,6 +150,19 @@ fn PlatformStruct() type {
                 }
 
                 return error.NoTtyFound;
+            }
+
+            fn readBuffer(reader: *std.Io.Reader, buffer: []u8) !usize {
+                var bytes_read: usize = 0;
+                var byte: u8 = try reader.takeByte();
+
+                while (byte != 0 and bytes_read < buffer.len) {
+                    buffer[bytes_read] = byte;
+                    bytes_read += 1;
+                    byte = reader.takeByte() catch break;
+                }
+
+                return bytes_read;
             }
         },
         .freebsd => struct {
