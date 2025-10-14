@@ -208,6 +208,7 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
             "fr.ini",
             "it.ini",
             "ja_JP.ini",
+            "lv.ini",
             "pl.ini",
             "pt.ini",
             "pt_BR.ini",

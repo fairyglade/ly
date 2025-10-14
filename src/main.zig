@@ -33,7 +33,7 @@ const DisplayServer = enums.DisplayServer;
 const Entry = Environment.Entry;
 const termbox = interop.termbox;
 const temporary_allocator = std.heap.page_allocator;
-const ly_top_str = "Ly version " ++ build_options.version;
+const ly_version_str = "Ly version " ++ build_options.version;
 
 var session_pid: std.posix.pid_t = -1;
 fn signalHandler(i: c_int) callconv(.c) void {
@@ -589,8 +589,23 @@ pub fn main() !void {
             if (!animation_timed_out) animation.draw();
 
             if (!config.hide_version_string) {
-                buffer.drawLabel(ly_top_str, length, 0);
-                length += ly_top_str.len + 1;
+                buffer.drawLabel(ly_version_str, 0, buffer.height - 1);
+            }
+
+            var battery_bar_shown = false;
+            if (config.battery_id) |id| draw_battery: {
+                const battery_percentage = getBatteryPercentage(id) catch |err| {
+                    try log_writer.print("failed to get battery percentage: {s}\n", .{@errorName(err)});
+                    try info_line.addMessage(lang.err_battery, config.error_bg, config.error_fg);
+                    break :draw_battery;
+                };
+
+                var battery_buf: [16:0]u8 = undefined;
+                const battery_str = std.fmt.bufPrintZ(&battery_buf, "BAT: {d}%", .{battery_percentage}) catch break :draw_battery;
+
+                const battery_y: usize = if (config.hide_key_hints) 0 else 1;
+                buffer.drawLabel(battery_str, 0, battery_y);
+                battery_bar_shown = true;
             }
 
             if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) {
@@ -1192,6 +1207,22 @@ fn adjustBrightness(allocator: std.mem.Allocator, cmd: []const u8) !void {
             return error.BrightnessChangeFailed;
         }
     }
+}
+
+fn getBatteryPercentage(battery_id: []const u8) !u8 {
+    const path = try std.fmt.allocPrint(temporary_allocator, "/sys/class/power_supply/{s}/capacity", .{battery_id});
+    defer temporary_allocator.free(path);
+
+    const battery_file = try std.fs.cwd().openFile(path, .{});
+    defer battery_file.close();
+
+    var buffer: [8]u8 = undefined;
+    const bytes_read = try battery_file.read(&buffer);
+    const capacity_str = buffer[0..bytes_read];
+
+    const trimmed = std.mem.trimRight(u8, capacity_str, "\n\r");
+
+    return try std.fmt.parseInt(u8, trimmed, 10);
 }
 
 fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
