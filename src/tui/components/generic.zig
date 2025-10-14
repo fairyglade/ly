@@ -2,11 +2,12 @@ const std = @import("std");
 const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 
-pub fn CyclableLabel(comptime ItemType: type) type {
+pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) type {
     return struct {
         const Allocator = std.mem.Allocator;
         const ItemList = std.ArrayListUnmanaged(ItemType);
         const DrawItemFn = *const fn (*Self, ItemType, usize, usize) bool;
+        const ChangeItemFn = *const fn (ItemType, ?ChangeItemType) void;
 
         const termbox = interop.termbox;
 
@@ -22,8 +23,10 @@ pub fn CyclableLabel(comptime ItemType: type) type {
         first_char_x: usize,
         text_in_center: bool,
         draw_item_fn: DrawItemFn,
+        change_item_fn: ?ChangeItemFn,
+        change_item_arg: ?ChangeItemType,
 
-        pub fn init(allocator: Allocator, buffer: *TerminalBuffer, draw_item_fn: DrawItemFn) Self {
+        pub fn init(allocator: Allocator, buffer: *TerminalBuffer, draw_item_fn: DrawItemFn, change_item_fn: ?ChangeItemFn, change_item_arg: ?ChangeItemType) Self {
             return .{
                 .allocator = allocator,
                 .buffer = buffer,
@@ -35,6 +38,8 @@ pub fn CyclableLabel(comptime ItemType: type) type {
                 .first_char_x = 0,
                 .text_in_center = false,
                 .draw_item_fn = draw_item_fn,
+                .change_item_fn = change_item_fn,
+                .change_item_arg = change_item_arg,
             };
         }
 
@@ -94,21 +99,19 @@ pub fn CyclableLabel(comptime ItemType: type) type {
         }
 
         fn goLeft(self: *Self) void {
-            if (self.current == 0) {
-                self.current = self.list.items.len - 1;
-                return;
-            }
+            self.current = if (self.current == 0) self.list.items.len - 1 else self.current - 1;
 
-            self.current -= 1;
+            if (self.change_item_fn) |change_item_fn| {
+                @call(.auto, change_item_fn, .{ self.list.items[self.current], self.change_item_arg });
+            }
         }
 
         fn goRight(self: *Self) void {
-            if (self.current == self.list.items.len - 1) {
-                self.current = 0;
-                return;
-            }
+            self.current = if (self.current == self.list.items.len - 1) 0 else self.current + 1;
 
-            self.current += 1;
+            if (self.change_item_fn) |change_item_fn| {
+                @call(.auto, change_item_fn, .{ self.list.items[self.current], self.change_item_arg });
+            }
         }
     };
 }

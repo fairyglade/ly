@@ -5,7 +5,8 @@
 const std = @import("std");
 const ini = @import("zigini");
 const Config = @import("Config.zig");
-const Save = @import("Save.zig");
+const OldSave = @import("OldSave.zig");
+const SavedUsers = @import("SavedUsers.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 
 const Color = TerminalBuffer.Color;
@@ -186,8 +187,8 @@ pub fn lateConfigFieldHandler(config: *Config) void {
     }
 }
 
-pub fn tryMigrateSaveFile(user_buf: *[32]u8) Save {
-    var save = Save{};
+pub fn tryMigrateFirstSaveFile(user_buf: *[32]u8) OldSave {
+    var save = OldSave{};
 
     if (maybe_save_file) |path| {
         defer temporary_allocator.free(path);
@@ -215,4 +216,30 @@ pub fn tryMigrateSaveFile(user_buf: *[32]u8) Save {
     }
 
     return save;
+}
+
+pub fn tryMigrateIniSaveFile(allocator: std.mem.Allocator, save_ini: *ini.Ini(OldSave), path: []const u8, saved_users: *SavedUsers, usernames: [][]const u8) !bool {
+    var old_save_file_exists = true;
+
+    var user_buf: [32]u8 = undefined;
+    const save = save_ini.readFileToStruct(path, .{
+        .fieldHandler = null,
+        .comment_characters = "#",
+    }) catch no_save_file: {
+        old_save_file_exists = false;
+        break :no_save_file tryMigrateFirstSaveFile(&user_buf);
+    };
+
+    if (!old_save_file_exists) return false;
+
+    // Add all other users to the list
+    for (usernames, 0..) |username, i| {
+        if (save.user) |user| {
+            if (std.mem.eql(u8, user, username)) saved_users.last_username_index = i;
+        }
+
+        try saved_users.user_list.append(allocator, .{ .username = username, .session_index = save.session_index orelse 0 });
+    }
+
+    return true;
 }

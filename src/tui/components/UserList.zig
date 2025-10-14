@@ -1,45 +1,83 @@
 const std = @import("std");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const generic = @import("generic.zig");
+const Session = @import("Session.zig");
+const SavedUsers = @import("../../config/SavedUsers.zig");
 
 const StringList = std.ArrayListUnmanaged([]const u8);
 const Allocator = std.mem.Allocator;
 
-const UsernameText = generic.CyclableLabel([]const u8);
+pub const User = struct {
+    name: []const u8,
+    session_index: *usize,
+    allocated_index: bool,
+};
+const UserLabel = generic.CyclableLabel(User, *Session);
 
 const UserList = @This();
 
-label: UsernameText,
+label: UserLabel,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, usernames: StringList) !UserList {
+pub fn init(allocator: Allocator, buffer: *TerminalBuffer, usernames: StringList, saved_users: *SavedUsers, session: *Session) !UserList {
     var userList = UserList{
-        .label = UsernameText.init(allocator, buffer, drawItem),
+        .label = UserLabel.init(allocator, buffer, drawItem, usernameChanged, session),
     };
 
     for (usernames.items) |username| {
         if (username.len == 0) continue;
 
-        try userList.label.addItem(username);
+        var maybe_session_index: ?*usize = null;
+        for (saved_users.user_list.items) |*saved_user| {
+            if (std.mem.eql(u8, username, saved_user.username)) {
+                maybe_session_index = &saved_user.session_index;
+                break;
+            }
+        }
+
+        var allocated_index = false;
+        if (maybe_session_index == null) {
+            maybe_session_index = try allocator.create(usize);
+            maybe_session_index.?.* = 0;
+            allocated_index = true;
+        }
+
+        try userList.label.addItem(.{
+            .name = username,
+            .session_index = maybe_session_index.?,
+            .allocated_index = allocated_index,
+        });
     }
 
     return userList;
 }
 
 pub fn deinit(self: *UserList) void {
+    for (self.label.list.items) |user| {
+        if (user.allocated_index) {
+            self.label.allocator.destroy(user.session_index);
+        }
+    }
+
     self.label.deinit();
 }
 
-pub fn getCurrentUser(self: UserList) []const u8 {
-    return self.label.list.items[self.label.current];
+pub fn getCurrentUsername(self: UserList) []const u8 {
+    return self.label.list.items[self.label.current].name;
 }
 
-fn drawItem(label: *UsernameText, username: []const u8, _: usize, _: usize) bool {
-    const length = @min(username.len, label.visible_length - 3);
+fn usernameChanged(user: User, maybe_session: ?*Session) void {
+    if (maybe_session) |session| {
+        session.label.current = user.session_index.*;
+    }
+}
+
+fn drawItem(label: *UserLabel, user: User, _: usize, _: usize) bool {
+    const length = @min(user.name.len, label.visible_length - 3);
     if (length == 0) return false;
 
-    const x = if (label.text_in_center) (label.x + (label.visible_length - username.len) / 2) else (label.x + 2);
-    label.first_char_x = x + username.len;
+    const x = if (label.text_in_center) (label.x + (label.visible_length - user.name.len) / 2) else (label.x + 2);
+    label.first_char_x = x + user.name.len;
 
-    label.buffer.drawLabel(username, x, label.y);
+    label.buffer.drawLabel(user.name, x, label.y);
     return true;
 }

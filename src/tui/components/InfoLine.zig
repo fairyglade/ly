@@ -4,7 +4,7 @@ const generic = @import("generic.zig");
 
 const Allocator = std.mem.Allocator;
 
-const MessageLabel = generic.CyclableLabel(Message);
+const MessageLabel = generic.CyclableLabel(Message, Message);
 
 const InfoLine = @This();
 
@@ -19,7 +19,7 @@ label: MessageLabel,
 
 pub fn init(allocator: Allocator, buffer: *TerminalBuffer) InfoLine {
     return .{
-        .label = MessageLabel.init(allocator, buffer, drawItem),
+        .label = MessageLabel.init(allocator, buffer, drawItem, null, null),
     };
 }
 
