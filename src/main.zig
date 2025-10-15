@@ -123,6 +123,7 @@ pub fn main() !void {
     var maybe_config_load_error: ?anyerror = null;
     var can_get_lock_state = true;
     var can_draw_clock = true;
+    var can_draw_battery = true;
 
     var saved_users = SavedUsers.init();
     defer saved_users.deinit(allocator);
@@ -592,11 +593,13 @@ pub fn main() !void {
                 buffer.drawLabel(ly_version_str, 0, buffer.height - 1);
             }
 
-            var battery_bar_shown = false;
             if (config.battery_id) |id| draw_battery: {
+                if (!can_draw_battery) break :draw_battery;
+
                 const battery_percentage = getBatteryPercentage(id) catch |err| {
                     try log_writer.print("failed to get battery percentage: {s}\n", .{@errorName(err)});
                     try info_line.addMessage(lang.err_battery, config.error_bg, config.error_fg);
+                    can_draw_battery = false;
                     break :draw_battery;
                 };
 
@@ -605,7 +608,7 @@ pub fn main() !void {
 
                 const battery_y: usize = if (config.hide_key_hints) 0 else 1;
                 buffer.drawLabel(battery_str, 0, battery_y);
-                battery_bar_shown = true;
+                can_draw_battery = true;
             }
 
             if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) {
