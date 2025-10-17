@@ -506,14 +506,17 @@ fn addUtmpEntry(entry: *Utmp, username: []const u8, pid: c_int) !void {
     entry.ut_type = utmp.USER_PROCESS;
     entry.ut_pid = pid;
 
-    var buf: [4096]u8 = undefined;
-    const ttyname = try std.os.getFdPath(std.posix.STDIN_FILENO, &buf);
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    const tty_path = try std.os.getFdPath(std.posix.STDIN_FILENO, &buf);
 
+    // Get the TTY name (i.e. without the /dev/ prefix)
     var ttyname_buf: [@sizeOf(@TypeOf(entry.ut_line))]u8 = undefined;
-    _ = try std.fmt.bufPrintZ(&ttyname_buf, "{s}", .{ttyname["/dev/".len..]});
+    const ttyname = try std.fmt.bufPrintZ(&ttyname_buf, "{s}", .{tty_path["/dev/".len..]});
 
     entry.ut_line = ttyname_buf;
-    entry.ut_id = ttyname_buf["tty".len..7].*;
+    // Get the TTY ID (i.e. without the tty prefix) and truncate it to the size
+    // of ut_id if necessary
+    entry.ut_id = ttyname["tty".len..(@sizeOf(@TypeOf(entry.ut_id)) + "tty".len)].*;
 
     var username_buf: [@sizeOf(@TypeOf(entry.ut_user))]u8 = undefined;
     _ = try std.fmt.bufPrintZ(&username_buf, "{s}", .{username});
@@ -530,7 +533,11 @@ fn addUtmpEntry(entry: *Utmp, username: []const u8, pid: c_int) !void {
         .tv_sec = @intCast(time.seconds),
         .tv_usec = @intCast(time.microseconds),
     };
-    entry.ut_addr_v6[0] = 0;
+
+    // FreeBSD doesn't have this field
+    if (builtin.os.tag == .linux) {
+        entry.ut_addr_v6[0] = 0;
+    }
 
     utmp.setutxent();
     _ = utmp.pututxline(entry);

@@ -20,7 +20,10 @@ const pwd = @cImport({
     @cInclude("pwd.h");
     // We include a FreeBSD-specific header here since login_cap.h references
     // the passwd struct directly, so we can't import it separately
-    if (builtin.os.tag == .freebsd) @cInclude("login_cap.h");
+    if (builtin.os.tag == .freebsd) {
+        @cInclude("sys/types.h");
+        @cInclude("login_cap.h");
+    }
 });
 
 const stdlib = @cImport({
