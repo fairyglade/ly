@@ -178,7 +178,7 @@ To disable TTY 2, go to `/etc/inittab` and comment out the line containing `tty2
 ### FreeBSD
 
 ```
-# zig build installexe -Dprefix_directory=/usr/local
+# zig build installexe -Dprefix_directory=/usr/local -Dinit_system=freebsd
 # sysrc lightdm_enable="NO"
 # sysrc ly_enable="YES"
 ```
