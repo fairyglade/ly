@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const UidRange = @import("UidRange.zig");
 
 pub const termbox = @import("termbox2");
 
@@ -155,6 +156,46 @@ fn PlatformStruct() type {
                 return error.NoTtyFound;
             }
 
+            // This is very bad parsing, but we only need to get 2 values..
+            // and the format of the file seems to be standard? So this should
+            // be fine...
+            pub fn getUserIdRange(allocator: std.mem.Allocator, file_path: []const u8) !UidRange {
+                const login_defs_file = try std.fs.cwd().openFile(file_path, .{});
+                defer login_defs_file.close();
+
+                const login_defs_buffer = try login_defs_file.readToEndAlloc(allocator, std.math.maxInt(u16));
+                defer allocator.free(login_defs_buffer);
+
+                var iterator = std.mem.splitScalar(u8, login_defs_buffer, '\n');
+                var uid_range = UidRange{};
+
+                while (iterator.next()) |line| {
+                    const trimmed_line = std.mem.trim(u8, line, " \n\r\t");
+
+                    if (std.mem.startsWith(u8, trimmed_line, "UID_MIN")) {
+                        uid_range.uid_min = try parseValue(std.posix.uid_t, "UID_MIN", trimmed_line);
+                    } else if (std.mem.startsWith(u8, trimmed_line, "UID_MAX")) {
+                        uid_range.uid_max = try parseValue(std.posix.uid_t, "UID_MAX", trimmed_line);
+                    }
+                }
+
+                return uid_range;
+            }
+
+            fn parseValue(comptime T: type, name: []const u8, buffer: []const u8) !T {
+                var iterator = std.mem.splitAny(u8, buffer, " \t");
+                var maybe_value: ?T = null;
+
+                while (iterator.next()) |slice| {
+                    // Skip the slice if it's empty (whitespace) or is the name of the
+                    // property (e.g. UID_MIN or UID_MAX)
+                    if (slice.len == 0 or std.mem.eql(u8, slice, name)) continue;
+                    maybe_value = std.fmt.parseInt(T, slice, 10) catch continue;
+                }
+
+                return maybe_value orelse error.ValueNotFound;
+            }
+
             fn readBuffer(reader: *std.Io.Reader, buffer: []u8) !usize {
                 var bytes_read: usize = 0;
                 var byte: u8 = try reader.takeByte();
@@ -197,6 +238,15 @@ fn PlatformStruct() type {
 
             pub fn getActiveTtyImpl(_: std.mem.Allocator) !u8 {
                 return error.FeatureUnimplemented;
+            }
+
+            pub fn getUserIdRange(_: std.mem.Allocator, _: []const u8) !UidRange {
+                return .{
+                    // Hardcoded default values chosen from
+                    // /usr/src/usr.sbin/pw/pw_conf.c
+                    .uid_min = 1000,
+                    .uid_max = 32000,
+                };
             }
         },
         else => @compileError("Unsupported target: " ++ builtin.os.tag),
@@ -329,4 +379,10 @@ pub fn getUsernameEntry(username: [:0]const u8) ?UsernameEntry {
 
 pub fn closePasswordDatabase() void {
     pwd.endpwent();
+}
+
+// This is very bad parsing, but we only need to get 2 values... and the format
+// of the file doesn't seem to be standard? So this should be fine...
+pub fn getUserIdRange(allocator: std.mem.Allocator, file_path: []const u8) !UidRange {
+    return platform_struct.getUserIdRange(allocator, file_path);
 }

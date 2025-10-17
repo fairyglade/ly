@@ -25,7 +25,6 @@ const OldSave = @import("config/OldSave.zig");
 const SavedUsers = @import("config/SavedUsers.zig");
 const migrator = @import("config/migrator.zig");
 const SharedError = @import("SharedError.zig");
-const UidRange = @import("UidRange.zig");
 
 const StringList = std.ArrayListUnmanaged([]const u8);
 const Ini = ini.Ini;
@@ -1151,7 +1150,7 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
 }
 
 fn getAllUsernames(allocator: std.mem.Allocator, login_defs_path: []const u8) !StringList {
-    const uid_range = try getUserIdRange(allocator, login_defs_path);
+    const uid_range = try interop.getUserIdRange(allocator, login_defs_path);
 
     var usernames: StringList = .empty;
     var maybe_entry = interop.getNextUsernameEntry();
@@ -1169,45 +1168,6 @@ fn getAllUsernames(allocator: std.mem.Allocator, login_defs_path: []const u8) !S
 
     interop.closePasswordDatabase();
     return usernames;
-}
-
-// This is very bad parsing, but we only need to get 2 values... and the format
-// of the file doesn't seem to be standard? So this should be fine...
-fn getUserIdRange(allocator: std.mem.Allocator, login_defs_path: []const u8) !UidRange {
-    const login_defs_file = try std.fs.cwd().openFile(login_defs_path, .{});
-    defer login_defs_file.close();
-
-    const login_defs_buffer = try login_defs_file.readToEndAlloc(allocator, std.math.maxInt(u16));
-    defer allocator.free(login_defs_buffer);
-
-    var iterator = std.mem.splitScalar(u8, login_defs_buffer, '\n');
-    var uid_range = UidRange{};
-
-    while (iterator.next()) |line| {
-        const trimmed_line = std.mem.trim(u8, line, " \n\r\t");
-
-        if (std.mem.startsWith(u8, trimmed_line, "UID_MIN")) {
-            uid_range.uid_min = try parseValue(std.posix.uid_t, "UID_MIN", trimmed_line);
-        } else if (std.mem.startsWith(u8, trimmed_line, "UID_MAX")) {
-            uid_range.uid_max = try parseValue(std.posix.uid_t, "UID_MAX", trimmed_line);
-        }
-    }
-
-    return uid_range;
-}
-
-fn parseValue(comptime T: type, name: []const u8, buffer: []const u8) !T {
-    var iterator = std.mem.splitAny(u8, buffer, " \t");
-    var maybe_value: ?T = null;
-
-    while (iterator.next()) |slice| {
-        // Skip the slice if it's empty (whitespace) or is the name of the
-        // property (e.g. UID_MIN or UID_MAX)
-        if (slice.len == 0 or std.mem.eql(u8, slice, name)) continue;
-        maybe_value = std.fmt.parseInt(T, slice, 10) catch continue;
-    }
-
-    return maybe_value orelse error.ValueNotFound;
 }
 
 fn adjustBrightness(allocator: std.mem.Allocator, cmd: []const u8) !void {
