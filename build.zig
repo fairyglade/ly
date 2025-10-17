@@ -316,7 +316,7 @@ fn install_service(allocator: std.mem.Allocator, patch_map: PatchMap) !void {
             defer service_dir.close();
 
             const patched_service = try patchFile(allocator, "res/ly-sysvinit", patch_map);
-            try installText(patched_service, service_dir, service_path, "ly", .{});
+            try installText(patched_service, service_dir, service_path, "ly", .{ .mode = 0o755 });
         },
     }
 }
