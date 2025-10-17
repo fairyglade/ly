@@ -8,6 +8,7 @@ const InitSystem = enum {
     runit,
     s6,
     dinit,
+    sysvinit,
 };
 
 const min_zig_string = "0.15.0";
@@ -308,6 +309,15 @@ fn install_service(allocator: std.mem.Allocator, patch_map: PatchMap) !void {
             const patched_service = try patchFile(allocator, "res/ly-dinit", patch_map);
             try installText(patched_service, service_dir, service_path, "ly", .{});
         },
+        .sysvinit => {
+            const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/init.d" });
+            std.fs.cwd().makePath(service_path) catch {};
+            var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
+            defer service_dir.close();
+
+            const patched_service = try patchFile(allocator, "res/ly-sysvinit", patch_map);
+            try installText(patched_service, service_dir, service_path, "ly", .{});
+        },
     }
 }
 
@@ -339,6 +349,7 @@ pub fn Uninstaller(uninstall_config: bool) type {
                     try deleteFile(allocator, config_directory, "/s6/adminsv/default/contents.d/ly-srv", "s6 admin service not found");
                 },
                 .dinit => try deleteFile(allocator, config_directory, "/dinit.d/ly", "dinit service not found"),
+                .sysvinit => try deleteFile(allocator, config_directory, "/init.d/ly", "sysvinit service not found"),
             }
         }
     };

@@ -159,6 +159,16 @@ To disable TTY 2, edit `/etc/s6/config/tty2.conf` and set `SPAWN="no"`.
 To disable TTY 2, go to `/etc/dinit.d/config/console.conf` and modify
 `ACTIVE_CONSOLES`.
 
+### sysvinit
+
+```
+# zig build installexe -Dinit_system=sysvinit
+# update-rc.d lightdm disable
+# update-rc.d ly defaults
+```
+
+To disable TTY 2, go to `/etc/inittab` and comment out the line containing `tty2`.
+
 ### Updating
 
 You can also install Ly without overrding the current configuration file. This

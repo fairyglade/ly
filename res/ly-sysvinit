@@ -1,0 +1,65 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          ly
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Ly display manager
+# Description:       Starts and stops the Ly display manager
+### END INIT INFO
+#
+# Author:       AnErrupTion <anerruption@disroot.org>
+#
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+DAEMON=/usr/bin/ly
+TTY=/dev/tty$DEFAULT_TTY
+PIDFILE=/var/run/ly.pid
+NAME=ly
+DESC="Ly display manager"
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting $DESC on $TTY..."
+    if [ -f "$PIDFILE" ]; then
+        log_progress_msg "$DESC is already running"
+        log_end_msg 0
+        return 0
+    fi
+
+    # Ensure TTY exists
+    [ -c "$TTY" ] || {
+        log_failure_msg "$TTY does not exist"
+        return 1
+    }
+
+    start-stop-daemon --start --background --make-pidfile --pidfile $PIDFILE \
+      --chdir / --exec /bin/sh -- -c "exec setsid sh -c 'exec <$TTY >$TTY 2>&1 $DAEMON'"
+    log_end_msg $?
+    ;;
+  stop)
+    log_daemon_msg "Stopping $DESC..."
+    start-stop-daemon --stop --pidfile $PIDFILE --retry 5
+    RETVAL=$?
+    [ $RETVAL -eq 0 ] && rm -f "$PIDFILE"
+    log_end_msg $RETVAL
+    ;;
+  restart)
+    echo "Restarting $DESC..."
+    $0 stop
+    sleep 1
+    $0 start
+    ;;
+  status)
+    status_of_proc -p $PIDFILE $DAEMON $NAME && exit 0 || exit $?
+    ;;
+  *)
+    echo "Usage: /etc/init.d/$NAME {start|stop|restart|status}"
+    exit 1
+    ;;
+esac
+
+exit 0
