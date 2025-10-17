@@ -9,6 +9,7 @@ const InitSystem = enum {
     s6,
     dinit,
     sysvinit,
+    freebsd,
 };
 
 const min_zig_string = "0.15.0";
@@ -42,7 +43,7 @@ pub fn build(b: *std.Build) !void {
     const version_str = try getVersionStr(b, "ly", ly_version);
     const enable_x11_support = b.option(bool, "enable_x11_support", "Enable X11 support (default is on)") orelse true;
     const default_tty = b.option(u8, "default_tty", "Set the TTY (default is 2)") orelse 2;
-    const fallback_tty = b.option(u8, "fallback_tty", "Set the fallback TTY (default is 1). This value gets embedded into the binary") orelse 1;
+    const fallback_tty = b.option(u8, "fallback_tty", "Set the fallback TTY (default is 2). This value gets embedded into the binary") orelse 2;
 
     default_tty_str = try std.fmt.allocPrint(b.allocator, "{d}", .{default_tty});
 
@@ -318,6 +319,15 @@ fn install_service(allocator: std.mem.Allocator, patch_map: PatchMap) !void {
             const patched_service = try patchFile(allocator, "res/ly-sysvinit", patch_map);
             try installText(patched_service, service_dir, service_path, "ly", .{ .mode = 0o755 });
         },
+        .freebsd => {
+            const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/rc.d" });
+            std.fs.cwd().makePath(service_path) catch {};
+            var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
+            defer service_dir.close();
+
+            const patched_service = try patchFile(allocator, "res/ly-freebsd", patch_map);
+            try installText(patched_service, service_dir, service_path, "ly", .{ .mode = 0o755 });
+        },
     }
 }
 
@@ -350,6 +360,7 @@ pub fn Uninstaller(uninstall_config: bool) type {
                 },
                 .dinit => try deleteFile(allocator, config_directory, "/dinit.d/ly", "dinit service not found"),
                 .sysvinit => try deleteFile(allocator, config_directory, "/init.d/ly", "sysvinit service not found"),
+                .freebsd => try deleteFile(allocator, config_directory, "/rc.d/ly", "freebsd service not found"),
             }
         }
     };

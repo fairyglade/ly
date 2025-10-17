@@ -38,6 +38,12 @@ It is recommended to add a rule for Ly as it currently does not ship one.
 # dnf install kernel-devel pam-devel libxcb-devel zig xorg-x11-xauth xorg-x11-server brightnessctl
 ```
 
+### FreeBSD
+
+```
+# pkg install ca_root_nss libxcb git
+```
+
 ## Packaging status
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/ly.svg?exclude_unsupported=1)](https://repology.org/project/ly/versions)
@@ -168,6 +174,16 @@ To disable TTY 2, go to `/etc/dinit.d/config/console.conf` and modify
 ```
 
 To disable TTY 2, go to `/etc/inittab` and comment out the line containing `tty2`.
+
+### FreeBSD
+
+```
+# zig build installexe -Dprefix_directory=/usr/local
+# sysrc lightdm_enable="NO"
+# sysrc ly_enable="YES"
+```
+
+To disable TTY 2, go to `/etc/ttys` and comment out the line starting with `ttyv2`.
 
 ### Updating
 

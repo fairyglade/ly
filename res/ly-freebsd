@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# PROVIDE: ly
+# REQUIRE: DAEMON
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name=ly
+rcvar=ly_enable
+
+command="/usr/local/bin/ly"
+
+load_rc_config $name
+
+#
+# DO NOT CHANGE THESE DEFAULT VALUES HERE
+# SET THEM IN THE /etc/rc.conf FILE
+#
+ly_enable=${ly_enable-"NO"}
+pidfile=${ly_pidfile-"/var/run/ly.pid"}
+
+run_rc_command "$1"
