@@ -250,6 +250,16 @@ pub fn main() !void {
                 .session_index = session_index,
             });
         }
+
+        // If no save file previously existed, fill it up with all usernames
+        if (saved_users.user_list.items.len > 0) break :read_save_file;
+
+        for (usernames.items) |user| {
+            try saved_users.user_list.append(allocator, .{
+                .username = user,
+                .session_index = 0,
+            });
+        }
     }
 
     var log_file: std.fs.File = undefined;
@@ -446,7 +456,10 @@ pub fn main() !void {
 
     // Load last saved username and desktop selection, if any
     if (config.save) {
-        if (saved_users.last_username_index) |index| {
+        if (saved_users.last_username_index) |index| load_last_user: {
+            // If the saved index isn't valid, bail out
+            if (index >= saved_users.user_list.items.len) break :load_last_user;
+
             const user = saved_users.user_list.items[index];
 
             // Find user with saved name, and switch over to it
