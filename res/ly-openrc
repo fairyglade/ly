@@ -19,12 +19,8 @@ then
     commandUL="/sbin/agetty"
 fi
 
-## Get the tty from the conf file
-CONFTTY=$(cat $CONFIG_DIRECTORY/ly/config.ini | sed -n 's/^tty.*=[^1-9]*// p')
-
 ## The execution vars
-# If CONFTTY is empty then default to $DEFAULT_TTY
-TTY="tty${CONFTTY:-$DEFAULT_TTY}"
+TTY="tty$DEFAULT_TTY"
 TERM=linux
 BAUD=38400
 # If we don't have getty then we should have agetty
