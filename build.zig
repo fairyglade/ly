@@ -243,7 +243,7 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
         var pam_dir = std.fs.cwd().openDir(pam_path, .{}) catch unreachable;
         defer pam_dir.close();
 
-        try installFile("res/pam.d/ly", pam_dir, pam_path, "ly", .{ .override_mode = 0o644 });
+        try installFile(if (init_system == .freebsd) "res/pam.d/ly-freebsd" else "res/pam.d/ly-linux", pam_dir, pam_path, "ly", .{ .override_mode = 0o644 });
     }
 }
 
