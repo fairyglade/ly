@@ -320,13 +320,12 @@ fn install_service(allocator: std.mem.Allocator, patch_map: PatchMap) !void {
             try installText(patched_service, service_dir, service_path, "ly", .{ .mode = 0o755 });
         },
         .freebsd => {
-            const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/rc.d" });
-            std.fs.cwd().makePath(service_path) catch {};
-            var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
-            defer service_dir.close();
+            const exe_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, prefix_directory, "/bin" });
+            var executable_dir = std.fs.cwd().openDir(exe_path, .{}) catch unreachable;
+            defer executable_dir.close();
 
-            const patched_service = try patchFile(allocator, "res/ly-freebsd", patch_map);
-            try installText(patched_service, service_dir, service_path, "ly", .{ .mode = 0o755 });
+            const patched_wrapper = try patchFile(allocator, "res/ly-freebsd-wrapper", patch_map);
+            try installText(patched_wrapper, executable_dir, exe_path, "ly_wrapper", .{ .mode = 0o755 });
         },
     }
 }

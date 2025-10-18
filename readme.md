@@ -180,10 +180,22 @@ To disable TTY 2, go to `/etc/inittab` and comment out the line containing `tty2
 ```
 # zig build installexe -Dprefix_directory=/usr/local -Dinit_system=freebsd
 # sysrc lightdm_enable="NO"
-# sysrc ly_enable="YES"
 ```
 
-To disable TTY 2, go to `/etc/ttys` and comment out the line starting with `ttyv1` (TTYs start at 0 in FreeBSD).
+To enable Ly, add the following entry to `/etc/gettytab`:
+
+```
+Ly:\
+	:lo=/usr/local/bin/ly_wrapper:\
+	:al=root:
+```
+
+Then, modify the command field of the `ttyv1` terminal entry in `/etc/ttys`
+(TTYs in FreeBSD start at 0):
+
+```
+ttyv1 "/usr/libexec/getty Ly" xterm on secure
+```
 
 ### Updating
 

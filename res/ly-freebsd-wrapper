@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# On FreeBSD, even if we override the default login program, getty will still
+# try to append "login -fp root" as arguments to Ly, which is not supported.
+# To avoid this, we use a wrapper script that ignores these arguments before
+# actually executing Ly.
+exec $PREFIX_DIRECTORY/bin/$EXECUTABLE_NAME
