@@ -15,7 +15,7 @@ body:
     id: version
     attributes:
       label: Ly version
-      description: The output of `ly --version`. Please note that only Ly v1.1.0 and above are supported.
+      description: The output of `ly --version`. Please note that only Ly v1.2.0 and above are supported.
       placeholder: 1.1.0-dev.12+2b0301c
     validations:
       required: true
