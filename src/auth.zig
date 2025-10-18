@@ -322,7 +322,7 @@ fn getXPid(display_num: u8) !i32 {
     return std.fmt.parseInt(i32, std.mem.trim(u8, buffer[0..written], " "), 10);
 }
 
-fn createXauthFile(pwd: []const u8) ![]const u8 {
+fn createXauthFile(pwd: []const u8, buffer: []u8) ![]const u8 {
     var xauth_buf: [100]u8 = undefined;
     var xauth_dir: []const u8 = undefined;
     const xdg_rt_dir = std.posix.getenv("XDG_RUNTIME_DIR");
@@ -364,8 +364,7 @@ fn createXauthFile(pwd: []const u8) ![]const u8 {
     while (xauth_dir[i] == '/') i -= 1;
     const trimmed_xauth_dir = xauth_dir[0 .. i + 1];
 
-    var buf: [256]u8 = undefined;
-    const xauthority: []u8 = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ trimmed_xauth_dir, xauth_file });
+    const xauthority: []u8 = try std.fmt.bufPrint(buffer, "{s}/{s}", .{ trimmed_xauth_dir, xauth_file });
     const file = try std.fs.createFileAbsolute(xauthority, .{});
     file.close();
 
@@ -382,8 +381,8 @@ fn mcookie() [Md5.digest_length * 2]u8 {
     return std.fmt.bytesToHex(&out, .lower);
 }
 
-fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, home: []const u8, options: AuthOptions) !void {
-    const xauthority = try createXauthFile(home);
+fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, home: []const u8, xauth_buffer: []u8, options: AuthOptions) !void {
+    const xauthority = try createXauthFile(home, xauth_buffer);
     try interop.setEnvironmentVariable(allocator, "XAUTHORITY", xauthority, true);
     try interop.setEnvironmentVariable(allocator, "DISPLAY", display_name, true);
 
@@ -408,6 +407,7 @@ fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, display_name: []u8, s
 
 fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []const u8, home: []const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
     var log_writer = &log_file.file_writer.interface;
+    var xauth_buffer: [256]u8 = undefined;
 
     try log_writer.writeAll("[x11] getting free display\n");
     const display_num = try getFreeDisplay();
@@ -418,7 +418,7 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
     defer allocator.free(shell_z);
 
     try log_writer.writeAll("[x11] creating xauth file\n");
-    try xauth(log_file, allocator, display_name, shell_z, home, options);
+    try xauth(log_file, allocator, display_name, shell_z, home, &xauth_buffer, options);
 
     try log_writer.writeAll("[x11] starting x server\n");
     const pid = try std.posix.fork();

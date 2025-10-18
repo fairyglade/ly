@@ -41,7 +41,7 @@ It is recommended to add a rule for Ly as it currently does not ship one.
 ### FreeBSD
 
 ```
-# pkg install ca_root_nss libxcb git
+# pkg install ca_root_nss libxcb git xorg xauth
 ```
 
 ## Packaging status
