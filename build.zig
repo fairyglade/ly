@@ -134,6 +134,10 @@ pub fn Installer(install_config: bool) type {
             try patch_map.put("$PREFIX_DIRECTORY", prefix_directory);
             try patch_map.put("$EXECUTABLE_NAME", executable_name);
 
+            // The "-a" argument doesn't exist on FreeBSD, so we use "-p"
+            // instead to shutdown the system.
+            try patch_map.put("$PLATFORM_SHUTDOWN_ARG", if (init_system == .freebsd) "-p" else "-a");
+
             try install_ly(allocator, patch_map, install_config);
             try install_service(allocator, patch_map);
         }
@@ -359,7 +363,7 @@ pub fn Uninstaller(uninstall_config: bool) type {
                 },
                 .dinit => try deleteFile(allocator, config_directory, "/dinit.d/ly", "dinit service not found"),
                 .sysvinit => try deleteFile(allocator, config_directory, "/init.d/ly", "sysvinit service not found"),
-                .freebsd => try deleteFile(allocator, config_directory, "/rc.d/ly", "freebsd service not found"),
+                .freebsd => try deleteFile(allocator, prefix_directory, "/bin/ly_wrapper", "freebsd wrapper not found"),
             }
         }
     };
