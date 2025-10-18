@@ -25,6 +25,7 @@ const OldSave = @import("config/OldSave.zig");
 const SavedUsers = @import("config/SavedUsers.zig");
 const migrator = @import("config/migrator.zig");
 const SharedError = @import("SharedError.zig");
+const LogFile = @import("LogFile.zig");
 
 const StringList = std.ArrayListUnmanaged([]const u8);
 const Ini = ini.Ini;
@@ -261,13 +262,12 @@ pub fn main() !void {
         }
     }
 
-    var log_file: std.fs.File = undefined;
-    defer log_file.close();
+    var log_file_buffer: [1024]u8 = undefined;
 
-    var log_buffer: [1024]u8 = undefined;
-    var log_file_writer: std.fs.File.Writer = undefined;
-    var could_open_log_file = try openLogFile(config.ly_log, &log_file, &log_buffer, &log_file_writer);
-    var log_writer = &log_file_writer.interface;
+    var log_file = try LogFile.init(config.ly_log, &log_file_buffer);
+    defer log_file.deinit();
+
+    var log_writer = &log_file.file_writer.interface;
 
     // These strings only end up getting freed if the user quits Ly using Ctrl+C, which is fine since in the other cases
     // we end up shutting down or restarting the system
@@ -352,7 +352,7 @@ pub fn main() !void {
         }
     }
 
-    if (!could_open_log_file) {
+    if (!log_file.could_open_log_file) {
         try info_line.addMessage(lang.err_log, config.error_bg, config.error_fg);
         try log_writer.writeAll("failed to open log file\n");
     }
@@ -917,7 +917,7 @@ pub fn main() !void {
                 defer shared_err.deinit();
 
                 {
-                    log_file.close();
+                    log_file.deinit();
 
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
@@ -942,18 +942,16 @@ pub fn main() !void {
                         };
                         std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);
 
-                        could_open_log_file = try openLogFile(config.ly_log, &log_file, &log_buffer, &log_file_writer);
-                        log_writer = &log_file_writer.interface;
-                        defer log_file.close();
+                        try log_file.reinit();
 
-                        auth.authenticate(allocator, log_writer, auth_options, current_environment, login.getCurrentUsername(), password.text.items) catch |err| {
+                        auth.authenticate(allocator, &log_file, auth_options, current_environment, login.getCurrentUsername(), password.text.items) catch |err| {
                             shared_err.writeError(err);
 
-                            try log_writer.flush();
+                            log_file.deinit();
                             std.process.exit(1);
                         };
 
-                        try log_writer.flush();
+                        log_file.deinit();
                         std.process.exit(0);
                     }
 
@@ -963,8 +961,7 @@ pub fn main() !void {
                     std.Thread.sleep(std.time.ns_per_s * 1);
                     session_pid = -1;
 
-                    could_open_log_file = try openLogFile(config.ly_log, &log_file, &log_buffer, &log_file_writer);
-                    log_writer = &log_file_writer.interface;
+                    try log_file.reinit();
                 }
 
                 // Take back control of the TTY
@@ -1051,33 +1048,6 @@ pub fn main() !void {
 
         try log_writer.flush();
     }
-}
-
-fn openLogFile(path: []const u8, log_file: *std.fs.File, buffer: []u8, writer: *std.fs.File.Writer) !bool {
-    var could_open_log_file = true;
-    open_log_file: {
-        log_file.* = std.fs.cwd().openFile(path, .{ .mode = .write_only }) catch std.fs.cwd().createFile(path, .{ .mode = 0o666 }) catch {
-            // If we could neither open an existing log file nor create a new
-            // one, abort.
-            could_open_log_file = false;
-            break :open_log_file;
-        };
-    }
-
-    if (!could_open_log_file) {
-        log_file.* = try std.fs.openFileAbsolute("/dev/null", .{ .mode = .write_only });
-    }
-
-    var log_file_writer = log_file.writer(buffer);
-
-    // Seek to the end of the log file
-    if (could_open_log_file) {
-        const stat = try log_file.stat();
-        try log_file_writer.seekTo(stat.size);
-    }
-
-    writer.* = log_file_writer;
-    return could_open_log_file;
 }
 
 fn configErrorHandler(type_name: []const u8, key: []const u8, value: []const u8, err: anyerror) void {

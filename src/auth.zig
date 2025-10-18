@@ -5,6 +5,7 @@ const enums = @import("enums.zig");
 const Environment = @import("Environment.zig");
 const interop = @import("interop.zig");
 const SharedError = @import("SharedError.zig");
+const LogFile = @import("LogFile.zig");
 
 const Md5 = std.crypto.hash.Md5;
 const utmp = interop.utmp;
@@ -32,7 +33,7 @@ pub fn sessionSignalHandler(i: c_int) callconv(.c) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, i);
 }
 
-pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, options: AuthOptions, current_environment: Environment, login: []const u8, password: []const u8) !void {
+pub fn authenticate(allocator: std.mem.Allocator, log_file: *LogFile, options: AuthOptions, current_environment: Environment, login: []const u8, password: []const u8) !void {
     var tty_buffer: [3]u8 = undefined;
     const tty_str = try std.fmt.bufPrint(&tty_buffer, "{d}", .{options.tty});
 
@@ -56,6 +57,8 @@ pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, op
         .appdata_ptr = @ptrCast(&credentials),
     };
     var handle: ?*interop.pam.pam_handle = undefined;
+
+    var log_writer = &log_file.file_writer.interface;
 
     try log_writer.writeAll("[pam] starting session\n");
     var status = interop.pam.pam_start(options.service_name, null, &conv, &handle);
@@ -100,15 +103,23 @@ pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, op
     var shared_err = try SharedError.init();
     defer shared_err.deinit();
 
+    log_file.deinit();
+
     child_pid = try std.posix.fork();
     if (child_pid == 0) {
-        try log_writer.writeAll("starting session\n");
-        try log_writer.flush();
+        try log_file.reinit();
+        log_writer = &log_file.file_writer.interface;
 
-        startSession(log_writer, allocator, options, tty_str, user_entry, handle, current_environment) catch |e| {
+        try log_writer.writeAll("starting session\n");
+
+        startSession(log_file, allocator, options, tty_str, user_entry, handle, current_environment) catch |e| {
             shared_err.writeError(e);
+
+            log_file.deinit();
             std.process.exit(1);
         };
+
+        log_file.deinit();
         std.process.exit(0);
     }
 
@@ -134,13 +145,15 @@ pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, op
     // Wait for the session to stop
     _ = std.posix.waitpid(child_pid, 0);
 
+    try log_file.reinit();
+
     removeUtmpEntry(&entry);
 
     if (shared_err.readError()) |err| return err;
 }
 
 fn startSession(
-    log_writer: *std.Io.Writer,
+    log_file: *LogFile,
     allocator: std.mem.Allocator,
     options: AuthOptions,
     tty_str: []u8,
@@ -172,11 +185,11 @@ fn startSession(
 
     // Execute what the user requested
     switch (current_environment.display_server) {
-        .wayland, .shell, .custom => try executeCmd(log_writer, allocator, user_entry.shell.?, options, current_environment.is_terminal, current_environment.cmd),
+        .wayland, .shell, .custom => try executeCmd(log_file, allocator, user_entry.shell.?, options, current_environment.is_terminal, current_environment.cmd),
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{options.tty});
-            try executeX11Cmd(log_writer, allocator, user_entry.shell.?, user_entry.home.?, options, current_environment.cmd orelse "", vt);
+            try executeX11Cmd(log_file, allocator, user_entry.shell.?, user_entry.home.?, options, current_environment.cmd orelse "", vt);
         },
     }
 }
@@ -369,7 +382,7 @@ fn mcookie() [Md5.digest_length * 2]u8 {
     return std.fmt.bytesToHex(&out, .lower);
 }
 
-fn xauth(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, home: []const u8, options: AuthOptions) !void {
+fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, home: []const u8, options: AuthOptions) !void {
     const xauthority = try createXauthFile(home);
     try interop.setEnvironmentVariable(allocator, "XAUTHORITY", xauthority, true);
     try interop.setEnvironmentVariable(allocator, "DISPLAY", display_name, true);
@@ -388,15 +401,15 @@ fn xauth(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, display_name:
 
     const status = std.posix.waitpid(pid, 0);
     if (status.status != 0) {
-        try log_writer.print("xauth command failed with status {d}\n", .{status.status});
+        try log_file.file_writer.interface.print("xauth command failed with status {d}\n", .{status.status});
         return error.XauthFailed;
     }
 }
 
-fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, home: []const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
-    try log_writer.writeAll("[x11] getting free display\n");
-    try log_writer.flush();
+fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []const u8, home: []const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
+    var log_writer = &log_file.file_writer.interface;
 
+    try log_writer.writeAll("[x11] getting free display\n");
     const display_num = try getFreeDisplay();
     var buf: [4]u8 = undefined;
     const display_name = try std.fmt.bufPrint(&buf, ":{d}", .{display_num});
@@ -405,13 +418,9 @@ fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell
     defer allocator.free(shell_z);
 
     try log_writer.writeAll("[x11] creating xauth file\n");
-    try log_writer.flush();
-
-    try xauth(log_writer, allocator, display_name, shell_z, home, options);
+    try xauth(log_file, allocator, display_name, shell_z, home, options);
 
     try log_writer.writeAll("[x11] starting x server\n");
-    try log_writer.flush();
-
     const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
@@ -432,16 +441,12 @@ fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell
         };
     }
 
-    try log_writer.writeAll("[x11] getting x server pid\n");
-    try log_writer.flush();
-
     // X Server detaches from the process.
     // PID can be fetched from /tmp/X{d}.lock
+    try log_writer.writeAll("[x11] getting x server pid\n");
     const x_pid = try getXPid(display_num);
 
     try log_writer.writeAll("[x11] launching environment\n");
-    try log_writer.flush();
-
     xorg_pid = try std.posix.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
@@ -471,14 +476,14 @@ fn executeX11Cmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell
     _ = std.posix.waitpid(x_pid, 0);
 }
 
-fn executeCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, is_terminal: bool, exec_cmd: ?[]const u8) !void {
+fn executeCmd(global_log_file: *LogFile, allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, is_terminal: bool, exec_cmd: ?[]const u8) !void {
     var maybe_log_file: ?std.fs.File = null;
     if (!is_terminal) {
         // For custom desktop entries, the "Terminal" value here determines if
         // we redirect standard output & error or not. That is, we redirect only
         // if it's equal to false (so if it's not running in a TTY).
         if (options.session_log) |log_path| {
-            maybe_log_file = try redirectStandardStreams(log_writer, log_path, true);
+            maybe_log_file = try redirectStandardStreams(global_log_file, log_path, true);
         }
     }
     defer if (maybe_log_file) |log_file| log_file.close();
@@ -493,12 +498,12 @@ fn executeCmd(log_writer: *std.Io.Writer, allocator: std.mem.Allocator, shell: [
     return std.posix.execveZ(shell_z, &args, std.c.environ);
 }
 
-fn redirectStandardStreams(log_writer: *std.Io.Writer, session_log: []const u8, create: bool) !std.fs.File {
+fn redirectStandardStreams(global_log_file: *LogFile, session_log: []const u8, create: bool) !std.fs.File {
     const log_file = if (create) (std.fs.cwd().createFile(session_log, .{ .mode = 0o666 }) catch |err| {
-        try log_writer.print("failed to create new session log file: {s}\n", .{@errorName(err)});
+        try global_log_file.file_writer.interface.print("failed to create new session log file: {s}\n", .{@errorName(err)});
         return err;
     }) else (std.fs.cwd().openFile(session_log, .{ .mode = .read_write }) catch |err| {
-        try log_writer.print("failed to open existing session log file: {s}\n", .{@errorName(err)});
+        try global_log_file.file_writer.interface.print("failed to open existing session log file: {s}\n", .{@errorName(err)});
         return err;
     });
 
