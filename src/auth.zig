@@ -57,25 +57,31 @@ pub fn authenticate(allocator: std.mem.Allocator, log_writer: *std.Io.Writer, op
     };
     var handle: ?*interop.pam.pam_handle = undefined;
 
+    try log_writer.writeAll("[pam] starting session\n");
     var status = interop.pam.pam_start(options.service_name, null, &conv, &handle);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer _ = interop.pam.pam_end(handle, status);
 
     // Set PAM_TTY as the current TTY. This is required in case it isn't being set by another PAM module
+    try log_writer.writeAll("[pam] setting tty\n");
     status = interop.pam.pam_set_item(handle, interop.pam.PAM_TTY, pam_tty_str.ptr);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     // Do the PAM routine
+    try log_writer.writeAll("[pam] authenticating\n");
     status = interop.pam.pam_authenticate(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
+    try log_writer.writeAll("[pam] validating account\n");
     status = interop.pam.pam_acct_mgmt(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
+    try log_writer.writeAll("[pam] setting credentials\n");
     status = interop.pam.pam_setcred(handle, interop.pam.PAM_ESTABLISH_CRED);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
 
+    try log_writer.writeAll("[pam] opening session\n");
     status = interop.pam.pam_open_session(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer status = interop.pam.pam_close_session(handle, 0);
