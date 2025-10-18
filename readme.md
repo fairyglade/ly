@@ -183,7 +183,7 @@ To disable TTY 2, go to `/etc/inittab` and comment out the line containing `tty2
 # sysrc ly_enable="YES"
 ```
 
-To disable TTY 2, go to `/etc/ttys` and comment out the line starting with `ttyv2`.
+To disable TTY 2, go to `/etc/ttys` and comment out the line starting with `ttyv1` (TTYs start at 0 in FreeBSD).
 
 ### Updating
 
