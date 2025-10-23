@@ -342,7 +342,7 @@ fn createXauthFile(pwd: []const u8, buffer: []u8) ![]const u8 {
             dir.close();
 
             // xauth_dir is a directory, use it to store Xauthority
-            xauth_dir = try std.fmt.bufPrint(&xauth_buf, "{s}/ly", .{xauth_dir});
+            xauth_dir = try std.fmt.bufPrint(&xauth_buf, "{s}/.config/ly", .{pwd});
         } else {
             xauth_dir = try std.fmt.bufPrint(&xauth_buf, "{s}/ly", .{xdg_cfg_home.?});
         }
@@ -365,6 +365,9 @@ fn createXauthFile(pwd: []const u8, buffer: []u8) ![]const u8 {
     const trimmed_xauth_dir = xauth_dir[0 .. i + 1];
 
     const xauthority: []u8 = try std.fmt.bufPrint(buffer, "{s}/{s}", .{ trimmed_xauth_dir, xauth_file });
+
+    std.fs.makeDirAbsolute(trimmed_xauth_dir) catch {};
+
     const file = try std.fs.createFileAbsolute(xauthority, .{});
     file.close();
 
