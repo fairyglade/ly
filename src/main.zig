@@ -577,12 +577,12 @@ pub fn main() !void {
 
             _ = termbox.tb_clear();
 
-            var length: usize = 0;
+            var length: usize = config.edge_margin;
 
             if (!animation_timed_out) animation.draw();
 
             if (!config.hide_version_string) {
-                buffer.drawLabel(ly_version_str, 0, buffer.height - 1);
+                buffer.drawLabel(ly_version_str, config.edge_margin, buffer.height - 1 - config.edge_margin);
             }
 
             if (config.battery_id) |id| draw_battery: {
@@ -598,8 +598,11 @@ pub fn main() !void {
                 var battery_buf: [16:0]u8 = undefined;
                 const battery_str = std.fmt.bufPrintZ(&battery_buf, "BAT: {d}%", .{battery_percentage}) catch break :draw_battery;
 
-                const battery_y: usize = if (config.hide_key_hints) 0 else 1;
-                buffer.drawLabel(battery_str, 0, battery_y);
+                var battery_y: usize = config.edge_margin;
+                if (!config.hide_key_hints) {
+                    battery_y += 1;
+                }
+                buffer.drawLabel(battery_str, config.edge_margin, battery_y);
                 can_draw_battery = true;
             }
 
@@ -672,44 +675,44 @@ pub fn main() !void {
             info_line.label.draw();
 
             if (!config.hide_key_hints) {
-                buffer.drawLabel(config.shutdown_key, length, 0);
+                buffer.drawLabel(config.shutdown_key, length, config.edge_margin);
                 length += config.shutdown_key.len + 1;
-                buffer.drawLabel(" ", length - 1, 0);
+                buffer.drawLabel(" ", length - 1, config.edge_margin);
 
-                buffer.drawLabel(lang.shutdown, length, 0);
+                buffer.drawLabel(lang.shutdown, length, config.edge_margin);
                 length += shutdown_len + 1;
 
-                buffer.drawLabel(config.restart_key, length, 0);
+                buffer.drawLabel(config.restart_key, length, config.edge_margin);
                 length += config.restart_key.len + 1;
-                buffer.drawLabel(" ", length - 1, 0);
+                buffer.drawLabel(" ", length - 1, config.edge_margin);
 
-                buffer.drawLabel(lang.restart, length, 0);
+                buffer.drawLabel(lang.restart, length, config.edge_margin);
                 length += restart_len + 1;
 
                 if (config.sleep_cmd != null) {
-                    buffer.drawLabel(config.sleep_key, length, 0);
+                    buffer.drawLabel(config.sleep_key, length, config.edge_margin);
                     length += config.sleep_key.len + 1;
-                    buffer.drawLabel(" ", length - 1, 0);
+                    buffer.drawLabel(" ", length - 1, config.edge_margin);
 
-                    buffer.drawLabel(lang.sleep, length, 0);
+                    buffer.drawLabel(lang.sleep, length, config.edge_margin);
                     length += sleep_len + 1;
                 }
 
                 if (config.brightness_down_key) |key| {
-                    buffer.drawLabel(key, length, 0);
+                    buffer.drawLabel(key, length, config.edge_margin);
                     length += key.len + 1;
-                    buffer.drawLabel(" ", length - 1, 0);
+                    buffer.drawLabel(" ", length - 1, config.edge_margin);
 
-                    buffer.drawLabel(lang.brightness_down, length, 0);
+                    buffer.drawLabel(lang.brightness_down, length, config.edge_margin);
                     length += brightness_down_len + 1;
                 }
 
                 if (config.brightness_up_key) |key| {
-                    buffer.drawLabel(key, length, 0);
+                    buffer.drawLabel(key, length, config.edge_margin);
                     length += key.len + 1;
-                    buffer.drawLabel(" ", length - 1, 0);
+                    buffer.drawLabel(" ", length - 1, config.edge_margin);
 
-                    buffer.drawLabel(lang.brightness_up, length, 0);
+                    buffer.drawLabel(lang.brightness_up, length, config.edge_margin);
                     length += brightness_up_len + 1;
                 }
             }
