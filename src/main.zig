@@ -663,7 +663,7 @@ pub fn main() !void {
                     break :draw_clock;
                 }
 
-                buffer.drawLabel(clock_str, buffer.width - @min(buffer.width, clock_str.len), 0);
+                buffer.drawLabel(clock_str, buffer.width - @min(buffer.width, clock_str.len) - config.edge_margin, config.edge_margin);
             }
 
             const label_x = buffer.box_x + buffer.margin_box_h;
