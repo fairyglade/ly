@@ -283,7 +283,13 @@ fn install_service(allocator: std.mem.Allocator, patch_map: PatchMap) !void {
             const patched_run = try patchFile(allocator, "res/ly-runit-service/run", patch_map);
             try installText(patched_run, service_dir, service_path, "run", .{ .mode = 0o755 });
 
-            try std.fs.cwd().symLink("/run/runit/supervise.ly", supervise_path, .{});
+            std.fs.cwd().symLink("/run/runit/supervise.ly", supervise_path, .{}) catch |err| {
+                if (err == error.PathAlreadyExists) {
+                    std.debug.print("warn: /run/runit/supervise.ly already exists as a symbolic link.\n", .{});
+                } else {
+                    return err;
+                }
+            };
             std.debug.print("info: installed symlink /run/runit/supervise.ly\n", .{});
         },
         .s6 => {
