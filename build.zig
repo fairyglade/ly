@@ -244,6 +244,7 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
         defer pam_dir.close();
 
         try installFile(if (init_system == .freebsd) "res/pam.d/ly-freebsd" else "res/pam.d/ly-linux", pam_dir, pam_path, "ly", .{ .override_mode = 0o644 });
+        try installFile(if (init_system == .freebsd) "res/pam.d/ly-freebsd-autologin" else "res/pam.d/ly-linux-autologin", pam_dir, pam_path, "ly-autologin", .{ .override_mode = 0o644 });
     }
 }
 

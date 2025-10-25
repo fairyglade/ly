@@ -432,9 +432,38 @@ pub fn main() !void {
 
     var active_input = config.default_input;
     var insert_mode = !config.vi_mode or config.vi_default_mode == .insert;
+    var is_autologin = false;
+
+    check_autologin: {
+        const auto_user = config.auto_login_user orelse break :check_autologin;
+        const auto_session = config.auto_login_session orelse break :check_autologin;
+
+        if (!isValidUsername(auto_user, usernames)) {
+            try info_line.addMessage(lang.err_pam_user_unknown, config.error_bg, config.error_fg);
+            try log_writer.print("autologin failed: username '{s}' not found\n", .{auto_user});
+            break :check_autologin;
+        }
+
+        const session_index = findSessionByName(&session, auto_session) orelse {
+            try log_writer.print("autologin failed: session '{s}' not found\n", .{auto_session});
+            try info_line.addMessage(lang.err_autologin_session, config.error_bg, config.error_fg);
+            break :check_autologin;
+        };
+        try log_writer.print("attempting autologin for user '{s}' with session '{s}'\n", .{ auto_user, auto_session });
+
+        session.label.current = session_index;
+        for (login.label.list.items, 0..) |username, i| {
+            if (std.mem.eql(u8, username.name, auto_user)) {
+                login.label.current = i;
+                break;
+            }
+        }
+        is_autologin = true;
+    }
 
     // Load last saved username and desktop selection, if any
-    if (config.save) {
+    // Skip if autologin is active to prevent overriding autologin session
+    if (config.save and !is_autologin) {
         if (saved_users.last_username_index) |index| load_last_user: {
             // If the saved index isn't valid, bail out
             if (index >= saved_users.user_list.items.len) break :load_last_user;
@@ -777,11 +806,25 @@ pub fn main() !void {
             timeout = @intCast(1000 - @divTrunc(time.microseconds, 1000) + 1);
         }
 
-        const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
+        // Skip event polling if autologin is set, use simulated Enter key press instead
+        if (is_autologin) {
+            event = termbox.tb_event{
+                .type = termbox.TB_EVENT_KEY,
+                .key = termbox.TB_KEY_ENTER,
+                .ch = 0,
+                .w = 0,
+                .h = 0,
+                .x = 0,
+                .y = 0,
+                .mod = 0,
+            };
+        } else {
+            const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
 
-        update = timeout != -1;
+            update = timeout != -1;
 
-        if (event_error < 0 or event.type != termbox.TB_EVENT_KEY) continue;
+            if (event_error < 0 or event.type != termbox.TB_EVENT_KEY) continue;
+        }
 
         switch (event.key) {
             termbox.TB_KEY_ESC => {
@@ -927,9 +970,14 @@ pub fn main() !void {
                     session_pid = try std.posix.fork();
                     if (session_pid == 0) {
                         const current_environment = session.label.list.items[session.label.current].environment;
+
+                        // Use auto_login_service for autologin, otherwise use configured service
+                        const service_name = if (is_autologin) config.auto_login_service else config.service_name;
+                        const password_text = if (is_autologin) "" else password.text.items;
+
                         const auth_options = auth.AuthOptions{
                             .tty = active_tty,
-                            .service_name = config.service_name,
+                            .service_name = service_name,
                             .path = config.path,
                             .session_log = config.session_log,
                             .xauth_cmd = config.xauth_cmd,
@@ -949,7 +997,7 @@ pub fn main() !void {
 
                         try log_file.reinit();
 
-                        auth.authenticate(allocator, &log_file, auth_options, current_environment, login.getCurrentUsername(), password.text.items) catch |err| {
+                        auth.authenticate(allocator, &log_file, auth_options, current_environment, login.getCurrentUsername(), password_text) catch |err| {
                             shared_err.writeError(err);
 
                             log_file.deinit();
@@ -992,6 +1040,7 @@ pub fn main() !void {
                     }
 
                     password.clear();
+                    is_autologin = false;
                     try info_line.addMessage(lang.logout, config.bg, config.fg);
                     try log_writer.writeAll("logged out\n");
                 }
@@ -1110,6 +1159,7 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
         const entry = entry_ini.data.@"Desktop Entry";
         var maybe_xdg_session_desktop: ?[]const u8 = null;
         var maybe_xdg_desktop_names: ?[]const u8 = null;
+        var xdg_session_desktop_owned = false;
 
         // Prepare the XDG_SESSION_DESKTOP and XDG_CURRENT_DESKTOP environment
         // variables here
@@ -1123,13 +1173,18 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
         } else if (display_server != .custom) {
             // If DesktopNames is empty, and this isn't a custom session entry,
             // we'll take the name of the session file
-            maybe_xdg_session_desktop = std.fs.path.stem(item.name);
+            const stem = std.fs.path.stem(item.name);
+            if (stem.len > 0) {
+                maybe_xdg_session_desktop = try session.label.allocator.dupe(u8, stem);
+                xdg_session_desktop_owned = true;
+            }
         }
 
         try session.addEnvironment(.{
             .entry_ini = entry_ini,
             .name = entry.Name,
             .xdg_session_desktop = maybe_xdg_session_desktop,
+            .xdg_session_desktop_owned = xdg_session_desktop_owned,
             .xdg_desktop_names = maybe_xdg_desktop_names,
             .cmd = entry.Exec,
             .specifier = switch (display_server) {
@@ -1142,6 +1197,26 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
             .is_terminal = entry.Terminal orelse false,
         });
     }
+}
+
+fn isValidUsername(username: []const u8, usernames: StringList) bool {
+    for (usernames.items) |valid_username| {
+        if (std.mem.eql(u8, username, valid_username)) return true;
+    }
+    return false;
+}
+
+fn findSessionByName(session: *Session, name: []const u8) ?usize {
+    for (session.label.list.items, 0..) |env, i| {
+        if (env.environment.xdg_session_desktop) |session_desktop| {
+            if (session_desktop.len > 0 and std.ascii.eqlIgnoreCase(session_desktop, name)) return i;
+        }
+        if (env.environment.xdg_desktop_names) |session_desktop_name| {
+            if (std.ascii.eqlIgnoreCase(session_desktop_name, name)) return i;
+        }
+        if (std.ascii.eqlIgnoreCase(env.environment.name, name)) return i;
+    }
+    return null;
 }
 
 fn getAllUsernames(allocator: std.mem.Allocator, login_defs_path: []const u8) !StringList {

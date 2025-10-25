@@ -1,0 +1,16 @@
+#%PAM-1.0
+
+auth       required     pam_permit.so
+-auth      optional     pam_gnome_keyring.so
+-auth      optional     pam_kwallet5.so
+
+account    include      login
+
+password   include      login
+-password  optional     pam_gnome_keyring.so use_authtok
+
+-session   optional     pam_systemd.so       class=greeter
+-session   optional     pam_elogind.so
+session    include      login
+-session   optional     pam_gnome_keyring.so auto_start
+-session   optional     pam_kwallet5.so      auto_start
