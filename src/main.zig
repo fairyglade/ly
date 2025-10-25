@@ -734,8 +734,10 @@ pub fn main() !void {
                     break :draw_lock_state;
                 };
 
-                var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len);
-                const lock_state_y: usize = if (config.clock != null) 1 else 0;
+                var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len) - config.edge_margin;
+                var lock_state_y: usize = config.edge_margin;
+
+                if (config.clock != null) lock_state_y += 1;
 
                 if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
 
