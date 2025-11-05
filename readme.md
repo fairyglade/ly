@@ -57,6 +57,10 @@ managers, all of which you can find in the sections below:
 
 [X11 environments](#supported-x11-environments)
 
+Logs are defined by `/etc/ly/config.ini`:
+ - The session log is located at `~/.local/state/ly-session.log` by default.
+ - The system log is located at `/var/log/ly.log` by default.
+
 ## Manually building
 
 The procedure for manually building Ly is pretty standard:
