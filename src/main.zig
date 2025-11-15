@@ -755,7 +755,7 @@ pub fn main() !void {
                 buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
             }
 
-            if (!hide_keyboard_locks and can_get_lock_state) draw_lock_state: {
+            if (!config.hide_keyboard_locks and can_get_lock_state) draw_lock_state: {
                 const lock_state = interop.getLockState() catch |err| {
                     try info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
                     can_get_lock_state = false;
