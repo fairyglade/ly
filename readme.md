@@ -44,9 +44,9 @@ It is recommended to add a rule for Ly as it currently does not ship one.
 # pkg install ca_root_nss libxcb git xorg xauth
 ```
 
-## Packaging status
+## Availability
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/ly.svg?exclude_unsupported=1)](https://repology.org/project/ly/versions)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ly-display-manager.svg?exclude_unsupported=1)](https://repology.org/project/ly-display-manager/versions)
 
 ## Support
 
@@ -58,8 +58,9 @@ managers, all of which you can find in the sections below:
 [X11 environments](#supported-x11-environments)
 
 Logs are defined by `/etc/ly/config.ini`:
- - The session log is located at `~/.local/state/ly-session.log` by default.
- - The system log is located at `/var/log/ly.log` by default.
+
+- The session log is located at `~/.local/state/ly-session.log` by default.
+- The system log is located at `/var/log/ly.log` by default.
 
 ## Manually building
 
