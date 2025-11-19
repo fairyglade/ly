@@ -67,6 +67,7 @@ pub fn getCurrentUsername(self: UserList) []const u8 {
 
 fn usernameChanged(user: User, maybe_session: ?*Session) void {
     if (maybe_session) |session| {
+        if (user.session_index.* >= session.label.list.items.len) return;
         session.label.current = user.session_index.*;
     }
 }
