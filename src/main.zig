@@ -540,6 +540,8 @@ pub fn main() !void {
     const restart_len = try TerminalBuffer.strWidth(lang.restart);
     const sleep_key = try std.fmt.parseInt(u8, config.sleep_key[1..], 10);
     const sleep_len = try TerminalBuffer.strWidth(lang.sleep);
+    const hibernate_key = try std.fmt.parseInt(u8, config.hibernate_key[1..], 10);
+    const hibernate_len = try TerminalBuffer.strWidth(lang.hibernate);
     const brightness_down_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
     const brightness_down_len = try TerminalBuffer.strWidth(lang.brightness_down);
     const brightness_up_key = if (config.brightness_up_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
@@ -727,6 +729,15 @@ pub fn main() !void {
                     length += sleep_len + 1;
                 }
 
+                if (config.hibernate_cmd != null) {
+                    buffer.drawLabel(config.hibernate_key, length, config.edge_margin);
+                    length += config.hibernate_key.len + 1;
+                    buffer.drawLabel(" ", length - 1, config.edge_margin);
+
+                    buffer.drawLabel(lang.hibernate, length, config.edge_margin);
+                    length += hibernate_len + 1;
+                }
+
                 if (config.brightness_down_key) |key| {
                     buffer.drawLabel(key, length, config.edge_margin);
                     length += key.len + 1;
@@ -854,6 +865,22 @@ pub fn main() !void {
                             if (process_result.Exited != 0) {
                                 try info_line.addMessage(lang.err_sleep, config.error_bg, config.error_fg);
                                 try log_writer.print("failed to execute sleep command: exit code {d}\n", .{process_result.Exited});
+                            }
+                        }
+                    }
+                } else if (pressed_key == hibernate_key) {
+                    if (config.hibernate_cmd) |hibernate_cmd| {
+                        var hibernate = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", hibernate_cmd }, allocator);
+                        hibernate.stdout_behavior = .Ignore;
+                        hibernate.stderr_behavior = .Ignore;
+
+                        handle_hibernate_cmd: {
+                            const process_result = hibernate.spawnAndWait() catch {
+                                break :handle_hibernate_cmd;
+                            };
+                            if (process_result.Exited != 0) {
+                                try info_line.addMessage(lang.err_hibernate, config.error_bg, config.error_fg);
+                                try log_writer.print("failed to execute hibernate command: exit code {d}\n", .{process_result.Exited});
                             }
                         }
                     }
