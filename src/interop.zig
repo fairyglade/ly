@@ -81,6 +81,9 @@ fn PlatformStruct() type {
             pub const vt_activate = vt.VT_ACTIVATE;
             pub const vt_waitactive = vt.VT_WAITACTIVE;
 
+            const SYSTEMD_HOMED_UID_MIN = 60001;
+            const SYSTEMD_HOMED_UID_MAX = 60513;
+
             pub fn setUserContextImpl(username: [*:0]const u8, entry: UsernameEntry) !void {
                 const status = grp.initgroups(username, @intCast(entry.gid));
                 if (status != 0) return error.GroupInitializationFailed;
@@ -179,6 +182,19 @@ fn PlatformStruct() type {
                     }
                 }
 
+                // This code assumes the OS has a login.defs file with UID_MIN
+                // and UID_MAX values defined in it, which should be the case
+                // for most systemd-based Linux distributions out there.
+                // This should be a good enough safeguard for now, as there's
+                // no reliable (and clean) way to check for systemd support
+                if (uid_range.uid_min > SYSTEMD_HOMED_UID_MIN) {
+                    uid_range.uid_min = SYSTEMD_HOMED_UID_MIN;
+                }
+
+                if (uid_range.uid_max < SYSTEMD_HOMED_UID_MAX) {
+                    uid_range.uid_max = SYSTEMD_HOMED_UID_MAX;
+                }
+
                 return uid_range;
             }
 
@@ -226,6 +242,9 @@ fn PlatformStruct() type {
             pub const vt_activate = consio.VT_ACTIVATE;
             pub const vt_waitactive = consio.VT_WAITACTIVE;
 
+            const FREEBSD_UID_MIN = 1000;
+            const FREEBSD_UID_MAX = 32000;
+
             pub fn setUserContextImpl(username: [*:0]const u8, entry: UsernameEntry) !void {
                 // FreeBSD has initgroups() in unistd
                 const status = unistd.initgroups(username, @intCast(entry.gid));
@@ -244,8 +263,8 @@ fn PlatformStruct() type {
                 return .{
                     // Hardcoded default values chosen from
                     // /usr/src/usr.sbin/pw/pw_conf.c
-                    .uid_min = 1000,
-                    .uid_max = 32000,
+                    .uid_min = FREEBSD_UID_MIN,
+                    .uid_max = FREEBSD_UID_MAX,
                 };
             }
         },
