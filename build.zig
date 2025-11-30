@@ -44,8 +44,8 @@ pub fn build(b: *std.Build) !void {
     const enable_x11_support = b.option(bool, "enable_x11_support", "Enable X11 support (default is on)") orelse true;
     const default_tty = b.option(u8, "default_tty", "Set the TTY (default is 2)") orelse 2;
     const fallback_tty = b.option(u8, "fallback_tty", "Set the fallback TTY (default is 2). This value gets embedded into the binary") orelse 2;
-    const fallback_uid_min = b.option(std.posix.uid_t, "fallback_uid_min", "Set the fallback minimum UID (default is 1000). This value gets embedded into the binary") orelse 2;
-    const fallback_uid_max = b.option(std.posix.uid_t, "fallback_uid_max", "Set the fallback maximum UID (default is 60000). This value gets embedded into the binary") orelse 2;
+    const fallback_uid_min = b.option(std.posix.uid_t, "fallback_uid_min", "Set the fallback minimum UID (default is 1000). This value gets embedded into the binary") orelse 1000;
+    const fallback_uid_max = b.option(std.posix.uid_t, "fallback_uid_max", "Set the fallback maximum UID (default is 60000). This value gets embedded into the binary") orelse 60000;
 
     default_tty_str = try std.fmt.allocPrint(b.allocator, "{d}", .{default_tty});
 

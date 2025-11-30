@@ -171,16 +171,21 @@ fn PlatformStruct() type {
 
                 var iterator = std.mem.splitScalar(u8, login_defs_buffer, '\n');
                 var uid_range = UidRange{};
+                var nameFound = false;
 
                 while (iterator.next()) |line| {
                     const trimmed_line = std.mem.trim(u8, line, " \n\r\t");
 
                     if (std.mem.startsWith(u8, trimmed_line, "UID_MIN")) {
                         uid_range.uid_min = try parseValue(std.posix.uid_t, "UID_MIN", trimmed_line);
+                        nameFound = true;
                     } else if (std.mem.startsWith(u8, trimmed_line, "UID_MAX")) {
                         uid_range.uid_max = try parseValue(std.posix.uid_t, "UID_MAX", trimmed_line);
+                        nameFound = true;
                     }
                 }
+
+                if (!nameFound) return error.UidNameNotFound;
 
                 // This code assumes the OS has a login.defs file with UID_MIN
                 // and UID_MAX values defined in it, which should be the case
