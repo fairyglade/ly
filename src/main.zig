@@ -411,22 +411,37 @@ pub fn main() !void {
         try info_line.addMessage(hostname, config.bg, config.fg);
     }
 
+    var has_crawl_error = false;
+
     // Crawl session directories (Wayland, X11 and custom respectively)
     var wayland_session_dirs = std.mem.splitScalar(u8, config.waylandsessions, ':');
     while (wayland_session_dirs.next()) |dir| {
-        try crawl(&session, lang, dir, .wayland);
+        crawl(&session, lang, dir, .wayland) catch |err| {
+            has_crawl_error = true;
+            try log_writer.print("failed to crawl wayland session directory '{s}': {s}\n", .{ dir, @errorName(err) });
+        };
     }
 
     if (build_options.enable_x11_support) {
         var x_session_dirs = std.mem.splitScalar(u8, config.xsessions, ':');
         while (x_session_dirs.next()) |dir| {
-            try crawl(&session, lang, dir, .x11);
+            crawl(&session, lang, dir, .x11) catch |err| {
+                has_crawl_error = true;
+                try log_writer.print("failed to crawl x11 session directory '{s}': {s}\n", .{ dir, @errorName(err) });
+            };
         }
     }
 
     var custom_session_dirs = std.mem.splitScalar(u8, config.custom_sessions, ':');
     while (custom_session_dirs.next()) |dir| {
-        try crawl(&session, lang, dir, .custom);
+        crawl(&session, lang, dir, .custom) catch |err| {
+            has_crawl_error = true;
+            try log_writer.print("failed to crawl custom session directory '{s}': {s}\n", .{ dir, @errorName(err) });
+        };
+    }
+
+    if (has_crawl_error) {
+        try info_line.addMessage(lang.err_crawl, config.error_bg, config.error_fg);
     }
 
     if (usernames.items.len == 0) {
@@ -1181,7 +1196,9 @@ fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplaySer
 }
 
 fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: DisplayServer) !void {
-    var iterable_directory = std.fs.openDirAbsolute(path, .{ .iterate = true }) catch return;
+    if (!std.fs.path.isAbsolute(path)) return error.PathNotAbsolute;
+
+    var iterable_directory = try std.fs.openDirAbsolute(path, .{ .iterate = true });
     defer iterable_directory.close();
 
     var iterator = iterable_directory.iterate();
