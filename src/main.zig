@@ -110,12 +110,14 @@ pub fn main() !void {
     );
 
     var diag = clap.Diagnostic{};
-    var res = clap.parse(clap.Help, &params, clap.parsers.default, .{ .diagnostic = &diag, .allocator = allocator }) catch |err| {
+    var arg_parse_error: anyerror = undefined;
+    var maybe_res = clap.parse(clap.Help, &params, clap.parsers.default, .{ .diagnostic = &diag, .allocator = allocator }) catch |err| parse_error: {
+        arg_parse_error = err;
         diag.report(stderr, err) catch {};
         try stderr.flush();
-        return err;
+        break :parse_error null;
     };
-    defer res.deinit();
+    defer if (maybe_res) |*res| res.deinit();
 
     var config: Config = undefined;
     var lang: Lang = undefined;
@@ -128,17 +130,19 @@ pub fn main() !void {
     var saved_users = SavedUsers.init();
     defer saved_users.deinit(allocator);
 
-    if (res.args.help != 0) {
-        try clap.help(stderr, clap.Help, &params, .{});
+    if (maybe_res) |*res| {
+        if (res.args.help != 0) {
+            try clap.help(stderr, clap.Help, &params, .{});
 
-        _ = try stderr.write("Note: if you want to configure Ly, please check the config file, which is located at " ++ build_options.config_directory ++ "/ly/config.ini.\n");
-        try stderr.flush();
-        std.process.exit(0);
-    }
-    if (res.args.version != 0) {
-        _ = try stderr.write("Ly version " ++ build_options.version ++ "\n");
-        try stderr.flush();
-        std.process.exit(0);
+            _ = try stderr.write("Note: if you want to configure Ly, please check the config file, which is located at " ++ build_options.config_directory ++ "/ly/config.ini.\n");
+            try stderr.flush();
+            std.process.exit(0);
+        }
+        if (res.args.version != 0) {
+            _ = try stderr.write("Ly version " ++ build_options.version ++ "\n");
+            try stderr.flush();
+            std.process.exit(0);
+        }
     }
 
     // Load configuration file
@@ -161,7 +165,8 @@ pub fn main() !void {
 
     const comment_characters = "#";
 
-    if (res.args.config) |s| {
+    if (maybe_res != null and maybe_res.?.args.config != null) {
+        const s = maybe_res.?.args.config.?;
         const trailing_slash = if (s[s.len - 1] != '/') "/" else "";
 
         const config_path = try std.fmt.allocPrint(allocator, "{s}{s}config.ini", .{ s, trailing_slash });
@@ -329,6 +334,15 @@ pub fn main() !void {
     // Initialize components
     var info_line = InfoLine.init(allocator, &buffer);
     defer info_line.deinit();
+
+    if (maybe_res == null) {
+        var longest = diag.name.longest();
+        if (longest.kind == .positional)
+            longest.name = diag.arg;
+
+        try info_line.addMessage(lang.err_args, config.error_bg, config.error_fg);
+        try log_writer.print("unable to parse argument '{s}{s}': {s}\n", .{ longest.kind.prefix(), longest.name, @errorName(arg_parse_error) });
+    }
 
     if (maybe_config_load_error) |err| {
         // We can't localize this since the config failed to load so we'd fallback to the default language anyway
