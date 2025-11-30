@@ -26,6 +26,7 @@ const SavedUsers = @import("config/SavedUsers.zig");
 const migrator = @import("config/migrator.zig");
 const SharedError = @import("SharedError.zig");
 const LogFile = @import("LogFile.zig");
+const UidRange = @import("UidRange.zig");
 
 const StringList = std.ArrayListUnmanaged([]const u8);
 const Ini = ini.Ini;
@@ -219,7 +220,8 @@ pub fn main() !void {
         migrator.lateConfigFieldHandler(&config);
     }
 
-    var usernames = try getAllUsernames(allocator, config.login_defs_path);
+    var maybe_uid_range_error: ?anyerror = null;
+    var usernames = try getAllUsernames(allocator, config.login_defs_path, &maybe_uid_range_error);
     defer {
         for (usernames.items) |username| allocator.free(username);
         usernames.deinit(allocator);
@@ -342,6 +344,11 @@ pub fn main() !void {
 
         try info_line.addMessage(lang.err_args, config.error_bg, config.error_fg);
         try log_writer.print("unable to parse argument '{s}{s}': {s}\n", .{ longest.kind.prefix(), longest.name, @errorName(arg_parse_error) });
+    }
+
+    if (maybe_uid_range_error) |err| {
+        try info_line.addMessage(lang.err_uid_range, config.error_bg, config.error_fg);
+        try log_writer.print("failed to get uid range: {s}; falling back to default\n", .{@errorName(err)});
     }
 
     if (maybe_config_load_error) |err| {
@@ -1277,8 +1284,14 @@ fn findSessionByName(session: *Session, name: []const u8) ?usize {
     return null;
 }
 
-fn getAllUsernames(allocator: std.mem.Allocator, login_defs_path: []const u8) !StringList {
-    const uid_range = try interop.getUserIdRange(allocator, login_defs_path);
+fn getAllUsernames(allocator: std.mem.Allocator, login_defs_path: []const u8, uid_range_error: *?anyerror) !StringList {
+    const uid_range = interop.getUserIdRange(allocator, login_defs_path) catch |err| no_uid_range: {
+        uid_range_error.* = err;
+        break :no_uid_range UidRange{
+            .uid_min = build_options.fallback_uid_min,
+            .uid_max = build_options.fallback_uid_max,
+        };
+    };
 
     var usernames: StringList = .empty;
     var maybe_entry = interop.getNextUsernameEntry();

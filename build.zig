@@ -44,6 +44,8 @@ pub fn build(b: *std.Build) !void {
     const enable_x11_support = b.option(bool, "enable_x11_support", "Enable X11 support (default is on)") orelse true;
     const default_tty = b.option(u8, "default_tty", "Set the TTY (default is 2)") orelse 2;
     const fallback_tty = b.option(u8, "fallback_tty", "Set the fallback TTY (default is 2). This value gets embedded into the binary") orelse 2;
+    const fallback_uid_min = b.option(std.posix.uid_t, "fallback_uid_min", "Set the fallback minimum UID (default is 1000). This value gets embedded into the binary") orelse 2;
+    const fallback_uid_max = b.option(std.posix.uid_t, "fallback_uid_max", "Set the fallback maximum UID (default is 60000). This value gets embedded into the binary") orelse 2;
 
     default_tty_str = try std.fmt.allocPrint(b.allocator, "{d}", .{default_tty});
 
@@ -52,6 +54,8 @@ pub fn build(b: *std.Build) !void {
     build_options.addOption([]const u8, "version", version_str);
     build_options.addOption(u8, "tty", default_tty);
     build_options.addOption(u8, "fallback_tty", fallback_tty);
+    build_options.addOption(std.posix.uid_t, "fallback_uid_min", fallback_uid_min);
+    build_options.addOption(std.posix.uid_t, "fallback_uid_max", fallback_uid_max);
     build_options.addOption(bool, "enable_x11_support", enable_x11_support);
 
     const target = b.standardTargetOptions(.{});
