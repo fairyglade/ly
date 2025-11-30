@@ -405,19 +405,6 @@ pub fn main() !void {
         try log_writer.writeAll("x11 support disabled at compile-time\n");
     }
 
-    if (config.initial_info_text) |text| {
-        try info_line.addMessage(text, config.bg, config.fg);
-    } else get_host_name: {
-        // Initialize information line with host name
-        var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
-        const hostname = std.posix.gethostname(&name_buf) catch |err| {
-            try info_line.addMessage(lang.err_hostname, config.error_bg, config.error_fg);
-            try log_writer.print("failed to get hostname: {s}\n", .{@errorName(err)});
-            break :get_host_name;
-        };
-        try info_line.addMessage(hostname, config.bg, config.fg);
-    }
-
     var has_crawl_error = false;
 
     // Crawl session directories (Wayland, X11 and custom respectively)
@@ -599,6 +586,19 @@ pub fn main() !void {
         try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
         try log_writer.print("failed to switch tty: {s}\n", .{@errorName(err)});
     };
+
+    if (config.initial_info_text) |text| {
+        try info_line.addMessage(text, config.bg, config.fg);
+    } else get_host_name: {
+        // Initialize information line with host name
+        var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
+        const hostname = std.posix.gethostname(&name_buf) catch |err| {
+            try info_line.addMessage(lang.err_hostname, config.error_bg, config.error_fg);
+            try log_writer.print("failed to get hostname: {s}\n", .{@errorName(err)});
+            break :get_host_name;
+        };
+        try info_line.addMessage(hostname, config.bg, config.fg);
+    }
 
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
