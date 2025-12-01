@@ -938,37 +938,19 @@ pub fn main() !void {
                 update = true;
             },
             termbox.TB_KEY_CTRL_K, termbox.TB_KEY_ARROW_UP => {
-                active_input = switch (active_input) {
-                    .session, .info_line => .info_line,
-                    .login => .session,
-                    .password => .login,
-                };
+                active_input.move(true, false);
                 update = true;
             },
             termbox.TB_KEY_CTRL_J, termbox.TB_KEY_ARROW_DOWN => {
-                active_input = switch (active_input) {
-                    .info_line => .session,
-                    .session => .login,
-                    .login, .password => .password,
-                };
+                active_input.move(false, false);
                 update = true;
             },
             termbox.TB_KEY_TAB => {
-                active_input = switch (active_input) {
-                    .info_line => .session,
-                    .session => .login,
-                    .login => .password,
-                    .password => .info_line,
-                };
+                active_input.move(false, true);
                 update = true;
             },
             termbox.TB_KEY_BACK_TAB => {
-                active_input = switch (active_input) {
-                    .info_line => .password,
-                    .session => .info_line,
-                    .login => .session,
-                    .password => .login,
-                };
+                active_input.move(true, true);
                 update = true;
             },
             termbox.TB_KEY_ENTER => authenticate: {
@@ -1125,20 +1107,12 @@ pub fn main() !void {
                 if (!insert_mode) {
                     switch (event.ch) {
                         'k' => {
-                            active_input = switch (active_input) {
-                                .session, .info_line => .info_line,
-                                .login => .session,
-                                .password => .login,
-                            };
+                            active_input.move(true, false);
                             update = true;
                             continue;
                         },
                         'j' => {
-                            active_input = switch (active_input) {
-                                .info_line => .session,
-                                .session => .login,
-                                .login, .password => .password,
-                            };
+                            active_input.move(false, false);
                             update = true;
                             continue;
                         },
