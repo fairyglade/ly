@@ -15,7 +15,7 @@ def process_lang_file(path: Path, lang_keys: list[str]) -> None:
             except ValueError:  # line does not contain '='
                 continue
 
-    # re-write current lang file with entries in order of occurence in `lang_keys`
+    # re-write current lang file with entries in order of occurrence in `lang_keys`
     # and with empty lines for missing translations
     with open(path, "w", encoding="UTF-8") as fh:
         for item in lang_keys:
