@@ -13,6 +13,8 @@ body:
           required: true
         - label: I have reproduced the issue on a fresh install of my OS & Ly with default settings, except ones I will mention
           required: true
+        - label: I have confirmed this issue also occurs on the latest development version
+          required: true
   - type: input
     id: version
     attributes:
