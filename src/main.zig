@@ -124,6 +124,7 @@ pub fn main() !void {
     var lang: Lang = undefined;
     var old_save_file_exists = false;
     var maybe_config_load_error: ?anyerror = null;
+    var start_cmd_exit_code: u8 = 0;
     var can_get_lock_state = true;
     var can_draw_clock = true;
     var can_draw_battery = true;
@@ -282,6 +283,19 @@ pub fn main() !void {
     restart_cmd = try temporary_allocator.dupe(u8, config.restart_cmd);
     commands_allocated = true;
 
+    if (config.start_cmd) |start_cmd| {
+        var sleep = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", start_cmd }, allocator);
+        sleep.stdout_behavior = .Ignore;
+        sleep.stderr_behavior = .Ignore;
+
+        handle_start_cmd: {
+            const process_result = sleep.spawnAndWait() catch {
+                break :handle_start_cmd;
+            };
+            start_cmd_exit_code = process_result.Exited;
+        }
+    }
+
     // Initialize termbox
     try log_writer.writeAll("initializing termbox2\n");
     _ = termbox.tb_init();
@@ -349,6 +363,11 @@ pub fn main() !void {
     if (maybe_uid_range_error) |err| {
         try info_line.addMessage(lang.err_uid_range, config.error_bg, config.error_fg);
         try log_writer.print("failed to get uid range: {s}; falling back to default\n", .{@errorName(err)});
+    }
+
+    if (start_cmd_exit_code != 0) {
+        try info_line.addMessage(lang.err_start, config.error_bg, config.error_fg);
+        try log_writer.print("failed to execute start command: exit code {d}\n", .{start_cmd_exit_code});
     }
 
     if (maybe_config_load_error) |err| {
