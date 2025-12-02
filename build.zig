@@ -260,8 +260,8 @@ fn install_service(allocator: std.mem.Allocator, patch_map: PatchMap) !void {
             var service_dir = std.fs.cwd().openDir(service_path, .{}) catch unreachable;
             defer service_dir.close();
 
-            const patched_service = try patchFile(allocator, "res/ly.service", patch_map);
-            try installText(patched_service, service_dir, service_path, "ly.service", .{ .mode = 0o644 });
+            const patched_service = try patchFile(allocator, "res/ly@.service", patch_map);
+            try installText(patched_service, service_dir, service_path, "ly@.service", .{ .mode = 0o644 });
         },
         .openrc => {
             const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/init.d" });
@@ -365,7 +365,7 @@ pub fn Uninstaller(uninstall_config: bool) type {
             try deleteFile(allocator, config_directory, "/pam.d/ly", "ly pam file not found");
 
             switch (init_system) {
-                .systemd => try deleteFile(allocator, prefix_directory, "/lib/systemd/system/ly.service", "systemd service not found"),
+                .systemd => try deleteFile(allocator, prefix_directory, "/lib/systemd/system/ly@.service", "systemd service not found"),
                 .openrc => try deleteFile(allocator, config_directory, "/init.d/ly", "openrc service not found"),
                 .runit => try deleteTree(allocator, config_directory, "/sv/ly", "runit service not found"),
                 .s6 => {

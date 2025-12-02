@@ -111,19 +111,19 @@ command:
 Then, similarly to the previous command, you need to enable the Ly service:
 
 ```
-# systemctl enable ly.service
+# systemctl enable ly@tty2.service
 ```
 
 **Important**: Because Ly runs in a TTY, you **must** disable the TTY service
-that Ly will run on, otherwise bad things will happen. For example, to disable `getty` spawning on TTY 2 (the default TTY on which Ly spawns), you need to
-execute the following command:
+that Ly will run on, otherwise bad things will happen. For example, to disable `getty` spawning on TTY 2, you need to execute the following command:
 
 ```
 # systemctl disable getty@tty2.service
 ```
 
 You can change the TTY Ly will run on by editing the corresponding
-service file for your platform.
+service file for your platform, or on systemd, by enabling the service on
+different TTYs, as is done above.
 
 ### OpenRC
 
