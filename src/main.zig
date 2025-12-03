@@ -98,7 +98,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
 
     // Allows stopping an animation after some time
-    const time_start = try interop.getTimeOfDay();
+    const animation_time_start = try interop.getTimeOfDay();
     var animation_timed_out: bool = false;
 
     const allocator = gpa.allocator();
@@ -284,12 +284,12 @@ pub fn main() !void {
     commands_allocated = true;
 
     if (config.start_cmd) |start_cmd| {
-        var sleep = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", start_cmd }, allocator);
-        sleep.stdout_behavior = .Ignore;
-        sleep.stderr_behavior = .Ignore;
+        var start = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", start_cmd }, allocator);
+        start.stdout_behavior = .Ignore;
+        start.stderr_behavior = .Ignore;
 
         handle_start_cmd: {
-            const process_result = sleep.spawnAndWait() catch {
+            const process_result = start.spawnAndWait() catch {
                 break :handle_start_cmd;
             };
             start_cmd_exit_code = process_result.Exited;
@@ -594,6 +594,8 @@ pub fn main() !void {
     var update = true;
     var resolution_changed = false;
     var auth_fails: u64 = 0;
+    var inactivity_time_start = try interop.getTimeOfDay();
+    var inactivity_cmd_ran = false;
 
     // Switch to selected TTY
     const active_tty = interop.getActiveTty(allocator) catch |err| no_tty_found: {
@@ -858,7 +860,7 @@ pub fn main() !void {
             // Check how long we've been running so we can turn off the animation
             const time = try interop.getTimeOfDay();
 
-            if (config.animation_timeout_sec > 0 and time.seconds - time_start.seconds > config.animation_timeout_sec) {
+            if (config.animation_timeout_sec > 0 and time.seconds - animation_time_start.seconds > config.animation_timeout_sec) {
                 animation_timed_out = true;
                 animation.deinit();
             }
@@ -870,6 +872,28 @@ pub fn main() !void {
             const time = try interop.getTimeOfDay();
 
             timeout = @intCast(1000 - @divTrunc(time.microseconds, 1000) + 1);
+        }
+
+        if (config.inactivity_cmd) |inactivity_cmd| {
+            const time = try interop.getTimeOfDay();
+
+            if (!inactivity_cmd_ran and time.seconds - inactivity_time_start.seconds > config.inactivity_delay) {
+                var inactivity = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", inactivity_cmd }, allocator);
+                inactivity.stdout_behavior = .Ignore;
+                inactivity.stderr_behavior = .Ignore;
+
+                handle_inactivity_cmd: {
+                    const process_result = inactivity.spawnAndWait() catch {
+                        break :handle_inactivity_cmd;
+                    };
+                    if (process_result.Exited != 0) {
+                        try info_line.addMessage(lang.err_inactivity, config.error_bg, config.error_fg);
+                        try log_writer.print("failed to execute inactivity command: exit code {d}\n", .{process_result.Exited});
+                    }
+                }
+
+                inactivity_cmd_ran = true;
+            }
         }
 
         // Skip event polling if autologin is set, use simulated Enter key press instead
@@ -891,6 +915,9 @@ pub fn main() !void {
 
             if (event_error < 0 or event.type != termbox.TB_EVENT_KEY) continue;
         }
+
+        // Input of some kind was detected, so reset the inactivity timer
+        inactivity_time_start = try interop.getTimeOfDay();
 
         switch (event.key) {
             termbox.TB_KEY_ESC => {
