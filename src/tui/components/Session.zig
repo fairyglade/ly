@@ -17,10 +17,12 @@ const EnvironmentLabel = generic.CyclableLabel(Env, *UserList);
 const Session = @This();
 
 label: EnvironmentLabel,
+user_list: *UserList,
 
 pub fn init(allocator: Allocator, buffer: *TerminalBuffer, user_list: *UserList) Session {
     return .{
         .label = EnvironmentLabel.init(allocator, buffer, drawItem, sessionChanged, user_list),
+        .user_list = user_list,
     };
 }
 
@@ -36,7 +38,10 @@ pub fn deinit(self: *Session) void {
 }
 
 pub fn addEnvironment(self: *Session, environment: Environment) !void {
-    try self.label.addItem(.{ .environment = environment, .index = self.label.list.items.len });
+    const env = Env{ .environment = environment, .index = self.label.list.items.len };
+
+    try self.label.addItem(env);
+    sessionChanged(env, self.user_list);
 }
 
 fn sessionChanged(env: Env, maybe_user_list: ?*UserList) void {

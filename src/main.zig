@@ -259,10 +259,10 @@ pub fn main() !void {
                 .session_index = session_index,
             });
         }
+    }
 
-        // If no save file previously existed, fill it up with all usernames
-        if (saved_users.user_list.items.len > 0) break :read_save_file;
-
+    // If no save file previously existed, fill it up with all usernames
+    if (config.save and saved_users.user_list.items.len == 0) {
         for (usernames.items) |user| {
             try saved_users.user_list.append(allocator, .{
                 .username = user,
@@ -408,6 +408,9 @@ pub fn main() !void {
     var session = Session.init(allocator, &buffer, &login);
     defer session.deinit();
 
+    login = try UserList.init(allocator, &buffer, usernames, &saved_users, &session);
+    defer login.deinit();
+
     addOtherEnvironment(&session, lang, .shell, null) catch |err| {
         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
         try log_writer.print("failed to add shell environment: {s}\n", .{@errorName(err)});
@@ -466,9 +469,6 @@ pub fn main() !void {
         try info_line.addMessage(lang.err_no_users, config.error_bg, config.error_fg);
         try log_writer.writeAll("no users found\n");
     }
-
-    login = try UserList.init(allocator, &buffer, usernames, &saved_users, &session);
-    defer login.deinit();
 
     var password = Text.init(allocator, &buffer, true, config.asterisk);
     defer password.deinit();
