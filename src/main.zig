@@ -13,6 +13,7 @@ const Doom = @import("animations/Doom.zig");
 const Dummy = @import("animations/Dummy.zig");
 const Matrix = @import("animations/Matrix.zig");
 const GameOfLife = @import("animations/GameOfLife.zig");
+const DurFile = @import("animations/DurFile.zig");
 const Animation = @import("tui/Animation.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const Session = @import("tui/components/Session.zig");
@@ -571,6 +572,10 @@ pub fn main() !void {
         .gameoflife => {
             var game_of_life = try GameOfLife.init(allocator, &buffer, config.gameoflife_fg, config.gameoflife_entropy_interval, config.gameoflife_frame_delay, config.gameoflife_initial_density);
             animation = game_of_life.animation();
+        },
+        .dur_file => {
+            var dur = try DurFile.init(allocator, &buffer, log_writer, config.dur_file_path, config.dur_x_offset, config.dur_y_offset, config.full_color);
+            animation = dur.animation();
         },
     }
     defer animation.deinit();
