@@ -30,7 +30,7 @@ fn read_decompress_file(allocator: Allocator, file_path: []const u8) ![]u8 {
 
 const Frame = struct {
     frameNumber: i32,
-    delay: i32,
+    delay: f32,
     contents: [][]u8,
     colorMap: [][][]i32,
 
@@ -398,7 +398,7 @@ fn draw(self: *DurFile) void {
     const delta_time = time_current - self.time_previous;
 
     // Convert delay from sec to ms
-    const delay_time: u32 = @intCast(current_frame.delay * 1000);
+    const delay_time: u32 = @intFromFloat(current_frame.delay * 1000);
     if (delta_time > (self.frame_time + delay_time)) {
         self.time_previous = time_current;
 
