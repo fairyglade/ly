@@ -255,18 +255,23 @@ pub fn main() !void {
             const session_index = std.fmt.parseInt(usize, session_index_str, 10) catch continue;
 
             try saved_users.user_list.append(allocator, .{
-                .username = username,
+                .username = try allocator.dupe(u8, username),
                 .session_index = session_index,
+                .first_run = false,
+                .allocated_username = true,
             });
         }
     }
 
     // If no save file previously existed, fill it up with all usernames
+    // TODO: Add new username with existing save file
     if (config.save and saved_users.user_list.items.len == 0) {
         for (usernames.items) |user| {
             try saved_users.user_list.append(allocator, .{
                 .username = user,
                 .session_index = 0,
+                .first_run = true,
+                .allocated_username = false,
             });
         }
     }

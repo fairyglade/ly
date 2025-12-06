@@ -11,6 +11,7 @@ pub const User = struct {
     name: []const u8,
     session_index: *usize,
     allocated_index: bool,
+    first_run: bool,
 };
 const UserLabel = generic.CyclableLabel(User, *Session);
 
@@ -27,9 +28,11 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer, usernames: StringList
         if (username.len == 0) continue;
 
         var maybe_session_index: ?*usize = null;
+        var first_run = true;
         for (saved_users.user_list.items) |*saved_user| {
             if (std.mem.eql(u8, username, saved_user.username)) {
                 maybe_session_index = &saved_user.session_index;
+                first_run = saved_user.first_run;
                 break;
             }
         }
@@ -45,6 +48,7 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer, usernames: StringList
             .name = username,
             .session_index = maybe_session_index.?,
             .allocated_index = allocated_index,
+            .first_run = first_run,
         });
     }
 

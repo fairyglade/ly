@@ -238,7 +238,12 @@ pub fn tryMigrateIniSaveFile(allocator: std.mem.Allocator, save_ini: *ini.Ini(Ol
             if (std.mem.eql(u8, user, username)) saved_users.last_username_index = i;
         }
 
-        try saved_users.user_list.append(allocator, .{ .username = username, .session_index = save.session_index orelse 0 });
+        try saved_users.user_list.append(allocator, .{
+            .username = username,
+            .session_index = save.session_index orelse 0,
+            .first_run = false,
+            .allocated_username = false,
+        });
     }
 
     return true;

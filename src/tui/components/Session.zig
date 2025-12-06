@@ -46,7 +46,10 @@ pub fn addEnvironment(self: *Session, environment: Environment) !void {
 
 fn sessionChanged(env: Env, maybe_user_list: ?*UserList) void {
     if (maybe_user_list) |user_list| {
-        user_list.label.list.items[user_list.label.current].session_index.* = env.index;
+        const user = user_list.label.list.items[user_list.label.current];
+        if (!user.first_run) return;
+
+        user.session_index.* = env.index;
     }
 }
 
