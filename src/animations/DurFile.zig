@@ -17,14 +17,14 @@ fn read_decompress_file(allocator: Allocator, file_path: []const u8) ![]u8 {
 
     var file_reader_buffer: [4096]u8 = undefined;
     var decompress_buffer: [flate.max_window_len]u8 = undefined;
-    
+
     var file_reader = file_buffer.reader(&file_reader_buffer);
     var decompress: flate.Decompress = .init(&file_reader.interface, .gzip, &decompress_buffer);
 
-    const file_decompressed = decompress.reader.allocRemaining(allocator, .unlimited) catch { 
+    const file_decompressed = decompress.reader.allocRemaining(allocator, .unlimited) catch {
         return error.NotValidFile;
     };
-    
+
     return file_decompressed;
 }
 
@@ -36,7 +36,7 @@ const Frame = struct {
 
     // allocator must be outside of struct as it will fail the json parser
     pub fn deinit(self: *const Frame, allocator: Allocator) void {
-        for (self.contents) |con| { 
+        for (self.contents) |con| {
             allocator.free(con);
         }
         allocator.free(self.contents);
@@ -63,22 +63,20 @@ const DurFormat = struct {
     frames: std.ArrayList(Frame) = undefined,
 
     pub fn valid(self: *DurFormat) bool {
-        if (self.formatVersion != null and 
+        if (self.formatVersion != null and
             self.colorFormat != null and
             self.encoding != null and
             self.framerate != null and
             self.columns != null and
             self.lines != null and
-            self.frames.items.len >= 1) {
-            
-            // Oldest example in dur repo was 5 so unsure if older changes json layout
-            if (self.formatVersion.? < 5) return false;
-            // v8 may have breaking changes like changing the colormap xy direction 
+            self.frames.items.len >= 1)
+        {
+            // v8 may have breaking changes like changing the colormap xy direction
             // (https://github.com/cmang/durdraw/issues/24)
-            if (self.formatVersion.? > 7) return false;
+            if (self.formatVersion.? != 7) return false;
 
             // Code currently only supports 16 and 256 color format only
-            if (!(eql(u8, "16", self.colorFormat.?) or eql(u8, "256", self.colorFormat.?))) 
+            if (!(eql(u8, "16", self.colorFormat.?) or eql(u8, "256", self.colorFormat.?)))
                 return false;
 
             // Code currently supports only utf-8 encoding
@@ -96,18 +94,16 @@ const DurFormat = struct {
     }
 
     fn parse_dur_from_json(self: *DurFormat, allocator: Allocator, dur_json_root: Json.Value) !void {
-        var dur_movie = if (dur_json_root.object.get("DurMovie")) |dm| dm.object else return error.NotValidFile; 
+        var dur_movie = if (dur_json_root.object.get("DurMovie")) |dm| dm.object else return error.NotValidFile;
 
         // Depending on the version, a dur file can have different json object names (ie: columns vs sizeX)
-        self.formatVersion  = if (dur_movie.get("formatVersion"))|x| x.integer else null;
-        self.colorFormat    = if (dur_movie.get("colorFormat"))  |x| try allocator.dupe(u8, x.string) else null;
-        self.encoding       = if (dur_movie.get("encoding"))     |x| try allocator.dupe(u8, x.string) else null;
-        self.framerate      = if (dur_movie.get("framerate"))    |x| x.float else null;
-        self.columns        = if (dur_movie.get("columns"))      |x| x.integer 
-                              else if (dur_movie.get("sizeX"))   |x| x.integer else null;
+        self.formatVersion = if (dur_movie.get("formatVersion")) |x| x.integer else null;
+        self.colorFormat = if (dur_movie.get("colorFormat")) |x| try allocator.dupe(u8, x.string) else null;
+        self.encoding = if (dur_movie.get("encoding")) |x| try allocator.dupe(u8, x.string) else null;
+        self.framerate = if (dur_movie.get("framerate")) |x| x.float else null;
+        self.columns = if (dur_movie.get("columns")) |x| x.integer else if (dur_movie.get("sizeX")) |x| x.integer else null;
 
-        self.lines          = if (dur_movie.get("lines"))        |x| x.integer 
-                              else if (dur_movie.get("sizeY"))   |x| x.integer else null; 
+        self.lines = if (dur_movie.get("lines")) |x| x.integer else if (dur_movie.get("sizeY")) |x| x.integer else null;
 
         const frames = dur_movie.get("frames") orelse return error.NotValidFile;
 
@@ -117,21 +113,16 @@ const DurFormat = struct {
             var parsed_frame = try Json.parseFromValue(Frame, allocator, json_frame, .{});
             defer parsed_frame.deinit();
 
-            const frame_val = parsed_frame.value; 
-            
-            // copy all fields to own the ptrs for deallocation, the parsed_frame has some other 
+            const frame_val = parsed_frame.value;
+
+            // copy all fields to own the ptrs for deallocation, the parsed_frame has some other
             // allocated memory making it difficult to deallocate without leaks
-            const frame: Frame = .{
-                .frameNumber = frame_val.frameNumber,
-                .delay = frame_val.delay,
-                .contents = try allocator.alloc([]u8, frame_val.contents.len),
-                .colorMap = try allocator.alloc([][]i32, frame_val.colorMap.len)
-            };
-            
+            const frame: Frame = .{ .frameNumber = frame_val.frameNumber, .delay = frame_val.delay, .contents = try allocator.alloc([]u8, frame_val.contents.len), .colorMap = try allocator.alloc([][]i32, frame_val.colorMap.len) };
+
             for (0..frame.contents.len) |i| {
                 frame.contents[i] = try allocator.dupe(u8, frame_val.contents[i]);
             }
-            
+
             // colorMap is stored as an 3d array where:
             // the outer (i) most array is the horizontal position of the color
             // the middle (j) is the vertical position of the color
@@ -143,22 +134,24 @@ const DurFormat = struct {
                     frame.colorMap[i][j][0] = frame_val.colorMap[i][j][0];
                     frame.colorMap[i][j][1] = frame_val.colorMap[i][j][1];
                 }
-            } 
-            
+            }
+
             try self.frames.append(allocator, frame);
         }
     }
 
-    pub fn create_from_file(self: *DurFormat, allocator: Allocator, file_path: [] const u8) !void { 
+    pub fn create_from_file(self: *DurFormat, allocator: Allocator, file_path: []const u8) !void {
         const file_decompressed = try read_decompress_file(allocator, file_path);
         defer allocator.free(file_decompressed);
-    
+
         const parsed = try Json.parseFromSlice(Json.Value, allocator, file_decompressed, .{});
         defer parsed.deinit();
-        
+
         try parse_dur_from_json(self, allocator, parsed.value);
 
-        if (!self.valid()) { return error.NotValidFile; }
+        if (!self.valid()) {
+            return error.NotValidFile;
+        }
     }
 
     pub fn init(allocator: Allocator) DurFormat {
@@ -169,8 +162,8 @@ const DurFormat = struct {
         if (self.colorFormat) |str| self.allocator.free(str);
         if (self.encoding) |str| self.allocator.free(str);
 
-        for (self.frames.items) |frame| { 
-            frame.deinit(self.allocator); 
+        for (self.frames.items) |frame| {
+            frame.deinit(self.allocator);
         }
         self.frames.deinit(self.allocator);
     }
@@ -218,30 +211,30 @@ const rgb_color_16 = [16]u32{
 // Made this table from looking at colormapping in dur source, not sure whats going on with the mapping logic
 // Array indexes are dur colormappings which value maps to indexes in table above. Only needed for dur 16 color
 const durcolor_table_to_color16 = [17]u32{
-    0,  // 0 black
-    0,  // 1 nothing?? dur source did not say why 1 is unused
-    4,  // 2 blue 
-    2,  // 3 green 
-    6,  // 4 cyan 
-    1,  // 5 red
-    5,  // 6 magenta 
-    3,  // 7 yellow 
-    7,  // 8 light gray
-    8,  // 9 gray
-    12, // 10 bright blue 
+    0, // 0 black
+    0, // 1 nothing?? dur source did not say why 1 is unused
+    4, // 2 blue
+    2, // 3 green
+    6, // 4 cyan
+    1, // 5 red
+    5, // 6 magenta
+    3, // 7 yellow
+    7, // 8 light gray
+    8, // 9 gray
+    12, // 10 bright blue
     10, // 11 bright green
     14, // 12 bright cyan
-    9,  // 13 bright red
+    9, // 13 bright red
     13, // 14 bright magenta
     11, // 15 bright yellow
     15, // 16 bright white
 };
 
 fn sixcube_to_channel(sixcube: u32) u32 {
-    // Although the range top for the extended range is 0xFF, 6 is not divisible into 0xFF, 
-    // so we use 0xF0 instead with a scaler 
+    // Although the range top for the extended range is 0xFF, 6 is not divisible into 0xFF,
+    // so we use 0xF0 instead with a scaler
     const equal_divisions = 0xF0 / 6;
-    
+
     // Since the range is to 0xFF but 6 isn't divisible, we must add a scaler to get it to 0xFF at the last index (5)
     const scaler = 0xFF - (equal_divisions * 5);
 
@@ -285,14 +278,13 @@ fn convert_256_to_rgb(color_256: u32) u32 {
         const equal_divisions = (0xEE - scaler) / 23; // evals to 0x0A
 
         const channel = scaler + equal_divisions * (color_256 - 232);
-        
+
         // gray is equal value of same channel color in rgb
         rgb_color = channel | (channel << 8) | (channel << 16);
     }
 
     return rgb_color;
 }
-
 
 const DurFile = @This();
 
@@ -307,20 +299,14 @@ dur_movie: DurFormat,
 frame_width: u32,
 frame_height: u32,
 frame_time: u32,
-is_color_format_16 : bool,
+is_color_format_16: bool,
 
-pub fn init(allocator: Allocator, 
-            terminal_buffer: *TerminalBuffer, 
-            log_writer: *std.io.Writer, 
-            file_path: []const u8, 
-            x_offset: u32, 
-            y_offset: u32,
-            full_color: bool) !DurFile { 
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_writer: *std.io.Writer, file_path: []const u8, x_offset: u32, y_offset: u32, full_color: bool) !DurFile {
     var dur_movie: DurFormat = .init(allocator);
 
     // error state is recoverable when thrown to main and results in no background with Dummy in main
     dur_movie.create_from_file(allocator, file_path) catch |err| switch (err) {
-        error.FileNotFound => { 
+        error.FileNotFound => {
             try log_writer.print("error: dur_file was not found at: {s}\n", .{file_path});
             return err;
         },
@@ -340,18 +326,18 @@ pub fn init(allocator: Allocator,
 
     const buf_width: u32 = @intCast(terminal_buffer.width);
     const buf_height: u32 = @intCast(terminal_buffer.height);
-    
+
     const movie_width: u32 = @intCast(dur_movie.columns.?);
     const movie_height: u32 = @intCast(dur_movie.lines.?);
 
     // Clamp to prevent user from exceeding draw window
     const x_offset_clamped = std.math.clamp(x_offset, 0, buf_width - 1);
     const y_offset_clamped = std.math.clamp(y_offset, 0, buf_height - 1);
-    
+
     // Ensure if user offsets and frame goes offscreen, it will not overflow draw
     const frame_width = if ((movie_width + x_offset_clamped) < buf_width) movie_width else buf_width - x_offset_clamped;
     const frame_height = if ((movie_height + y_offset_clamped) < buf_height) movie_height else buf_height - y_offset_clamped;
-    
+
     // Convert dur fps to frames per ms
     const frame_time: u32 = @intFromFloat(1000 / dur_movie.framerate.?);
 
@@ -367,7 +353,7 @@ pub fn init(allocator: Allocator,
         .frame_width = frame_width,
         .frame_height = frame_height,
         .frame_time = frame_time,
-        .is_color_format_16 = eql(u8, dur_movie.colorFormat.?, "16")
+        .is_color_format_16 = eql(u8, dur_movie.colorFormat.?, "16"),
     };
 }
 
@@ -383,37 +369,34 @@ fn realloc(_: *DurFile) anyerror!void {}
 
 fn draw(self: *DurFile) void {
     const current_frame = self.dur_movie.frames.items[self.frames];
-    
+
     for (0..self.frame_height) |y| {
         var iter = std.unicode.Utf8View.initUnchecked(current_frame.contents[y]).iterator();
-        
+
         for (0..self.frame_width) |x| {
             const codepoint: u21 = iter.nextCodepoint().?;
+            const color_map = current_frame.colorMap[x][y];
 
-            var color_map_0: u32 = @intCast(current_frame.colorMap[x][y][0]);
-            var color_map_1: u32 = @intCast(current_frame.colorMap[x][y][1]);
+            var color_map_0: u32 = @intCast(if (color_map[0] == -1) 0 else color_map[0]);
+            var color_map_1: u32 = @intCast(if (color_map[1] == -1) 0 else color_map[1]);
 
             if (self.is_color_format_16) {
-                color_map_0 = durcolor_table_to_color16[color_map_0]; 
+                color_map_0 = durcolor_table_to_color16[color_map_0];
                 color_map_1 = durcolor_table_to_color16[color_map_1 + 1]; // Add 1, dur source stores it like this for some reason
             }
-            
+
             const fg_color = if (self.full_color) convert_256_to_rgb(color_map_0) else tb_color_16[color_map_0];
             const bg_color = if (self.full_color) convert_256_to_rgb(color_map_1) else tb_color_16[color_map_1];
 
-            const cell = Cell {
-                .ch = @intCast(codepoint),
-                .fg = fg_color,
-                .bg = bg_color
-            };
+            const cell = Cell{ .ch = @intCast(codepoint), .fg = fg_color, .bg = bg_color };
 
             cell.put(x + self.x_offset, y + self.y_offset);
         }
     }
-    
+
     const time_current = std.time.milliTimestamp();
     const delta_time = time_current - self.time_previous;
-    
+
     // Convert delay from sec to ms
     const delay_time: u32 = @intCast(current_frame.delay * 1000);
     if (delta_time > (self.frame_time + delay_time)) {
