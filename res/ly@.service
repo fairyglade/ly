@@ -1,8 +1,8 @@
 [Unit]
 Description=TUI display manager
 After=systemd-user-sessions.service plymouth-quit-wait.service
-After=getty@%I.service
-Conflicts=getty@%I.service
+After=getty@%i.service
+Conflicts=getty@%i.service
 
 [Service]
 Type=idle
