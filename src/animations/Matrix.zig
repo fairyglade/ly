@@ -86,17 +86,17 @@ fn draw(self: *Matrix) void {
         self.count = 0;
 
         var x: usize = 0;
-        while (x < self.terminal_buffer.width) : (x += 2) {
+        while (x < buf_width) : (x += 2) {
             var tail: usize = 0;
             var line = &self.lines[x];
             if (self.frame <= line.update) continue;
 
-            if (self.dots[x].value == null and self.dots[self.terminal_buffer.width + x].value == ' ') {
+            if (self.dots[x].value == null and self.dots[buf_width + x].value == ' ') {
                 if (line.space > 0) {
                     line.space -= 1;
                 } else {
                     const randint = self.terminal_buffer.random.int(u16);
-                    const h = self.terminal_buffer.height;
+                    const h = buf_height;
                     line.length = @mod(randint, h - 3) + 3;
                     self.dots[x].value = @mod(randint, self.max_codepoint) + self.min_codepoint;
                     line.space = @mod(randint, h + 1);
@@ -153,7 +153,7 @@ fn draw(self: *Matrix) void {
     var x: usize = 0;
     while (x < buf_width) : (x += 2) {
         var y: usize = 1;
-        while (y <= self.terminal_buffer.height) : (y += 1) {
+        while (y <= buf_height) : (y += 1) {
             const dot = self.dots[buf_width * y + x];
             const cell = if (dot.value == null or dot.value == ' ') self.default_cell else Cell{
                 .ch = @intCast(dot.value.?),
