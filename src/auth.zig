@@ -502,6 +502,14 @@ fn executeCmd(global_log_file: *LogFile, allocator: std.mem.Allocator, shell: []
 }
 
 fn redirectStandardStreams(global_log_file: *LogFile, session_log: []const u8, create: bool) !std.fs.File {
+    create_session_log_dir: {
+        const session_log_dir = std.fs.path.dirname(session_log) orelse break :create_session_log_dir;
+        std.fs.cwd().makePath(session_log_dir) catch |err| {
+            try global_log_file.file_writer.interface.print("failed to create session log file directory: {s}\n", .{@errorName(err)});
+            return err;
+        };
+    }
+
     const log_file = if (create) (std.fs.cwd().createFile(session_log, .{ .mode = 0o666 }) catch |err| {
         try global_log_file.file_writer.interface.print("failed to create new session log file: {s}\n", .{@errorName(err)});
         return err;
