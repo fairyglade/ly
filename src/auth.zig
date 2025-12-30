@@ -169,6 +169,7 @@ fn startSession(
 
     // Reset the XDG environment variables
     try setXdgEnv(allocator, tty_str, current_environment);
+    try setXdgRuntimeDir(allocator);
 
     // Set the PAM variables
     const pam_env_vars: ?[*:null]?[*:0]u8 = interop.pam.pam_getenvlist(handle);
@@ -217,6 +218,15 @@ fn setXdgEnv(allocator: std.mem.Allocator, tty_str: []u8, environment: Environme
         .custom => if (environment.is_terminal) "tty" else "unspecified",
     }, false);
 
+    if (environment.xdg_desktop_names) |xdg_desktop_names| try interop.setEnvironmentVariable(allocator, "XDG_CURRENT_DESKTOP", xdg_desktop_names, false);
+    try interop.setEnvironmentVariable(allocator, "XDG_SESSION_CLASS", "user", false);
+    try interop.setEnvironmentVariable(allocator, "XDG_SESSION_ID", "1", false);
+    if (environment.xdg_session_desktop) |desktop_name| try interop.setEnvironmentVariable(allocator, "XDG_SESSION_DESKTOP", desktop_name, false);
+    try interop.setEnvironmentVariable(allocator, "XDG_SEAT", "seat0", false);
+    try interop.setEnvironmentVariable(allocator, "XDG_VTNR", tty_str, false);
+}
+
+fn setXdgRuntimeDir(allocator: std.mem.Allocator) !void {
     // The "/run/user/%d" directory is not available on FreeBSD. It is much
     // better to stick to the defaults and let applications using
     // XDG_RUNTIME_DIR to fall back to directories inside user's home
@@ -228,13 +238,6 @@ fn setXdgEnv(allocator: std.mem.Allocator, tty_str: []u8, environment: Environme
 
         try interop.setEnvironmentVariable(allocator, "XDG_RUNTIME_DIR", uid_str, false);
     }
-
-    if (environment.xdg_desktop_names) |xdg_desktop_names| try interop.setEnvironmentVariable(allocator, "XDG_CURRENT_DESKTOP", xdg_desktop_names, false);
-    try interop.setEnvironmentVariable(allocator, "XDG_SESSION_CLASS", "user", false);
-    try interop.setEnvironmentVariable(allocator, "XDG_SESSION_ID", "1", false);
-    if (environment.xdg_session_desktop) |desktop_name| try interop.setEnvironmentVariable(allocator, "XDG_SESSION_DESKTOP", desktop_name, false);
-    try interop.setEnvironmentVariable(allocator, "XDG_SEAT", "seat0", false);
-    try interop.setEnvironmentVariable(allocator, "XDG_VTNR", tty_str, false);
 }
 
 fn loginConv(
