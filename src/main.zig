@@ -529,7 +529,7 @@ pub fn main() !void {
 
             active_input = .password;
 
-            if (user.session_index < session.label.list.items.len) session.label.current = user.session_index;
+            session.label.current = @min(user.session_index, session.label.list.items.len - 1);
         }
     }
 
