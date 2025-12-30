@@ -369,7 +369,7 @@ fn createXauthFile(pwd: []const u8, buffer: []u8) ![]const u8 {
 
     const xauthority: []u8 = try std.fmt.bufPrint(buffer, "{s}/{s}", .{ trimmed_xauth_dir, xauth_file });
 
-    std.fs.makeDirAbsolute(trimmed_xauth_dir) catch {};
+    std.fs.cwd().makePath(trimmed_xauth_dir) catch {};
 
     const file = try std.fs.createFileAbsolute(xauthority, .{});
     file.close();
