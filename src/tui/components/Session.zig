@@ -41,15 +41,19 @@ pub fn addEnvironment(self: *Session, environment: Environment) !void {
     const env = Env{ .environment = environment, .index = self.label.list.items.len };
 
     try self.label.addItem(env);
-    sessionChanged(env, self.user_list);
+    addedSession(env, self.user_list);
+}
+
+fn addedSession(env: Env, user_list: *UserList) void {
+    const user = user_list.label.list.items[user_list.label.current];
+    if (!user.first_run) return;
+
+    user.session_index.* = env.index;
 }
 
 fn sessionChanged(env: Env, maybe_user_list: ?*UserList) void {
     if (maybe_user_list) |user_list| {
-        const user = user_list.label.list.items[user_list.label.current];
-        if (!user.first_run) return;
-
-        user.session_index.* = env.index;
+        user_list.label.list.items[user_list.label.current].session_index.* = env.index;
     }
 }
 
