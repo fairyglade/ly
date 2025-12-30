@@ -23,7 +23,7 @@ comptime {
     }
 }
 
-const ly_version = std.SemanticVersion{ .major = 1, .minor = 3, .patch = 0 };
+const ly_version = std.SemanticVersion{ .major = 1, .minor = 3, .patch = 1 };
 
 var dest_directory: []const u8 = undefined;
 var config_directory: []const u8 = undefined;
