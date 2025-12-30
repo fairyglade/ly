@@ -14,9 +14,9 @@ pub const DesktopEntry = struct {
 pub const Entry = struct { @"Desktop Entry": DesktopEntry = .{} };
 
 entry_ini: ?Ini(Entry) = null,
+file_name: []const u8 = "",
 name: []const u8 = "",
 xdg_session_desktop: ?[]const u8 = null,
-xdg_session_desktop_owned: bool = false,
 xdg_desktop_names: ?[]const u8 = null,
 cmd: ?[]const u8 = null,
 specifier: []const u8 = "",

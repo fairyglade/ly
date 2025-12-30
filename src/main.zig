@@ -1251,10 +1251,10 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
         });
         errdefer entry_ini.deinit();
 
+        const file_name = try session.label.allocator.dupe(u8, std.fs.path.stem(item.name));
         const entry = entry_ini.data.@"Desktop Entry";
         var maybe_xdg_session_desktop: ?[]const u8 = null;
         var maybe_xdg_desktop_names: ?[]const u8 = null;
-        var xdg_session_desktop_owned = false;
 
         // Prepare the XDG_SESSION_DESKTOP and XDG_CURRENT_DESKTOP environment
         // variables here
@@ -1268,18 +1268,14 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
         } else if (display_server != .custom) {
             // If DesktopNames is empty, and this isn't a custom session entry,
             // we'll take the name of the session file
-            const stem = std.fs.path.stem(item.name);
-            if (stem.len > 0) {
-                maybe_xdg_session_desktop = try session.label.allocator.dupe(u8, stem);
-                xdg_session_desktop_owned = true;
-            }
+            if (file_name.len > 0) maybe_xdg_session_desktop = file_name;
         }
 
         try session.addEnvironment(.{
             .entry_ini = entry_ini,
+            .file_name = file_name,
             .name = entry.Name,
             .xdg_session_desktop = maybe_xdg_session_desktop,
-            .xdg_session_desktop_owned = xdg_session_desktop_owned,
             .xdg_desktop_names = maybe_xdg_desktop_names,
             .cmd = entry.Exec,
             .specifier = switch (display_server) {
@@ -1310,6 +1306,7 @@ fn findSessionByName(session: *Session, name: []const u8) ?usize {
             if (std.ascii.eqlIgnoreCase(session_desktop_name, name)) return i;
         }
         if (std.ascii.eqlIgnoreCase(env.environment.name, name)) return i;
+        if (std.ascii.eqlIgnoreCase(env.environment.file_name, name)) return i;
     }
     return null;
 }
