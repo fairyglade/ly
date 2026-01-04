@@ -104,4 +104,5 @@ if [ "$XDG_SESSION_TYPE" = "x11" ]; then
     [ -f "$XDG_CONFIG_HOME"/X11/Xresources ] && xrdb -merge "$XDG_CONFIG_HOME"/X11/Xresources
 fi
 
+unset DISPLAY
 exec "$@"
