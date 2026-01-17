@@ -121,12 +121,11 @@ that Ly will run on, otherwise bad things will happen. For example, to disable `
 # systemctl disable getty@tty2.service
 ```
 
-On platforms that use systemd-logind to dynamically start `autovt@.service` instances when the switch to a new tty occurs, any ly instances for ttys *except the default tty* need to be enabled using a different mechanism: To autostart ly on switch to `tty2`, do not enable any `ly` unit directly, instead symlink `autovt@tty2.service` to `ly@tty2.service` within `/usr/lib/systemd/system/` (analogous for every other tty you want to enable ly on).
+On platforms that use systemd-logind to dynamically start `autovt@.service` instances when the switch to a new tty occurs, any ly instances for ttys _except the default tty_ need to be enabled using a different mechanism: To autostart ly on switch to `tty2`, do not enable any `ly` unit directly, instead symlink `autovt@tty2.service` to `ly@tty2.service` within `/usr/lib/systemd/system/` (analogous for every other tty you want to enable ly on).
 
 The target of the symlink, `ly@ttyN.service`, does not actually exist, but systemd nevertheless recognizes that the instanciation of `autovt@.service` with `%I` equal to `ttyN` now points to an instanciation of `ly@.service` with `%I` set to `ttyN`.
 
 Compare to `man 5 logind.conf`, especially regarding the `NAutoVTs=` and `ReserveVT=` parameters.
-
 
 On non-systemd systems, you can change the TTY Ly will run on by editing the corresponding
 service file for your platform.
@@ -294,3 +293,8 @@ A typical shebang for a shell script looks like this:
 
 The name "Ly" is a tribute to the fairy from the game Rayman. Ly was tested by
 oxodao, who is some seriously awesome dude.
+
+### Donate
+
+If you like Ly and wish to support my work further, feel free to donate via my
+[Liberapay link](https://liberapay.com/ShiningLea)!
