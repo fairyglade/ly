@@ -5,7 +5,7 @@
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD,
 designed with portability in mind (e.g. it does not require systemd to run).
 
-Join us on Matrix over at [#ly:envs.net](https://matrix.to/#/#ly:envs.net)!
+Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.org)!
 
 **Note**: Development happens on [Codeberg](https://codeberg.org/fairyglade/ly)
 with a mirror on [GitHub](https://github.com/fairyglade/ly).
