@@ -1,11 +1,10 @@
 const std = @import("std");
-const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 
 const Allocator = std.mem.Allocator;
 const DynamicString = std.ArrayListUnmanaged(u8);
 
-const termbox = interop.termbox;
+const termbox = TerminalBuffer.termbox;
 
 const Text = @This();
 

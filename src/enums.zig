@@ -1,4 +1,5 @@
 const std = @import("std");
+
 pub const Animation = enum {
     none,
     doom,

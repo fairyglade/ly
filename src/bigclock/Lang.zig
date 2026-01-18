@@ -1,10 +1,10 @@
-const interop = @import("../interop.zig");
+const ly_core = @import("ly-core");
 
 pub const WIDTH = 5;
 pub const HEIGHT = 5;
 pub const SIZE = WIDTH * HEIGHT;
 
-pub const X: u32 = if (interop.supportsUnicode()) 0x2593 else '#';
+pub const X: u32 = if (ly_core.interop.supportsUnicode()) 0x2593 else '#';
 pub const O: u32 = 0;
 
 // zig fmt: off

@@ -72,6 +72,9 @@ pub fn build(b: *std.Build) !void {
         .use_llvm = true,
     });
 
+    const ly_core = b.dependency("ly_core", .{ .target = target, .optimize = optimize });
+    exe.root_module.addImport("ly-core", ly_core.module("ly-core"));
+
     const zigini = b.dependency("zigini", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("zigini", zigini.module("zigini"));
 

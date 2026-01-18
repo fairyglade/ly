@@ -1,5 +1,4 @@
 const std = @import("std");
-const interop = @import("../../interop.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 
 pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) type {
@@ -9,7 +8,7 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
         const DrawItemFn = *const fn (*Self, ItemType, usize, usize) bool;
         const ChangeItemFn = *const fn (ItemType, ?ChangeItemType) void;
 
-        const termbox = interop.termbox;
+        const termbox = TerminalBuffer.termbox;
 
         const Self = @This();
 

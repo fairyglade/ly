@@ -1,13 +1,13 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const builtin = @import("builtin");
+const ly_core = @import("ly-core");
 const clap = @import("clap");
 const ini = @import("zigini");
 const auth = @import("auth.zig");
 const bigclock = @import("bigclock.zig");
 const enums = @import("enums.zig");
 const Environment = @import("Environment.zig");
-const interop = @import("interop.zig");
 const ColorMix = @import("animations/ColorMix.zig");
 const Doom = @import("animations/Doom.zig");
 const Dummy = @import("animations/Dummy.zig");
@@ -25,15 +25,16 @@ const Lang = @import("config/Lang.zig");
 const OldSave = @import("config/OldSave.zig");
 const SavedUsers = @import("config/SavedUsers.zig");
 const migrator = @import("config/migrator.zig");
-const SharedError = @import("SharedError.zig");
-const LogFile = @import("LogFile.zig");
-const UidRange = @import("UidRange.zig");
 
 const StringList = std.ArrayListUnmanaged([]const u8);
 const Ini = ini.Ini;
 const DisplayServer = enums.DisplayServer;
 const Entry = Environment.Entry;
-const termbox = interop.termbox;
+const interop = ly_core.interop;
+const UidRange = ly_core.UidRange;
+const LogFile = ly_core.LogFile;
+const SharedError = ly_core.SharedError;
+const termbox = TerminalBuffer.termbox;
 const temporary_allocator = std.heap.page_allocator;
 const ly_version_str = "Ly version " ++ build_options.version;
 

@@ -1,0 +1,12 @@
+.{
+    .name = .ly_core,
+    .version = "1.0.0",
+    .fingerprint = 0xddda7afda795472,
+    .minimum_zig_version = "0.15.0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

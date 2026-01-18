@@ -2,8 +2,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 const UidRange = @import("UidRange.zig");
 
-pub const termbox = @import("termbox2");
-
 pub const pam = @cImport({
     @cInclude("security/pam_appl.h");
 });

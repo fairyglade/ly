@@ -1,11 +1,12 @@
 const std = @import("std");
-const interop = @import("interop.zig");
+const ly_core = @import("ly-core");
 const enums = @import("enums.zig");
 const Lang = @import("bigclock/Lang.zig");
 const en = @import("bigclock/en.zig");
 const fa = @import("bigclock/fa.zig");
 const Cell = @import("tui/Cell.zig");
 
+const interop = ly_core.interop;
 const Bigclock = enums.Bigclock;
 pub const WIDTH = Lang.WIDTH;
 pub const HEIGHT = Lang.HEIGHT;

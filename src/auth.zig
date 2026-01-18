@@ -1,12 +1,13 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const builtin = @import("builtin");
+const ly_core = @import("ly-core");
 const Environment = @import("Environment.zig");
-const interop = @import("interop.zig");
-const SharedError = @import("SharedError.zig");
-const LogFile = @import("LogFile.zig");
 
 const Md5 = std.crypto.hash.Md5;
+const interop = ly_core.interop;
+const SharedError = ly_core.SharedError;
+const LogFile = ly_core.LogFile;
 const utmp = interop.utmp;
 const Utmp = utmp.utmpx;
 

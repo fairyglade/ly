@@ -1,6 +1,6 @@
-const interop = @import("../interop.zig");
+const TerminalBuffer = @import("TerminalBuffer.zig");
 
-const termbox = interop.termbox;
+const termbox = TerminalBuffer.termbox;
 
 const Cell = @This();
 
