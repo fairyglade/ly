@@ -1,7 +1,6 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const builtin = @import("builtin");
-const enums = @import("enums.zig");
 const Environment = @import("Environment.zig");
 const interop = @import("interop.zig");
 const SharedError = @import("SharedError.zig");
