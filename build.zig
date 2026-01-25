@@ -197,6 +197,8 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
 
         const patched_setup = try patchFile(allocator, "res/setup.sh", patch_map);
         try installText(patched_setup, config_dir, ly_config_directory, "setup.sh", .{ .mode = 0o755 });
+
+        try installFile("res/example.dur", config_dir, ly_config_directory, "example.dur", .{ .override_mode = 0o755 });
     }
 
     {

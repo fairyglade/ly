@@ -580,7 +580,7 @@ pub fn main() !void {
             animation = game_of_life.animation();
         },
         .dur_file => {
-            var dur = try DurFile.init(allocator, &buffer, log_writer, config.dur_file_path, config.dur_x_offset, config.dur_y_offset, config.full_color);
+            var dur = try DurFile.init(allocator, &buffer, log_writer, config.dur_file_path, config.dur_offset_alignment, config.dur_x_offset, config.dur_y_offset, config.full_color);
             animation = dur.animation();
         },
     }

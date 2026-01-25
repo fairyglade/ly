@@ -2,6 +2,8 @@ const std = @import("std");
 const Animation = @import("../tui/Animation.zig");
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+const enums = @import("../enums.zig");
+const DurOffsetAlignment = enums.DurOffsetAlignment;
 const Color = TerminalBuffer.Color;
 const Styling = TerminalBuffer.Styling;
 const Allocator = std.mem.Allocator;
@@ -286,25 +288,74 @@ fn convert_256_to_rgb(color_256: u32) u32 {
     return rgb_color;
 }
 
+const UVec2 = @Vector(2, u32);
+const IVec2 = @Vector(2, i64);
+
+const VEC_X = 0;
+const VEC_Y = 1;
+
 const DurFile = @This();
 
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
-frames: u64,
-time_previous: i64,
-x_offset: u32,
-y_offset: u32,
-full_color: bool,
 dur_movie: DurFormat,
-frame_width: u32,
-frame_height: u32,
+frames: u64,
+frame_size: UVec2,
+start_pos: IVec2,
+full_color: bool,
 frame_time: u32,
+time_previous: i64,
 is_color_format_16: bool,
+offset_alignment: DurOffsetAlignment,
+offset: IVec2,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_writer: *std.io.Writer, file_path: []const u8, x_offset: u32, y_offset: u32, full_color: bool) !DurFile {
+// if the user has an even number of columns or rows, we will default to the left or higher position (e.g. 4 columns center = .x..)
+fn center(v: u32) i64 { 
+    return @intCast((v / 2) + (v % 2)); 
+}
+
+fn calc_start_position(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat, offset_alignment: DurOffsetAlignment, offset: IVec2) IVec2 {
+    const buf_width: u32 = @intCast(terminal_buffer.width);
+    const buf_height: u32 = @intCast(terminal_buffer.height);
+
+    var movie_width: u32 = @intCast(dur_movie.columns.?);
+    var movie_height: u32 = @intCast(dur_movie.lines.?);
+
+    if (movie_width > buf_width) movie_width = buf_width;
+    if (movie_height > buf_height) movie_height = buf_height;
+
+    const start_pos: IVec2 = switch (offset_alignment) {
+        DurOffsetAlignment.center => .{ center(buf_width) - center(movie_width), center(buf_height) - center(movie_height) },
+        DurOffsetAlignment.topleft => .{ 0, 0 },
+        DurOffsetAlignment.topcenter => .{ center(buf_width) - center(movie_width), 0 },
+        DurOffsetAlignment.topright => .{ buf_width - movie_width, 0 },
+        DurOffsetAlignment.centerleft => .{ 0, center(buf_height) - center(movie_height) },
+        DurOffsetAlignment.centerright => .{ buf_width - movie_width, center(buf_height) - center(movie_height) },
+        DurOffsetAlignment.bottomleft => .{ 0, buf_height - movie_height },
+        DurOffsetAlignment.bottomcenter => .{ center(buf_width) - center(movie_width), buf_height - movie_height },
+        DurOffsetAlignment.bottomright => .{ buf_width - movie_width,  buf_height - movie_height },
+    };
+    
+    return start_pos + offset;
+}
+
+fn calc_frame_size(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat) UVec2 {
+    const buf_width: u32 = @intCast(terminal_buffer.width);
+    const buf_height: u32 = @intCast(terminal_buffer.height);
+
+    const movie_width: u32 = @intCast(dur_movie.columns.?);
+    const movie_height: u32 = @intCast(dur_movie.lines.?);
+
+    // Draw only the needed amount if movie smaller than screen. If movie is bigger, we will just draw entire screen
+    const frame_width = if (movie_width < buf_width) movie_width else buf_width;
+    const frame_height = if (movie_height < buf_height) movie_height else buf_height;
+
+    return .{ frame_width, frame_height };
+}
+
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_writer: *std.io.Writer, file_path: []const u8, offset_alignment: DurOffsetAlignment, x_offset: i32, y_offset: i32, full_color: bool) !DurFile {
     var dur_movie: DurFormat = .init(allocator);
 
-    // error state is recoverable when thrown to main and results in no background with Dummy in main
     dur_movie.create_from_file(allocator, file_path) catch |err| switch (err) {
         error.FileNotFound => {
             try log_writer.print("error: dur_file was not found at: {s}\n", .{file_path});
@@ -324,19 +375,10 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_writer: 
         return error.InvalidColorFormat;
     }
 
-    const buf_width: u32 = @intCast(terminal_buffer.width);
-    const buf_height: u32 = @intCast(terminal_buffer.height);
+    const offset: IVec2 = .{ x_offset, y_offset };
 
-    const movie_width: u32 = @intCast(dur_movie.columns.?);
-    const movie_height: u32 = @intCast(dur_movie.lines.?);
-
-    // Clamp to prevent user from exceeding draw window
-    const x_offset_clamped = std.math.clamp(x_offset, 0, buf_width - 1);
-    const y_offset_clamped = std.math.clamp(y_offset, 0, buf_height - 1);
-
-    // Ensure if user offsets and frame goes offscreen, it will not overflow draw
-    const frame_width = if ((movie_width + x_offset_clamped) < buf_width) movie_width else buf_width - x_offset_clamped;
-    const frame_height = if ((movie_height + y_offset_clamped) < buf_height) movie_height else buf_height - y_offset_clamped;
+    const start_pos = calc_start_position(terminal_buffer, &dur_movie, offset_alignment, offset);
+    const frame_size = calc_frame_size(terminal_buffer, &dur_movie);
 
     // Convert dur fps to frames per ms
     const frame_time: u32 = @intFromFloat(1000 / dur_movie.framerate.?);
@@ -346,14 +388,14 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_writer: 
         .terminal_buffer = terminal_buffer,
         .frames = 0,
         .time_previous = std.time.milliTimestamp(),
-        .x_offset = x_offset_clamped,
-        .y_offset = y_offset_clamped,
+        .frame_size = frame_size,
+        .start_pos = start_pos,
         .full_color = full_color,
         .dur_movie = dur_movie,
-        .frame_width = frame_width,
-        .frame_height = frame_height,
         .frame_time = frame_time,
         .is_color_format_16 = eql(u8, dur_movie.colorFormat.?, "16"),
+        .offset_alignment = offset_alignment,
+        .offset = offset,
     };
 }
 
@@ -365,15 +407,34 @@ fn deinit(self: *DurFile) void {
     self.dur_movie.deinit();
 }
 
-fn realloc(_: *DurFile) anyerror!void {}
+fn realloc(self: *DurFile) anyerror!void {
+    // when terminal size changes, we need to recalculate the start_pos and frame_size based on the new size
+    self.start_pos = calc_start_position(self.terminal_buffer, &self.dur_movie, self.offset_alignment, self.offset);
+    self.frame_size = calc_frame_size(self.terminal_buffer, &self.dur_movie);
+}
 
 fn draw(self: *DurFile) void {
     const current_frame = self.dur_movie.frames.items[self.frames];
 
-    for (0..self.frame_height) |y| {
+    const buf_width: u32 = @intCast(self.terminal_buffer.width);
+    const buf_height: u32 = @intCast(self.terminal_buffer.height);
+
+    // y is used as an iterator in the durformat, while cell_y gives us the correct placement for the cell (same for x)
+    for (0..self.frame_size[VEC_Y]) |y| {
+        const y_offset_i = @as(i32, @intCast(y)) + self.start_pos[VEC_Y];
+        // we skip the pass if it falls outside of the draw window (ensure no int underflow)
+        const cell_y: u32 = if (y_offset_i >= 0 and y_offset_i < buf_height) @intCast(y_offset_i) else continue;
+        
         var iter = std.unicode.Utf8View.initUnchecked(current_frame.contents[y]).iterator();
 
-        for (0..self.frame_width) |x| {
+        for (0..self.frame_size[VEC_X]) |x| {
+            const x_offset_i = @as(i32, @intCast(x)) + self.start_pos[VEC_X];
+            // skip pass, same as y but also increment the codepoint iter to fetch correct values in later passes
+            const cell_x: u32 = if (x_offset_i >= 0 and x_offset_i < buf_width) @intCast(x_offset_i) else {
+                _ = iter.nextCodepoint().?;
+                continue;
+            };
+            
             const codepoint: u21 = iter.nextCodepoint().?;
             const color_map = current_frame.colorMap[x][y];
 
@@ -390,7 +451,7 @@ fn draw(self: *DurFile) void {
 
             const cell = Cell{ .ch = @intCast(codepoint), .fg = fg_color, .bg = bg_color };
 
-            cell.put(x + self.x_offset, y + self.y_offset);
+            cell.put(cell_x, cell_y);
         }
     }
 

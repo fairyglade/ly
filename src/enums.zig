@@ -54,3 +54,15 @@ pub const Bigclock = enum {
     en,
     fa,
 };
+
+pub const DurOffsetAlignment = enum {
+    topleft,
+    topcenter,
+    topright,
+    centerleft,
+    center,
+    centerright,
+    bottomleft,
+    bottomcenter,
+    bottomright,
+};
