@@ -20,6 +20,7 @@ pub const AuthOptions = struct {
     setup_cmd: []const u8,
     login_cmd: ?[]const u8,
     x_cmd: []const u8,
+    x_vt: ?u8,
     session_pid: std.posix.pid_t,
 };
 
@@ -189,7 +190,7 @@ fn startSession(
         .wayland, .shell, .custom => try executeCmd(log_file, allocator, user_entry.shell.?, options, current_environment.is_terminal, current_environment.cmd),
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
-            const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{options.tty});
+            const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{options.x_vt orelse options.tty});
             try executeX11Cmd(log_file, allocator, user_entry.shell.?, user_entry.home.?, options, current_environment.cmd orelse "", vt);
         },
     }

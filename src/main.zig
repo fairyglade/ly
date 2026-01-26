@@ -1086,6 +1086,7 @@ pub fn main() !void {
                             .setup_cmd = config.setup_cmd,
                             .login_cmd = config.login_cmd,
                             .x_cmd = config.x_cmd,
+                            .x_vt = config.x_vt,
                             .session_pid = session_pid,
                         };
 
