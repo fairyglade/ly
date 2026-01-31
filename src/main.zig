@@ -10,7 +10,6 @@ const enums = @import("enums.zig");
 const Environment = @import("Environment.zig");
 const ColorMix = @import("animations/ColorMix.zig");
 const Doom = @import("animations/Doom.zig");
-const Dummy = @import("animations/Dummy.zig");
 const Matrix = @import("animations/Matrix.zig");
 const GameOfLife = @import("animations/GameOfLife.zig");
 const DurFile = @import("animations/DurFile.zig");
@@ -70,7 +69,7 @@ const UiState = struct {
     update: bool,
     buffer: *TerminalBuffer,
     animation_timed_out: bool,
-    animation: *Animation,
+    animation: *?Animation,
     can_draw_battery: bool,
     info_line: *InfoLine,
     animate: bool,
@@ -507,7 +506,7 @@ pub fn main() !void {
         is_autologin = true;
     }
 
-    var animation: Animation = undefined;
+    var animation: ?Animation = null;
     var state = UiState{
         .auth_fails = 0,
         .update = true,
@@ -580,10 +579,7 @@ pub fn main() !void {
 
     // Initialize the animation, if any
     switch (config.animation) {
-        .none => {
-            var dummy = Dummy{};
-            animation = dummy.animation();
-        },
+        .none => {},
         .doom => {
             var doom = try Doom.init(allocator, &buffer, config.doom_top_color, config.doom_middle_color, config.doom_bottom_color, config.doom_fire_height, config.doom_fire_spread);
             animation = doom.animation();
@@ -605,7 +601,7 @@ pub fn main() !void {
             animation = dur.animation();
         },
     }
-    defer animation.deinit();
+    defer if (animation) |*a| a.deinit();
 
     const shutdown_key = try std.fmt.parseInt(u8, config.shutdown_key[1..], 10);
     const restart_key = try std.fmt.parseInt(u8, config.restart_key[1..], 10);
@@ -660,7 +656,7 @@ pub fn main() !void {
                 buffer.width = width;
                 buffer.height = height;
 
-                animation.realloc() catch |err| {
+                if (animation) |*a| a.realloc() catch |err| {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     try log_file.err("tui", "failed to reallocate animation buffers: {s}", .{@errorName(err)});
                 };
@@ -685,7 +681,7 @@ pub fn main() !void {
 
             if (config.animation_timeout_sec > 0 and time.seconds - animation_time_start.seconds > config.animation_timeout_sec) {
                 state.animation_timed_out = true;
-                animation.deinit();
+                if (animation) |*a| a.deinit();
             }
         } else if (config.bigclock != .none and config.clock == null) {
             const time = try interop.getTimeOfDay();
@@ -1020,7 +1016,7 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
 
     var length: usize = config.edge_margin;
 
-    if (!state.animation_timed_out) state.animation.draw();
+    if (!state.animation_timed_out) if (state.animation.*) |*a| a.draw();
 
     if (!config.hide_version_string) {
         state.buffer.drawLabel(ly_version_str, config.edge_margin, state.buffer.height - 1 - config.edge_margin);
