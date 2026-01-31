@@ -65,6 +65,31 @@ const ConfigError = struct {
 };
 var config_errors: std.ArrayList(ConfigError) = .empty;
 
+const UiState = struct {
+    auth_fails: u64,
+    update: bool,
+    buffer: *TerminalBuffer,
+    animation_timed_out: bool,
+    animation: *Animation,
+    can_draw_battery: bool,
+    info_line: *InfoLine,
+    animate: bool,
+    resolution_changed: bool,
+    session: *Session,
+    login: *UserList,
+    password: *Text,
+    active_input: enums.Input,
+    insert_mode: bool,
+    can_draw_clock: bool,
+    shutdown_len: u8,
+    restart_len: u8,
+    sleep_len: u8,
+    hibernate_len: u8,
+    brightness_down_len: u8,
+    brightness_up_len: u8,
+    can_get_lock_state: bool,
+};
+
 pub fn main() !void {
     var shutdown = false;
     var restart = false;
@@ -99,11 +124,10 @@ pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}).init;
     defer _ = gpa.deinit();
 
+    const allocator = gpa.allocator();
+
     // Allows stopping an animation after some time
     const animation_time_start = try interop.getTimeOfDay();
-    var animation_timed_out: bool = false;
-
-    const allocator = gpa.allocator();
 
     // Load arguments
     const params = comptime clap.parseParamsComptime(
@@ -127,9 +151,6 @@ pub fn main() !void {
     var old_save_file_exists = false;
     var maybe_config_load_error: ?anyerror = null;
     var start_cmd_exit_code: u8 = 0;
-    var can_get_lock_state = true;
-    var can_draw_clock = true;
-    var can_draw_battery = true;
 
     var saved_users = SavedUsers.init();
     defer saved_users.deinit(allocator);
@@ -457,8 +478,6 @@ pub fn main() !void {
     var password = Text.init(allocator, &buffer, true, config.asterisk);
     defer password.deinit();
 
-    var active_input = config.default_input;
-    var insert_mode = !config.vi_mode or config.vi_default_mode == .insert;
     var is_autologin = false;
 
     check_autologin: {
@@ -488,6 +507,32 @@ pub fn main() !void {
         is_autologin = true;
     }
 
+    var animation: Animation = undefined;
+    var state = UiState{
+        .auth_fails = 0,
+        .update = true,
+        .buffer = &buffer,
+        .animation_timed_out = false,
+        .animation = &animation,
+        .can_draw_battery = true,
+        .info_line = &info_line,
+        .animate = config.animation != .none,
+        .resolution_changed = false,
+        .session = &session,
+        .login = &login,
+        .password = &password,
+        .active_input = config.default_input,
+        .insert_mode = !config.vi_mode or config.vi_default_mode == .insert,
+        .can_draw_clock = true,
+        .shutdown_len = try TerminalBuffer.strWidth(lang.shutdown),
+        .restart_len = try TerminalBuffer.strWidth(lang.restart),
+        .sleep_len = try TerminalBuffer.strWidth(lang.sleep),
+        .hibernate_len = try TerminalBuffer.strWidth(lang.hibernate),
+        .brightness_down_len = try TerminalBuffer.strWidth(lang.brightness_down),
+        .brightness_up_len = try TerminalBuffer.strWidth(lang.brightness_up),
+        .can_get_lock_state = true,
+    };
+
     // Load last saved username and desktop selection, if any
     // Skip if autologin is active to prevent overriding autologin session
     if (config.save and !is_autologin) {
@@ -506,7 +551,7 @@ pub fn main() !void {
                 }
             }
 
-            active_input = .password;
+            state.active_input = .password;
 
             session.label.current = @min(user.session_index, session.label.list.items.len - 1);
         }
@@ -522,11 +567,11 @@ pub fn main() !void {
         login.label.position(coordinates.x, coordinates.y + 4, coordinates.visible_length, config.text_in_center);
         password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
 
-        switch (active_input) {
-            .info_line => info_line.label.handle(null, insert_mode),
-            .session => session.label.handle(null, insert_mode),
-            .login => login.label.handle(null, insert_mode),
-            .password => password.handle(null, insert_mode) catch |err| {
+        switch (state.active_input) {
+            .info_line => info_line.label.handle(null, state.insert_mode),
+            .session => session.label.handle(null, state.insert_mode),
+            .login => login.label.handle(null, state.insert_mode),
+            .password => password.handle(null, state.insert_mode) catch |err| {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                 try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
             },
@@ -534,8 +579,6 @@ pub fn main() !void {
     }
 
     // Initialize the animation, if any
-    var animation: Animation = undefined;
-
     switch (config.animation) {
         .none => {
             var dummy = Dummy{};
@@ -564,25 +607,15 @@ pub fn main() !void {
     }
     defer animation.deinit();
 
-    const animate = config.animation != .none;
     const shutdown_key = try std.fmt.parseInt(u8, config.shutdown_key[1..], 10);
-    const shutdown_len = try TerminalBuffer.strWidth(lang.shutdown);
     const restart_key = try std.fmt.parseInt(u8, config.restart_key[1..], 10);
-    const restart_len = try TerminalBuffer.strWidth(lang.restart);
     const sleep_key = try std.fmt.parseInt(u8, config.sleep_key[1..], 10);
-    const sleep_len = try TerminalBuffer.strWidth(lang.sleep);
     const hibernate_key = try std.fmt.parseInt(u8, config.hibernate_key[1..], 10);
-    const hibernate_len = try TerminalBuffer.strWidth(lang.hibernate);
     const brightness_down_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
-    const brightness_down_len = try TerminalBuffer.strWidth(lang.brightness_down);
     const brightness_up_key = if (config.brightness_up_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
-    const brightness_up_len = try TerminalBuffer.strWidth(lang.brightness_up);
 
     var event: termbox.tb_event = undefined;
     var run = true;
-    var update = true;
-    var resolution_changed = false;
-    var auth_fails: u64 = 0;
     var inactivity_time_start = try interop.getTimeOfDay();
     var inactivity_cmd_ran = false;
 
@@ -612,8 +645,8 @@ pub fn main() !void {
 
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
-        if (!update or animate) {
-            if (!update) std.Thread.sleep(std.time.ns_per_ms * 100);
+        if (!state.update or state.animate) {
+            if (!state.update) std.Thread.sleep(std.time.ns_per_ms * 100);
 
             // Required to update tb_width() and tb_height()
             const new_dimensions = TerminalBuffer.presentBufferStatic();
@@ -632,232 +665,33 @@ pub fn main() !void {
                     try log_file.err("tui", "failed to reallocate animation buffers: {s}", .{@errorName(err)});
                 };
 
-                update = true;
-                resolution_changed = true;
+                state.update = true;
+                state.resolution_changed = true;
             }
         }
 
-        if (update) {
-            // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
-            if (config.auth_fails > 0 and auth_fails >= config.auth_fails) {
-                std.Thread.sleep(std.time.ns_per_ms * 10);
-                update = buffer.cascade();
-
-                if (!update) {
-                    std.Thread.sleep(std.time.ns_per_s * 7);
-                    auth_fails = 0;
-                }
-
-                _ = TerminalBuffer.presentBufferStatic();
-                continue;
-            }
-
-            try TerminalBuffer.clearScreenStatic(false);
-
-            var length: usize = config.edge_margin;
-
-            if (!animation_timed_out) animation.draw();
-
-            if (!config.hide_version_string) {
-                buffer.drawLabel(ly_version_str, config.edge_margin, buffer.height - 1 - config.edge_margin);
-            }
-
-            if (config.battery_id) |id| draw_battery: {
-                if (!can_draw_battery) break :draw_battery;
-
-                const battery_percentage = getBatteryPercentage(id) catch |err| {
-                    try log_file.err("sys", "failed to get battery percentage: {s}", .{@errorName(err)});
-                    try info_line.addMessage(lang.err_battery, config.error_bg, config.error_fg);
-                    can_draw_battery = false;
-                    break :draw_battery;
-                };
-
-                var battery_buf: [16:0]u8 = undefined;
-                const battery_str = std.fmt.bufPrintZ(&battery_buf, "BAT: {d}%", .{battery_percentage}) catch break :draw_battery;
-
-                var battery_y: usize = config.edge_margin;
-                if (!config.hide_key_hints) {
-                    battery_y += 1;
-                }
-                buffer.drawLabel(battery_str, config.edge_margin, battery_y);
-                can_draw_battery = true;
-            }
-
-            if (config.bigclock != .none and buffer.box_height + (bigclock.HEIGHT + 2) * 2 < buffer.height) {
-                var format_buf: [16:0]u8 = undefined;
-                var clock_buf: [32:0]u8 = undefined;
-                // We need the slice/c-string returned by `bufPrintZ`.
-                const format = try std.fmt.bufPrintZ(&format_buf, "{s}{s}{s}{s}", .{
-                    if (config.bigclock_12hr) "%I" else "%H",
-                    ":%M",
-                    if (config.bigclock_seconds) ":%S" else "",
-                    if (config.bigclock_12hr) "%P" else "",
-                });
-                const xo = buffer.width / 2 - @min(buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
-                const yo = (buffer.height - buffer.box_height) / 2 - bigclock.HEIGHT - 2;
-
-                const clock_str = interop.timeAsString(&clock_buf, format);
-
-                for (clock_str, 0..) |c, i| {
-                    // TODO: Show error
-                    const clock_cell = try bigclock.clockCell(animate, c, buffer.fg, buffer.bg, config.bigclock);
-                    bigclock.alphaBlit(xo + i * (bigclock.WIDTH + 1), yo, buffer.width, buffer.height, clock_cell);
-                }
-            }
-
-            buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
-
-            if (resolution_changed) {
-                const coordinates = buffer.calculateComponentCoordinates();
-                info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length, null);
-                session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length, config.text_in_center);
-                login.label.position(coordinates.x, coordinates.y + 4, coordinates.visible_length, config.text_in_center);
-                password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
-
-                resolution_changed = false;
-            }
-
-            switch (active_input) {
-                .info_line => info_line.label.handle(null, insert_mode),
-                .session => session.label.handle(null, insert_mode),
-                .login => login.label.handle(null, insert_mode),
-                .password => password.handle(null, insert_mode) catch |err| {
-                    try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
-                },
-            }
-
-            if (config.clock) |clock| draw_clock: {
-                if (!can_draw_clock) break :draw_clock;
-
-                var clock_buf: [64:0]u8 = undefined;
-                const clock_str = interop.timeAsString(&clock_buf, clock);
-
-                if (clock_str.len == 0) {
-                    try info_line.addMessage(lang.err_clock_too_long, config.error_bg, config.error_fg);
-                    can_draw_clock = false;
-                    try log_file.err("tui", "clock string too long", .{});
-                    break :draw_clock;
-                }
-
-                buffer.drawLabel(clock_str, buffer.width - @min(buffer.width, clock_str.len) - config.edge_margin, config.edge_margin);
-            }
-
-            const label_x = buffer.box_x + buffer.margin_box_h;
-            const label_y = buffer.box_y + buffer.margin_box_v;
-
-            buffer.drawLabel(lang.login, label_x, label_y + 4);
-            buffer.drawLabel(lang.password, label_x, label_y + 6);
-
-            info_line.label.draw();
-
-            if (!config.hide_key_hints) {
-                buffer.drawLabel(config.shutdown_key, length, config.edge_margin);
-                length += config.shutdown_key.len + 1;
-                buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-                buffer.drawLabel(lang.shutdown, length, config.edge_margin);
-                length += shutdown_len + 1;
-
-                buffer.drawLabel(config.restart_key, length, config.edge_margin);
-                length += config.restart_key.len + 1;
-                buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-                buffer.drawLabel(lang.restart, length, config.edge_margin);
-                length += restart_len + 1;
-
-                if (config.sleep_cmd != null) {
-                    buffer.drawLabel(config.sleep_key, length, config.edge_margin);
-                    length += config.sleep_key.len + 1;
-                    buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-                    buffer.drawLabel(lang.sleep, length, config.edge_margin);
-                    length += sleep_len + 1;
-                }
-
-                if (config.hibernate_cmd != null) {
-                    buffer.drawLabel(config.hibernate_key, length, config.edge_margin);
-                    length += config.hibernate_key.len + 1;
-                    buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-                    buffer.drawLabel(lang.hibernate, length, config.edge_margin);
-                    length += hibernate_len + 1;
-                }
-
-                if (config.brightness_down_key) |key| {
-                    buffer.drawLabel(key, length, config.edge_margin);
-                    length += key.len + 1;
-                    buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-                    buffer.drawLabel(lang.brightness_down, length, config.edge_margin);
-                    length += brightness_down_len + 1;
-                }
-
-                if (config.brightness_up_key) |key| {
-                    buffer.drawLabel(key, length, config.edge_margin);
-                    length += key.len + 1;
-                    buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-                    buffer.drawLabel(lang.brightness_up, length, config.edge_margin);
-                    length += brightness_up_len + 1;
-                }
-            }
-
-            if (config.box_title) |title| {
-                buffer.drawConfinedLabel(title, buffer.box_x, buffer.box_y - 1, buffer.box_width);
-            }
-
-            if (config.vi_mode) {
-                const label_txt = if (insert_mode) lang.insert else lang.normal;
-                buffer.drawLabel(label_txt, buffer.box_x, buffer.box_y + buffer.box_height);
-            }
-
-            if (!config.hide_keyboard_locks and can_get_lock_state) draw_lock_state: {
-                const lock_state = interop.getLockState() catch |err| {
-                    try info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
-                    can_get_lock_state = false;
-                    try log_file.err("sys", "failed to get lock state: {s}", .{@errorName(err)});
-                    break :draw_lock_state;
-                };
-
-                var lock_state_x = buffer.width - @min(buffer.width, lang.numlock.len) - config.edge_margin;
-                var lock_state_y: usize = config.edge_margin;
-
-                if (config.clock != null) lock_state_y += 1;
-
-                if (lock_state.numlock) buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
-
-                if (lock_state_x >= lang.capslock.len + 1) {
-                    lock_state_x -= lang.capslock.len + 1;
-                    if (lock_state.capslock) buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
-                }
-            }
-
-            session.label.draw();
-            login.label.draw();
-            password.draw();
-
-            _ = TerminalBuffer.presentBufferStatic();
+        if (state.update) {
+            if (!try drawUi(config, lang, &log_file, &state)) continue;
         }
 
         var timeout: i32 = -1;
 
         // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for the event indefinitely instead
-        if (animate and !animation_timed_out) {
+        if (state.animate and !state.animation_timed_out) {
             timeout = config.min_refresh_delta;
 
             // Check how long we've been running so we can turn off the animation
             const time = try interop.getTimeOfDay();
 
             if (config.animation_timeout_sec > 0 and time.seconds - animation_time_start.seconds > config.animation_timeout_sec) {
-                animation_timed_out = true;
+                state.animation_timed_out = true;
                 animation.deinit();
             }
         } else if (config.bigclock != .none and config.clock == null) {
             const time = try interop.getTimeOfDay();
 
             timeout = @intCast((60 - @rem(time.seconds, 60)) * 1000 - @divTrunc(time.microseconds, 1000) + 1);
-        } else if (config.clock != null or (config.auth_fails > 0 and auth_fails >= config.auth_fails)) {
+        } else if (config.clock != null or (config.auth_fails > 0 and state.auth_fails >= config.auth_fails)) {
             const time = try interop.getTimeOfDay();
 
             timeout = @intCast(1000 - @divTrunc(time.microseconds, 1000) + 1);
@@ -900,7 +734,7 @@ pub fn main() !void {
         } else {
             const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
 
-            update = timeout != -1;
+            state.update = timeout != -1;
 
             if (event_error < 0 or event.type != termbox.TB_EVENT_KEY) continue;
         }
@@ -910,9 +744,9 @@ pub fn main() !void {
 
         switch (event.key) {
             termbox.TB_KEY_ESC => {
-                if (config.vi_mode and insert_mode) {
-                    insert_mode = false;
-                    update = true;
+                if (config.vi_mode and state.insert_mode) {
+                    state.insert_mode = false;
+                    state.update = true;
                 }
             },
             termbox.TB_KEY_F12...termbox.TB_KEY_F1 => {
@@ -968,25 +802,25 @@ pub fn main() !void {
                 }
             },
             termbox.TB_KEY_CTRL_C => run = false,
-            termbox.TB_KEY_CTRL_U => if (active_input == .password) {
+            termbox.TB_KEY_CTRL_U => if (state.active_input == .password) {
                 password.clear();
-                update = true;
+                state.update = true;
             },
             termbox.TB_KEY_CTRL_K, termbox.TB_KEY_ARROW_UP => {
-                active_input.move(true, false);
-                update = true;
+                state.active_input.move(true, false);
+                state.update = true;
             },
             termbox.TB_KEY_CTRL_J, termbox.TB_KEY_ARROW_DOWN => {
-                active_input.move(false, false);
-                update = true;
+                state.active_input.move(false, false);
+                state.update = true;
             },
             termbox.TB_KEY_TAB => {
-                active_input.move(false, true);
-                update = true;
+                state.active_input.move(false, true);
+                state.update = true;
             },
             termbox.TB_KEY_BACK_TAB => {
-                active_input.move(true, true);
-                update = true;
+                state.active_input.move(true, true);
+                state.update = true;
             },
             termbox.TB_KEY_ENTER => authenticate: {
                 try log_file.info("auth", "starting authentication", .{});
@@ -1102,8 +936,8 @@ pub fn main() !void {
 
                 const auth_err = shared_err.readError();
                 if (auth_err) |err| {
-                    auth_fails += 1;
-                    active_input = .password;
+                    state.auth_fails += 1;
+                    state.active_input = .password;
 
                     try info_line.addMessage(getAuthErrorMsg(err, lang), config.error_bg, config.error_fg);
                     try log_file.err("auth", "failed to authenticate: {s}", .{@errorName(err)});
@@ -1121,9 +955,9 @@ pub fn main() !void {
                     try log_file.info("auth", "logged out", .{});
                 }
 
-                if (config.auth_fails == 0 or auth_fails < config.auth_fails) {
+                if (config.auth_fails == 0 or state.auth_fails < config.auth_fails) {
                     try TerminalBuffer.clearScreenStatic(true);
-                    update = true;
+                    state.update = true;
                 }
 
                 // Restore the cursor
@@ -1131,39 +965,244 @@ pub fn main() !void {
                 _ = TerminalBuffer.presentBufferStatic();
             },
             else => {
-                if (!insert_mode) {
+                if (!state.insert_mode) {
                     switch (event.ch) {
                         'k' => {
-                            active_input.move(true, false);
-                            update = true;
+                            state.active_input.move(true, false);
+                            state.update = true;
                             continue;
                         },
                         'j' => {
-                            active_input.move(false, false);
-                            update = true;
+                            state.active_input.move(false, false);
+                            state.update = true;
                             continue;
                         },
                         'i' => {
-                            insert_mode = true;
-                            update = true;
+                            state.insert_mode = true;
+                            state.update = true;
                             continue;
                         },
                         else => {},
                     }
                 }
 
-                switch (active_input) {
-                    .info_line => info_line.label.handle(&event, insert_mode),
-                    .session => session.label.handle(&event, insert_mode),
-                    .login => login.label.handle(&event, insert_mode),
-                    .password => password.handle(&event, insert_mode) catch {
+                switch (state.active_input) {
+                    .info_line => info_line.label.handle(&event, state.insert_mode),
+                    .session => session.label.handle(&event, state.insert_mode),
+                    .login => login.label.handle(&event, state.insert_mode),
+                    .password => password.handle(&event, state.insert_mode) catch {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     },
                 }
-                update = true;
+
+                state.update = true;
             },
         }
     }
+}
+
+fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool {
+    // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
+    if (config.auth_fails > 0 and state.auth_fails >= config.auth_fails) {
+        std.Thread.sleep(std.time.ns_per_ms * 10);
+        state.update = state.buffer.cascade();
+
+        if (!state.update) {
+            std.Thread.sleep(std.time.ns_per_s * 7);
+            state.auth_fails = 0;
+        }
+
+        _ = TerminalBuffer.presentBufferStatic();
+        return false;
+    }
+
+    try TerminalBuffer.clearScreenStatic(false);
+
+    var length: usize = config.edge_margin;
+
+    if (!state.animation_timed_out) state.animation.draw();
+
+    if (!config.hide_version_string) {
+        state.buffer.drawLabel(ly_version_str, config.edge_margin, state.buffer.height - 1 - config.edge_margin);
+    }
+
+    if (config.battery_id) |id| draw_battery: {
+        if (!state.can_draw_battery) break :draw_battery;
+
+        const battery_percentage = getBatteryPercentage(id) catch |err| {
+            try log_file.err("sys", "failed to get battery percentage: {s}", .{@errorName(err)});
+            try state.info_line.addMessage(lang.err_battery, config.error_bg, config.error_fg);
+            state.can_draw_battery = false;
+            break :draw_battery;
+        };
+
+        var battery_buf: [16:0]u8 = undefined;
+        const battery_str = std.fmt.bufPrintZ(&battery_buf, "BAT: {d}%", .{battery_percentage}) catch break :draw_battery;
+
+        var battery_y: usize = config.edge_margin;
+        if (!config.hide_key_hints) {
+            battery_y += 1;
+        }
+        state.buffer.drawLabel(battery_str, config.edge_margin, battery_y);
+        state.can_draw_battery = true;
+    }
+
+    if (config.bigclock != .none and state.buffer.box_height + (bigclock.HEIGHT + 2) * 2 < state.buffer.height) {
+        var format_buf: [16:0]u8 = undefined;
+        var clock_buf: [32:0]u8 = undefined;
+        // We need the slice/c-string returned by `bufPrintZ`.
+        const format = try std.fmt.bufPrintZ(&format_buf, "{s}{s}{s}{s}", .{
+            if (config.bigclock_12hr) "%I" else "%H",
+            ":%M",
+            if (config.bigclock_seconds) ":%S" else "",
+            if (config.bigclock_12hr) "%P" else "",
+        });
+        const xo = state.buffer.width / 2 - @min(state.buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
+        const yo = (state.buffer.height - state.buffer.box_height) / 2 - bigclock.HEIGHT - 2;
+
+        const clock_str = interop.timeAsString(&clock_buf, format);
+
+        for (clock_str, 0..) |c, i| {
+            // TODO: Show error
+            const clock_cell = try bigclock.clockCell(state.animate, c, state.buffer.fg, state.buffer.bg, config.bigclock);
+            bigclock.alphaBlit(xo + i * (bigclock.WIDTH + 1), yo, state.buffer.width, state.buffer.height, clock_cell);
+        }
+    }
+
+    state.buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
+
+    if (state.resolution_changed) {
+        const coordinates = state.buffer.calculateComponentCoordinates();
+        state.info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length, null);
+        state.session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length, config.text_in_center);
+        state.login.label.position(coordinates.x, coordinates.y + 4, coordinates.visible_length, config.text_in_center);
+        state.password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
+
+        state.resolution_changed = false;
+    }
+
+    switch (state.active_input) {
+        .info_line => state.info_line.label.handle(null, state.insert_mode),
+        .session => state.session.label.handle(null, state.insert_mode),
+        .login => state.login.label.handle(null, state.insert_mode),
+        .password => state.password.handle(null, state.insert_mode) catch |err| {
+            try state.info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+            try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
+        },
+    }
+
+    if (config.clock) |clock| draw_clock: {
+        if (!state.can_draw_clock) break :draw_clock;
+
+        var clock_buf: [64:0]u8 = undefined;
+        const clock_str = interop.timeAsString(&clock_buf, clock);
+
+        if (clock_str.len == 0) {
+            try state.info_line.addMessage(lang.err_clock_too_long, config.error_bg, config.error_fg);
+            state.can_draw_clock = false;
+            try log_file.err("tui", "clock string too long", .{});
+            break :draw_clock;
+        }
+
+        state.buffer.drawLabel(clock_str, state.buffer.width - @min(state.buffer.width, clock_str.len) - config.edge_margin, config.edge_margin);
+    }
+
+    const label_x = state.buffer.box_x + state.buffer.margin_box_h;
+    const label_y = state.buffer.box_y + state.buffer.margin_box_v;
+
+    state.buffer.drawLabel(lang.login, label_x, label_y + 4);
+    state.buffer.drawLabel(lang.password, label_x, label_y + 6);
+
+    state.info_line.label.draw();
+
+    if (!config.hide_key_hints) {
+        state.buffer.drawLabel(config.shutdown_key, length, config.edge_margin);
+        length += config.shutdown_key.len + 1;
+        state.buffer.drawLabel(" ", length - 1, config.edge_margin);
+
+        state.buffer.drawLabel(lang.shutdown, length, config.edge_margin);
+        length += state.shutdown_len + 1;
+
+        state.buffer.drawLabel(config.restart_key, length, config.edge_margin);
+        length += config.restart_key.len + 1;
+        state.buffer.drawLabel(" ", length - 1, config.edge_margin);
+
+        state.buffer.drawLabel(lang.restart, length, config.edge_margin);
+        length += state.restart_len + 1;
+
+        if (config.sleep_cmd != null) {
+            state.buffer.drawLabel(config.sleep_key, length, config.edge_margin);
+            length += config.sleep_key.len + 1;
+            state.buffer.drawLabel(" ", length - 1, config.edge_margin);
+
+            state.buffer.drawLabel(lang.sleep, length, config.edge_margin);
+            length += state.sleep_len + 1;
+        }
+
+        if (config.hibernate_cmd != null) {
+            state.buffer.drawLabel(config.hibernate_key, length, config.edge_margin);
+            length += config.hibernate_key.len + 1;
+            state.buffer.drawLabel(" ", length - 1, config.edge_margin);
+
+            state.buffer.drawLabel(lang.hibernate, length, config.edge_margin);
+            length += state.hibernate_len + 1;
+        }
+
+        if (config.brightness_down_key) |key| {
+            state.buffer.drawLabel(key, length, config.edge_margin);
+            length += key.len + 1;
+            state.buffer.drawLabel(" ", length - 1, config.edge_margin);
+
+            state.buffer.drawLabel(lang.brightness_down, length, config.edge_margin);
+            length += state.brightness_down_len + 1;
+        }
+
+        if (config.brightness_up_key) |key| {
+            state.buffer.drawLabel(key, length, config.edge_margin);
+            length += key.len + 1;
+            state.buffer.drawLabel(" ", length - 1, config.edge_margin);
+
+            state.buffer.drawLabel(lang.brightness_up, length, config.edge_margin);
+            length += state.brightness_up_len + 1;
+        }
+    }
+
+    if (config.box_title) |title| {
+        state.buffer.drawConfinedLabel(title, state.buffer.box_x, state.buffer.box_y - 1, state.buffer.box_width);
+    }
+
+    if (config.vi_mode) {
+        const label_txt = if (state.insert_mode) lang.insert else lang.normal;
+        state.buffer.drawLabel(label_txt, state.buffer.box_x, state.buffer.box_y + state.buffer.box_height);
+    }
+
+    if (!config.hide_keyboard_locks and state.can_get_lock_state) draw_lock_state: {
+        const lock_state = interop.getLockState() catch |err| {
+            try state.info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
+            state.can_get_lock_state = false;
+            try log_file.err("sys", "failed to get lock state: {s}", .{@errorName(err)});
+            break :draw_lock_state;
+        };
+
+        var lock_state_x = state.buffer.width - @min(state.buffer.width, lang.numlock.len) - config.edge_margin;
+        var lock_state_y: usize = config.edge_margin;
+
+        if (config.clock != null) lock_state_y += 1;
+
+        if (lock_state.numlock) state.buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
+
+        if (lock_state_x >= lang.capslock.len + 1) {
+            lock_state_x -= lang.capslock.len + 1;
+            if (lock_state.capslock) state.buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
+        }
+    }
+
+    state.session.label.draw();
+    state.login.label.draw();
+    state.password.draw();
+
+    _ = TerminalBuffer.presentBufferStatic();
+    return true;
 }
 
 fn configErrorHandler(type_name: []const u8, key: []const u8, value: []const u8, err: anyerror) void {
