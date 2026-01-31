@@ -42,9 +42,11 @@ pub fn authenticate(allocator: std.mem.Allocator, log_file: *LogFile, options: A
     const pam_tty_str = try std.fmt.bufPrintZ(&pam_tty_buffer, "tty{d}", .{options.tty});
 
     // Set the XDG environment variables
+    try log_file.info("auth/env", "setting xdg environment variables", .{});
     try setXdgEnv(allocator, tty_str, current_environment);
 
     // Open the PAM session
+    try log_file.info("auth/pam", "encoding credentials", .{});
     const login_z = try allocator.dupeZ(u8, login);
     defer allocator.free(login_z);
 
@@ -88,6 +90,7 @@ pub fn authenticate(allocator: std.mem.Allocator, log_file: *LogFile, options: A
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer status = interop.pam.pam_close_session(handle, 0);
 
+    try log_file.info("auth/passwd", "getting struct", .{});
     var user_entry: interop.UsernameEntry = undefined;
     {
         defer interop.closePasswordDatabase();
@@ -97,6 +100,7 @@ pub fn authenticate(allocator: std.mem.Allocator, log_file: *LogFile, options: A
     }
 
     // Set user shell if it hasn't already been set
+    try log_file.info("auth/passwd", "setting user shell", .{});
     if (user_entry.shell == null) interop.setUserShell(&user_entry);
 
     var shared_err = try SharedError.init();
@@ -107,7 +111,7 @@ pub fn authenticate(allocator: std.mem.Allocator, log_file: *LogFile, options: A
     child_pid = try std.posix.fork();
     if (child_pid == 0) {
         try log_file.reinit();
-        try log_file.info("auth", "starting session", .{});
+        try log_file.info("auth/sys", "starting session", .{});
 
         startSession(log_file, allocator, options, tty_str, user_entry, handle, current_environment) catch |e| {
             shared_err.writeError(e);
@@ -144,6 +148,7 @@ pub fn authenticate(allocator: std.mem.Allocator, log_file: *LogFile, options: A
 
     try log_file.reinit();
 
+    try log_file.info("auth/utmp", "removing utmp entry", .{});
     removeUtmpEntry(&entry);
 
     if (shared_err.readError()) |err| return err;
@@ -159,12 +164,15 @@ fn startSession(
     current_environment: Environment,
 ) !void {
     // Set the user's GID & PID
+    try log_file.info("auth/passwd", "setting user context", .{});
     try interop.setUserContext(allocator, user_entry);
 
     // Set up the environment
+    try log_file.info("auth/env", "setting environment variables", .{});
     try initEnv(allocator, user_entry, options.path);
 
     // Reset the XDG environment variables
+    try log_file.info("auth/env", "resetting xdg environment variables", .{});
     try setXdgEnv(allocator, tty_str, current_environment);
     try setXdgRuntimeDir(allocator);
 
@@ -173,12 +181,18 @@ fn startSession(
     if (pam_env_vars == null) return error.GetEnvListFailed;
 
     const env_list = std.mem.span(pam_env_vars.?);
-    for (env_list) |env_var| try interop.putEnvironmentVariable(env_var);
+    for (env_list) |env_var| {
+        if (env_var == null) continue;
+        try log_file.info("auth/env", "setting pam environment variable: {s}", .{std.mem.span(env_var.?)});
+        try interop.putEnvironmentVariable(env_var);
+    }
 
     // Change to the user's home directory
+    try log_file.info("auth/sys", "changing cwd to user home", .{});
     std.posix.chdir(user_entry.home.?) catch return error.ChangeDirectoryFailed;
 
     // Signal to the session process to give up control on the TTY
+    try log_file.info("auth/sys", "releasing tty", .{});
     std.posix.kill(options.session_pid, std.posix.SIG.CHLD) catch return error.TtyControlTransferFailed;
 
     // Execute what the user requested
@@ -187,6 +201,8 @@ fn startSession(
         .xinitrc, .x11 => if (build_options.enable_x11_support) {
             var vt_buf: [5]u8 = undefined;
             const vt = try std.fmt.bufPrint(&vt_buf, "vt{d}", .{options.x_vt orelse options.tty});
+
+            try log_file.info("auth/x11", "setting vt to {s}", .{vt});
             try executeX11Cmd(log_file, allocator, user_entry.shell.?, user_entry.home.?, options, current_environment.cmd orelse "", vt);
         },
     }
@@ -322,7 +338,7 @@ fn getXPid(display_num: u8) !i32 {
     return std.fmt.parseInt(i32, std.mem.trim(u8, buffer[0..written], " "), 10);
 }
 
-fn createXauthFile(pwd: []const u8, buffer: []u8) ![]const u8 {
+fn createXauthFile(log_file: *LogFile, pwd: []const u8, buffer: []u8) ![]const u8 {
     var xauth_buf: [100]u8 = undefined;
     var xauth_dir: []const u8 = undefined;
     const xdg_rt_dir = std.posix.getenv("XDG_RUNTIME_DIR");
@@ -368,6 +384,8 @@ fn createXauthFile(pwd: []const u8, buffer: []u8) ![]const u8 {
 
     std.fs.cwd().makePath(trimmed_xauth_dir) catch {};
 
+    try log_file.info("auth/x11", "creating xauth file: {s}", .{xauthority});
+
     const file = try std.fs.createFileAbsolute(xauthority, .{});
     file.close();
 
@@ -385,7 +403,7 @@ fn mcookie() [Md5.digest_length * 2]u8 {
 }
 
 fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, home: []const u8, xauth_buffer: []u8, options: AuthOptions) !void {
-    const xauthority = try createXauthFile(home, xauth_buffer);
+    const xauthority = try createXauthFile(log_file, home, xauth_buffer);
     try interop.setEnvironmentVariable(allocator, "XAUTHORITY", xauthority, true);
     try interop.setEnvironmentVariable(allocator, "DISPLAY", display_name, true);
 
@@ -396,6 +414,7 @@ fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, display_name: []u8, s
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . {s}", .{ options.xauth_cmd, display_name, magic_cookie }) catch std.process.exit(1);
 
+        try log_file.info("auth/x11", "executing: {s} -c {s}", .{ shell, cmd_str });
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         std.posix.execveZ(shell, &args, std.c.environ) catch {};
         std.process.exit(1);
@@ -415,6 +434,7 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
     const display_num = try getFreeDisplay();
     var buf: [4]u8 = undefined;
     const display_name = try std.fmt.bufPrint(&buf, ":{d}", .{display_num});
+    try log_file.info("auth/x11", "got free display: {d}", .{display_num});
 
     const shell_z = try allocator.dupeZ(u8, shell);
     defer allocator.free(shell_z);
@@ -427,12 +447,14 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.x_cmd, display_name, vt }) catch std.process.exit(1);
+        try log_file.info("auth/x11", "executing: {s} -c {s}", .{ shell, cmd_str });
 
         const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
         std.posix.execveZ(shell_z, &args, std.c.environ) catch {};
         std.process.exit(1);
     }
 
+    try log_file.info("auth/x11", "waiting for xcb connection", .{});
     var ok: c_int = -1;
     var xcb: ?*interop.xcb.xcb_connection_t = null;
     while (ok != 0) {
@@ -447,12 +469,14 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
     // PID can be fetched from /tmp/X{d}.lock
     try log_file.info("auth/x11", "getting x server pid", .{});
     const x_pid = try getXPid(display_num);
+    try log_file.info("auth/x11", "got x server pid: {d}", .{x_pid});
 
     try log_file.info("auth/x11", "launching environment", .{});
     xorg_pid = try std.posix.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", desktop_cmd }) catch std.process.exit(1);
+        try log_file.info("auth/x11", "executing: {s} -c {s}", .{ shell, cmd_str });
 
         const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
         std.posix.execveZ(shell_z, &args, std.c.environ) catch {};
@@ -468,6 +492,8 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     _ = std.posix.waitpid(xorg_pid, 0);
+
+    try log_file.info("auth/x11", "disconnecting xcb", .{});
     interop.xcb.xcb_disconnect(xcb);
 
     // TODO: Find a more robust way to ensure that X has been terminated (pidfds?)
@@ -479,12 +505,15 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
 }
 
 fn executeCmd(global_log_file: *LogFile, allocator: std.mem.Allocator, shell: []const u8, options: AuthOptions, is_terminal: bool, exec_cmd: ?[]const u8) !void {
+    try global_log_file.info("auth/sys", "launching wayland/shell/custom session", .{});
+
     var maybe_log_file: ?std.fs.File = null;
     if (!is_terminal) {
         // For custom desktop entries, the "Terminal" value here determines if
         // we redirect standard output & error or not. That is, we redirect only
         // if it's equal to false (so if it's not running in a TTY).
         if (options.session_log) |log_path| {
+            try global_log_file.info("auth/sys", "setting up stdio & stderr redirection", .{});
             maybe_log_file = try redirectStandardStreams(global_log_file, log_path, true);
         }
     }
@@ -496,6 +525,7 @@ fn executeCmd(global_log_file: *LogFile, allocator: std.mem.Allocator, shell: []
     var cmd_buffer: [1024]u8 = undefined;
     const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", exec_cmd orelse shell });
 
+    try global_log_file.info("auth/sys", "executing: {s} -c {s}", .{ shell, cmd_str });
     const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
     return std.posix.execveZ(shell_z, &args, std.c.environ);
 }
@@ -504,16 +534,16 @@ fn redirectStandardStreams(global_log_file: *LogFile, session_log: []const u8, c
     create_session_log_dir: {
         const session_log_dir = std.fs.path.dirname(session_log) orelse break :create_session_log_dir;
         std.fs.cwd().makePath(session_log_dir) catch |err| {
-            try global_log_file.file_writer.interface.print("failed to create session log file directory: {s}\n", .{@errorName(err)});
+            try global_log_file.err("auth/sys", "failed to create session log file directory: {s}", .{@errorName(err)});
             return err;
         };
     }
 
     const log_file = if (create) (std.fs.cwd().createFile(session_log, .{ .mode = 0o666 }) catch |err| {
-        try global_log_file.file_writer.interface.print("failed to create new session log file: {s}\n", .{@errorName(err)});
+        try global_log_file.err("auth/sys", "failed to create new session log file: {s}", .{@errorName(err)});
         return err;
     }) else (std.fs.cwd().openFile(session_log, .{ .mode = .read_write }) catch |err| {
-        try global_log_file.file_writer.interface.print("failed to open existing session log file: {s}\n", .{@errorName(err)});
+        try global_log_file.err("auth/sys", "failed to open existing session log file: {s}", .{@errorName(err)});
         return err;
     });
 

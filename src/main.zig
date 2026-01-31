@@ -989,7 +989,7 @@ pub fn main() !void {
                 update = true;
             },
             termbox.TB_KEY_ENTER => authenticate: {
-                try log_file.info("auth", "authenticating...", .{});
+                try log_file.info("auth", "starting authentication", .{});
 
                 if (!config.allow_empty_password and password.text.items.len == 0) {
                     // Let's not log this message for security reasons
