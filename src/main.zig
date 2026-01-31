@@ -49,12 +49,12 @@ fn signalHandler(i: c_int) callconv(.c) void {
         _ = std.c.waitpid(session_pid, &status, 0);
     }
 
-    _ = termbox.tb_shutdown();
+    TerminalBuffer.shutdownStatic();
     std.c.exit(i);
 }
 
 fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
-    _ = termbox.tb_shutdown();
+    TerminalBuffer.shutdownStatic();
 }
 
 const ConfigError = struct {
@@ -303,37 +303,8 @@ pub fn main() !void {
         }
     }
 
-    // Initialize termbox
-    try log_writer.writeAll("initializing termbox2\n");
-    _ = termbox.tb_init();
-    defer {
-        log_writer.writeAll("shutting down termbox2\n") catch {};
-        _ = termbox.tb_shutdown();
-    }
-
-    const act = std.posix.Sigaction{
-        .handler = .{ .handler = &signalHandler },
-        .mask = std.posix.sigemptyset(),
-        .flags = 0,
-    };
-    std.posix.sigaction(std.posix.SIG.TERM, &act, null);
-
-    if (config.full_color) {
-        _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
-        try log_writer.writeAll("termbox2 set to 24-bit color output mode\n");
-    } else {
-        try log_writer.writeAll("termbox2 set to eight-color output mode\n");
-    }
-
-    _ = termbox.tb_clear();
-
-    // Let's take some precautions here and clear the back buffer as well
-    try ttyClearScreen();
-
-    // Needed to reset termbox after auth
-    const tb_termios = try std.posix.tcgetattr(std.posix.STDIN_FILENO);
-
     // Initialize terminal buffer
+    try log_writer.writeAll("initializing terminal buffer\n");
     const labels_max_length = @max(lang.login.len, lang.password.len);
 
     var seed: u64 = undefined;
@@ -349,10 +320,22 @@ pub fn main() !void {
         .margin_box_h = config.margin_box_h,
         .margin_box_v = config.margin_box_v,
         .input_len = config.input_len,
+        .full_color = config.full_color,
+        .labels_max_length = labels_max_length,
+        .is_tty = true,
     };
-    var buffer = TerminalBuffer.init(buffer_options, labels_max_length, random);
+    var buffer = try TerminalBuffer.init(buffer_options, &log_file, random);
+    defer {
+        log_writer.writeAll("shutting down terminal buffer\n") catch {};
+        TerminalBuffer.shutdownStatic();
+    }
 
-    try log_writer.print("screen resolution is {d}x{d}\n", .{ buffer.width, buffer.height });
+    const act = std.posix.Sigaction{
+        .handler = .{ .handler = &signalHandler },
+        .mask = std.posix.sigemptyset(),
+        .flags = 0,
+    };
+    std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     // Initialize components
     var info_line = InfoLine.init(allocator, &buffer);
@@ -637,10 +620,10 @@ pub fn main() !void {
         if (!update or animate) {
             if (!update) std.Thread.sleep(std.time.ns_per_ms * 100);
 
-            _ = termbox.tb_present(); // Required to update tb_width() and tb_height()
-
-            const width: usize = @intCast(termbox.tb_width());
-            const height: usize = @intCast(termbox.tb_height());
+            // Required to update tb_width() and tb_height()
+            const new_dimensions = TerminalBuffer.presentBufferStatic();
+            const width = new_dimensions.width;
+            const height = new_dimensions.height;
 
             if (width != buffer.width or height != buffer.height) {
                 // If it did change, then update the cell buffer, reallocate the current animation's buffers, and force a draw update
@@ -670,11 +653,11 @@ pub fn main() !void {
                     auth_fails = 0;
                 }
 
-                _ = termbox.tb_present();
+                _ = TerminalBuffer.presentBufferStatic();
                 continue;
             }
-
-            _ = termbox.tb_clear();
+ 
+            try TerminalBuffer.clearScreenStatic(false);
 
             var length: usize = config.edge_margin;
 
@@ -859,7 +842,7 @@ pub fn main() !void {
             login.label.draw();
             password.draw();
 
-            _ = termbox.tb_present();
+            _ = TerminalBuffer.presentBufferStatic();
         }
 
         var timeout: i32 = -1;
@@ -1021,7 +1004,7 @@ pub fn main() !void {
                         try log_writer.print("failed to clear info line: {s}\n", .{@errorName(err)});
                     };
                     info_line.label.draw();
-                    _ = termbox.tb_present();
+                    _ = TerminalBuffer.presentBufferStatic();
                     break :authenticate;
                 }
 
@@ -1031,7 +1014,7 @@ pub fn main() !void {
                     try log_writer.print("failed to clear info line: {s}\n", .{@errorName(err)});
                 };
                 info_line.label.draw();
-                _ = termbox.tb_present();
+                _ = TerminalBuffer.presentBufferStatic();
 
                 if (config.save) save_last_settings: {
                     // It isn't worth cluttering the code with precise error
@@ -1120,12 +1103,7 @@ pub fn main() !void {
                     try log_file.reinit();
                 }
 
-                // Take back control of the TTY
-                _ = termbox.tb_init();
-
-                if (config.full_color) {
-                    _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
-                }
+                try buffer.reclaim();
 
                 const auth_err = shared_err.readError();
                 if (auth_err) |err| {
@@ -1148,18 +1126,14 @@ pub fn main() !void {
                     try log_writer.writeAll("logged out\n");
                 }
 
-                try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, tb_termios);
-
                 if (config.auth_fails == 0 or auth_fails < config.auth_fails) {
-                    _ = termbox.tb_clear();
-                    try ttyClearScreen();
-
+                    try TerminalBuffer.clearScreenStatic(true);
                     update = true;
                 }
 
                 // Restore the cursor
-                _ = termbox.tb_set_cursor(0, 0);
-                _ = termbox.tb_present();
+                TerminalBuffer.setCursorStatic(0, 0);
+                _ = TerminalBuffer.presentBufferStatic();
             },
             else => {
                 if (!insert_mode) {
@@ -1206,13 +1180,6 @@ fn configErrorHandler(type_name: []const u8, key: []const u8, value: []const u8,
         .value = temporary_allocator.dupe(u8, value) catch return,
         .error_name = @errorName(err),
     }) catch return;
-}
-
-fn ttyClearScreen() !void {
-    // Clear the TTY because termbox2 doesn't seem to do it properly
-    const capability = termbox.global.caps[termbox.TB_CAP_CLEAR_SCREEN];
-    const capability_slice = std.mem.span(capability);
-    _ = try std.posix.write(termbox.global.ttyfd, capability_slice);
 }
 
 fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplayServer, exec: ?[]const u8) !void {

@@ -7,6 +7,7 @@ pub const termbox = @import("termbox2");
 const Random = std.Random;
 
 const interop = ly_core.interop;
+const LogFile = ly_core.LogFile;
 
 const TerminalBuffer = @This();
 
@@ -17,6 +18,9 @@ pub const InitOptions = struct {
     margin_box_h: u8,
     margin_box_v: u8,
     input_len: u8,
+    full_color: bool,
+    labels_max_length: usize,
+    is_tty: bool,
 };
 
 pub const Styling = struct {
@@ -81,12 +85,36 @@ box_height: usize,
 margin_box_v: u8,
 margin_box_h: u8,
 blank_cell: Cell,
+full_color: bool,
+termios: ?std.posix.termios,
 
-pub fn init(options: InitOptions, labels_max_length: usize, random: Random) TerminalBuffer {
+pub fn init(options: InitOptions, log_file: *LogFile, random: Random) !TerminalBuffer {
+    var log_writer = &log_file.file_writer.interface;
+
+    // Initialize termbox
+    _ = termbox.tb_init();
+
+    if (options.full_color) {
+        _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
+        try log_writer.writeAll("termbox2 set to 24-bit color output mode\n");
+    } else {
+        try log_writer.writeAll("termbox2 set to eight-color output mode\n");
+    }
+
+    _ = termbox.tb_clear();
+
+    // Let's take some precautions here and clear the back buffer as well
+    try clearBackBuffer();
+
+    const width: usize = @intCast(termbox.tb_width());
+    const height: usize = @intCast(termbox.tb_height());
+
+    try log_writer.print("screen resolution is {d}x{d}\n", .{ width, height });
+
     return .{
         .random = random,
-        .width = @intCast(termbox.tb_width()),
-        .height = @intCast(termbox.tb_height()),
+        .width = width,
+        .height = height,
         .fg = options.fg,
         .bg = options.bg,
         .border_fg = options.border_fg,
@@ -109,15 +137,52 @@ pub fn init(options: InitOptions, labels_max_length: usize, random: Random) Term
             .left = '|',
             .right = '|',
         },
-        .labels_max_length = labels_max_length,
+        .labels_max_length = options.labels_max_length,
         .box_x = 0,
         .box_y = 0,
-        .box_width = (2 * options.margin_box_h) + options.input_len + 1 + labels_max_length,
+        .box_width = (2 * options.margin_box_h) + options.input_len + 1 + options.labels_max_length,
         .box_height = 7 + (2 * options.margin_box_v),
         .margin_box_v = options.margin_box_v,
         .margin_box_h = options.margin_box_h,
         .blank_cell = Cell.init(' ', options.fg, options.bg),
+        .full_color = options.full_color,
+        // Needed to reclaim the TTY after giving up its control
+        .termios = try std.posix.tcgetattr(std.posix.STDIN_FILENO),
     };
+}
+
+pub fn setCursorStatic(x: usize, y: usize) void {
+    _ = termbox.tb_set_cursor(@intCast(x), @intCast(y));
+}
+
+pub fn clearScreenStatic(clear_back_buffer: bool) !void {
+    _ = termbox.tb_clear();
+    if (clear_back_buffer) try clearBackBuffer();
+}
+
+pub fn shutdownStatic() void {
+    _ = termbox.tb_shutdown();
+}
+
+pub fn presentBufferStatic() struct { width: usize, height: usize } {
+    _ = termbox.tb_present();
+    return .{
+        .width = @intCast(termbox.tb_width()),
+        .height = @intCast(termbox.tb_height()),
+    };
+}
+
+pub fn reclaim(self: TerminalBuffer) !void {
+    if (self.termios) |termios| {
+        // Take back control of the TTY
+        _ = termbox.tb_init();
+
+        if (self.full_color) {
+            _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
+        }
+
+        try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, termios);
+    }
 }
 
 pub fn cascade(self: TerminalBuffer) bool {
@@ -259,4 +324,11 @@ pub fn strWidth(str: []const u8) !u8 {
     while (utf8.nextCodepoint()) |codepoint| i += termbox.tb_wcwidth(codepoint);
 
     return @intCast(i);
+}
+
+fn clearBackBuffer() !void {
+    // Clear the TTY because termbox2 doesn't seem to do it properly
+    const capability = termbox.global.caps[termbox.TB_CAP_CLEAR_SCREEN];
+    const capability_slice = std.mem.span(capability);
+    _ = try std.posix.write(termbox.global.ttyfd, capability_slice);
 }
