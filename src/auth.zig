@@ -59,33 +59,31 @@ pub fn authenticate(allocator: std.mem.Allocator, log_file: *LogFile, options: A
     };
     var handle: ?*interop.pam.pam_handle = undefined;
 
-    var log_writer = &log_file.file_writer.interface;
-
-    try log_writer.writeAll("[pam] starting session\n");
+    try log_file.info("auth/pam", "starting session", .{});
     var status = interop.pam.pam_start(options.service_name, null, &conv, &handle);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer _ = interop.pam.pam_end(handle, status);
 
     // Set PAM_TTY as the current TTY. This is required in case it isn't being set by another PAM module
-    try log_writer.writeAll("[pam] setting tty\n");
+    try log_file.info("auth/pam", "setting tty", .{});
     status = interop.pam.pam_set_item(handle, interop.pam.PAM_TTY, pam_tty_str.ptr);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     // Do the PAM routine
-    try log_writer.writeAll("[pam] authenticating\n");
+    try log_file.info("auth/pam", "authenticating", .{});
     status = interop.pam.pam_authenticate(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
-    try log_writer.writeAll("[pam] validating account\n");
+    try log_file.info("auth/pam", "validating account", .{});
     status = interop.pam.pam_acct_mgmt(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
-    try log_writer.writeAll("[pam] setting credentials\n");
+    try log_file.info("auth/pam", "setting credentials", .{});
     status = interop.pam.pam_setcred(handle, interop.pam.PAM_ESTABLISH_CRED);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer status = interop.pam.pam_setcred(handle, interop.pam.PAM_DELETE_CRED);
 
-    try log_writer.writeAll("[pam] opening session\n");
+    try log_file.info("auth/pam", "opening session", .{});
     status = interop.pam.pam_open_session(handle, 0);
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
     defer status = interop.pam.pam_close_session(handle, 0);
@@ -109,9 +107,7 @@ pub fn authenticate(allocator: std.mem.Allocator, log_file: *LogFile, options: A
     child_pid = try std.posix.fork();
     if (child_pid == 0) {
         try log_file.reinit();
-        log_writer = &log_file.file_writer.interface;
-
-        try log_writer.writeAll("starting session\n");
+        try log_file.info("auth", "starting session", .{});
 
         startSession(log_file, allocator, options, tty_str, user_entry, handle, current_environment) catch |e| {
             shared_err.writeError(e);
@@ -413,10 +409,9 @@ fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, display_name: []u8, s
 }
 
 fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []const u8, home: []const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
-    var log_writer = &log_file.file_writer.interface;
     var xauth_buffer: [256]u8 = undefined;
 
-    try log_writer.writeAll("[x11] getting free display\n");
+    try log_file.info("auth/x11", "getting free display", .{});
     const display_num = try getFreeDisplay();
     var buf: [4]u8 = undefined;
     const display_name = try std.fmt.bufPrint(&buf, ":{d}", .{display_num});
@@ -424,10 +419,10 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
     const shell_z = try allocator.dupeZ(u8, shell);
     defer allocator.free(shell_z);
 
-    try log_writer.writeAll("[x11] creating xauth file\n");
+    try log_file.info("auth/x11", "creating xauth file", .{});
     try xauth(log_file, allocator, display_name, shell_z, home, &xauth_buffer, options);
 
-    try log_writer.writeAll("[x11] starting x server\n");
+    try log_file.info("auth/x11", "starting x server", .{});
     const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
@@ -450,10 +445,10 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
 
     // X Server detaches from the process.
     // PID can be fetched from /tmp/X{d}.lock
-    try log_writer.writeAll("[x11] getting x server pid\n");
+    try log_file.info("auth/x11", "getting x server pid", .{});
     const x_pid = try getXPid(display_num);
 
-    try log_writer.writeAll("[x11] launching environment\n");
+    try log_file.info("auth/x11", "launching environment", .{});
     xorg_pid = try std.posix.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;

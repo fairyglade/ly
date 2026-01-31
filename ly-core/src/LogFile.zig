@@ -1,4 +1,5 @@
 const std = @import("std");
+const interop = @import("interop.zig");
 
 const LogFile = @This();
 
@@ -19,8 +20,27 @@ pub fn reinit(self: *LogFile) !void {
 }
 
 pub fn deinit(self: *LogFile) void {
-    self.file_writer.interface.flush() catch {};
     self.file.close();
+}
+
+pub fn info(self: *LogFile, category: []const u8, comptime message: []const u8, args: anytype) !void {
+    var buffer: [128:0]u8 = undefined;
+    const time = interop.timeAsString(&buffer, "%Y-%m-%d %H:%M:%S");
+
+    try self.file_writer.interface.print("{s} [info/{s}] ", .{ time, category });
+    try self.file_writer.interface.print(message, args);
+    try self.file_writer.interface.writeByte('\n');
+    try self.file_writer.interface.flush();
+}
+
+pub fn err(self: *LogFile, category: []const u8, comptime message: []const u8, args: anytype) !void {
+    var buffer: [128:0]u8 = undefined;
+    const time = interop.timeAsString(&buffer, "%Y-%m-%d %H:%M:%S");
+
+    try self.file_writer.interface.print("{s} [err/{s}] ", .{ time, category });
+    try self.file_writer.interface.print(message, args);
+    try self.file_writer.interface.writeByte('\n');
+    try self.file_writer.interface.flush();
 }
 
 fn openLogFile(path: []const u8, log_file: *LogFile) !bool {

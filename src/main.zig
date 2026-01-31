@@ -282,8 +282,6 @@ pub fn main() !void {
     var log_file = try LogFile.init(config.ly_log, &log_file_buffer);
     defer log_file.deinit();
 
-    var log_writer = &log_file.file_writer.interface;
-
     // These strings only end up getting freed if the user quits Ly using Ctrl+C, which is fine since in the other cases
     // we end up shutting down or restarting the system
     shutdown_cmd = try temporary_allocator.dupe(u8, config.shutdown_cmd);
@@ -304,7 +302,7 @@ pub fn main() !void {
     }
 
     // Initialize terminal buffer
-    try log_writer.writeAll("initializing terminal buffer\n");
+    try log_file.info("tui", "initializing terminal buffer", .{});
     const labels_max_length = @max(lang.login.len, lang.password.len);
 
     var seed: u64 = undefined;
@@ -326,7 +324,7 @@ pub fn main() !void {
     };
     var buffer = try TerminalBuffer.init(buffer_options, &log_file, random);
     defer {
-        log_writer.writeAll("shutting down terminal buffer\n") catch {};
+        log_file.info("tui", "shutting down terminal buffer", .{}) catch {};
         TerminalBuffer.shutdownStatic();
     }
 
@@ -347,23 +345,23 @@ pub fn main() !void {
             longest.name = diag.arg;
 
         try info_line.addMessage(lang.err_args, config.error_bg, config.error_fg);
-        try log_writer.print("unable to parse argument '{s}{s}': {s}\n", .{ longest.kind.prefix(), longest.name, @errorName(arg_parse_error) });
+        try log_file.err("cli", "unable to parse argument '{s}{s}': {s}", .{ longest.kind.prefix(), longest.name, @errorName(arg_parse_error) });
     }
 
     if (maybe_uid_range_error) |err| {
         try info_line.addMessage(lang.err_uid_range, config.error_bg, config.error_fg);
-        try log_writer.print("failed to get uid range: {s}; falling back to default\n", .{@errorName(err)});
+        try log_file.err("sys", "failed to get uid range: {s}; falling back to default", .{@errorName(err)});
     }
 
     if (start_cmd_exit_code != 0) {
         try info_line.addMessage(lang.err_start, config.error_bg, config.error_fg);
-        try log_writer.print("failed to execute start command: exit code {d}\n", .{start_cmd_exit_code});
+        try log_file.err("sys", "failed to execute start command: exit code {d}", .{start_cmd_exit_code});
     }
 
     if (maybe_config_load_error) |err| {
         // We can't localize this since the config failed to load so we'd fallback to the default language anyway
         try info_line.addMessage("unable to parse config file", config.error_bg, config.error_fg);
-        try log_writer.print("unable to parse config file: {s}\n", .{@errorName(err)});
+        try log_file.err("conf", "unable to parse config file: {s}", .{@errorName(err)});
 
         defer config_errors.deinit(temporary_allocator);
 
@@ -375,21 +373,18 @@ pub fn main() !void {
                 temporary_allocator.free(config_error.value);
             }
 
-            try log_writer.print("failed to convert value '{s}' of option '{s}' to type '{s}': {s}\n", .{ config_error.value, config_error.key, config_error.type_name, config_error.error_name });
-
-            // Flush immediately so we can free the allocated memory afterwards
-            try log_writer.flush();
+            try log_file.err("conf", "failed to convert value '{s}' of option '{s}' to type '{s}': {s}", .{ config_error.value, config_error.key, config_error.type_name, config_error.error_name });
         }
     }
 
     if (!log_file.could_open_log_file) {
         try info_line.addMessage(lang.err_log, config.error_bg, config.error_fg);
-        try log_writer.writeAll("failed to open log file\n");
+        try log_file.err("sys", "failed to open log file", .{});
     }
 
     interop.setNumlock(config.numlock) catch |err| {
         try info_line.addMessage(lang.err_numlock, config.error_bg, config.error_fg);
-        try log_writer.print("failed to set numlock: {s}\n", .{@errorName(err)});
+        try log_file.err("sys", "failed to set numlock: {s}", .{@errorName(err)});
     };
 
     var login: UserList = undefined;
@@ -402,19 +397,19 @@ pub fn main() !void {
 
     addOtherEnvironment(&session, lang, .shell, null) catch |err| {
         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-        try log_writer.print("failed to add shell environment: {s}\n", .{@errorName(err)});
+        try log_file.err("sys", "failed to add shell environment: {s}", .{@errorName(err)});
     };
 
     if (build_options.enable_x11_support) {
         if (config.xinitrc) |xinitrc_cmd| {
             addOtherEnvironment(&session, lang, .xinitrc, xinitrc_cmd) catch |err| {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                try log_writer.print("failed to add xinitrc environment: {s}\n", .{@errorName(err)});
+                try log_file.err("sys", "failed to add xinitrc environment: {s}", .{@errorName(err)});
             };
         }
     } else {
         try info_line.addMessage(lang.no_x11_support, config.bg, config.fg);
-        try log_writer.writeAll("x11 support disabled at compile-time\n");
+        try log_file.err("comp", "x11 support disabled at compile-time");
     }
 
     var has_crawl_error = false;
@@ -424,7 +419,7 @@ pub fn main() !void {
     while (wayland_session_dirs.next()) |dir| {
         crawl(&session, lang, dir, .wayland) catch |err| {
             has_crawl_error = true;
-            try log_writer.print("failed to crawl wayland session directory '{s}': {s}\n", .{ dir, @errorName(err) });
+            try log_file.err("sys", "failed to crawl wayland session directory '{s}': {s}", .{ dir, @errorName(err) });
         };
     }
 
@@ -433,7 +428,7 @@ pub fn main() !void {
         while (x_session_dirs.next()) |dir| {
             crawl(&session, lang, dir, .x11) catch |err| {
                 has_crawl_error = true;
-                try log_writer.print("failed to crawl x11 session directory '{s}': {s}\n", .{ dir, @errorName(err) });
+                try log_file.err("sys", "failed to crawl x11 session directory '{s}': {s}", .{ dir, @errorName(err) });
             };
         }
     }
@@ -442,7 +437,7 @@ pub fn main() !void {
     while (custom_session_dirs.next()) |dir| {
         crawl(&session, lang, dir, .custom) catch |err| {
             has_crawl_error = true;
-            try log_writer.print("failed to crawl custom session directory '{s}': {s}\n", .{ dir, @errorName(err) });
+            try log_file.err("sys", "failed to crawl custom session directory '{s}': {s}", .{ dir, @errorName(err) });
         };
     }
 
@@ -456,7 +451,7 @@ pub fn main() !void {
         // accounts *and* no root account...but at this point, if that's the
         // case, you have bigger problems to deal with in the first place. :D
         try info_line.addMessage(lang.err_no_users, config.error_bg, config.error_fg);
-        try log_writer.writeAll("no users found\n");
+        try log_file.err("sys", "no users found", .{});
     }
 
     var password = Text.init(allocator, &buffer, true, config.asterisk);
@@ -472,16 +467,16 @@ pub fn main() !void {
 
         if (!isValidUsername(auto_user, usernames)) {
             try info_line.addMessage(lang.err_pam_user_unknown, config.error_bg, config.error_fg);
-            try log_writer.print("autologin failed: username '{s}' not found\n", .{auto_user});
+            try log_file.err("auth", "autologin failed: username '{s}' not found", .{auto_user});
             break :check_autologin;
         }
 
         const session_index = findSessionByName(&session, auto_session) orelse {
-            try log_writer.print("autologin failed: session '{s}' not found\n", .{auto_session});
+            try log_file.err("auth", "autologin failed: session '{s}' not found", .{auto_session});
             try info_line.addMessage(lang.err_autologin_session, config.error_bg, config.error_fg);
             break :check_autologin;
         };
-        try log_writer.print("attempting autologin for user '{s}' with session '{s}'\n", .{ auto_user, auto_session });
+        try log_file.err("auth", "attempting autologin for user '{s}' with session '{s}'", .{ auto_user, auto_session });
 
         session.label.current = session_index;
         for (login.label.list.items, 0..) |username, i| {
@@ -533,7 +528,7 @@ pub fn main() !void {
             .login => login.label.handle(null, insert_mode),
             .password => password.handle(null, insert_mode) catch |err| {
                 try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                try log_writer.print("failed to handle password input: {s}\n", .{@errorName(err)});
+                try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
             },
         }
     }
@@ -563,7 +558,7 @@ pub fn main() !void {
             animation = game_of_life.animation();
         },
         .dur_file => {
-            var dur = try DurFile.init(allocator, &buffer, log_writer, config.dur_file_path, config.dur_offset_alignment, config.dur_x_offset, config.dur_y_offset, config.full_color);
+            var dur = try DurFile.init(allocator, &buffer, &log_file, config.dur_file_path, config.dur_offset_alignment, config.dur_x_offset, config.dur_y_offset, config.full_color);
             animation = dur.animation();
         },
     }
@@ -594,12 +589,12 @@ pub fn main() !void {
     // Switch to selected TTY
     const active_tty = interop.getActiveTty(allocator) catch |err| no_tty_found: {
         try info_line.addMessage(lang.err_get_active_tty, config.error_bg, config.error_fg);
-        try log_writer.print("failed to get active tty: {s}\n", .{@errorName(err)});
+        try log_file.err("sys", "failed to get active tty: {s}", .{@errorName(err)});
         break :no_tty_found build_options.fallback_tty;
     };
     interop.switchTty(active_tty) catch |err| {
         try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
-        try log_writer.print("failed to switch tty: {s}\n", .{@errorName(err)});
+        try log_file.err("sys", "failed to switch tty: {s}", .{@errorName(err)});
     };
 
     if (config.initial_info_text) |text| {
@@ -609,7 +604,7 @@ pub fn main() !void {
         var name_buf: [std.posix.HOST_NAME_MAX]u8 = undefined;
         const hostname = std.posix.gethostname(&name_buf) catch |err| {
             try info_line.addMessage(lang.err_hostname, config.error_bg, config.error_fg);
-            try log_writer.print("failed to get hostname: {s}\n", .{@errorName(err)});
+            try log_file.err("sys", "failed to get hostname: {s}", .{@errorName(err)});
             break :get_host_name;
         };
         try info_line.addMessage(hostname, config.bg, config.fg);
@@ -627,14 +622,14 @@ pub fn main() !void {
 
             if (width != buffer.width or height != buffer.height) {
                 // If it did change, then update the cell buffer, reallocate the current animation's buffers, and force a draw update
-                try log_writer.print("screen resolution updated to {d}x{d}\n", .{ width, height });
+                try log_file.info("tui", "screen resolution updated to {d}x{d}", .{ width, height });
 
                 buffer.width = width;
                 buffer.height = height;
 
                 animation.realloc() catch |err| {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    try log_writer.print("failed to reallocate animation buffers: {s}\n", .{@errorName(err)});
+                    try log_file.err("tui", "failed to reallocate animation buffers: {s}", .{@errorName(err)});
                 };
 
                 update = true;
@@ -656,7 +651,7 @@ pub fn main() !void {
                 _ = TerminalBuffer.presentBufferStatic();
                 continue;
             }
- 
+
             try TerminalBuffer.clearScreenStatic(false);
 
             var length: usize = config.edge_margin;
@@ -671,7 +666,7 @@ pub fn main() !void {
                 if (!can_draw_battery) break :draw_battery;
 
                 const battery_percentage = getBatteryPercentage(id) catch |err| {
-                    try log_writer.print("failed to get battery percentage: {s}\n", .{@errorName(err)});
+                    try log_file.err("sys", "failed to get battery percentage: {s}", .{@errorName(err)});
                     try info_line.addMessage(lang.err_battery, config.error_bg, config.error_fg);
                     can_draw_battery = false;
                     break :draw_battery;
@@ -728,7 +723,7 @@ pub fn main() !void {
                 .login => login.label.handle(null, insert_mode),
                 .password => password.handle(null, insert_mode) catch |err| {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    try log_writer.print("failed to handle password input: {s}\n", .{@errorName(err)});
+                    try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
                 },
             }
 
@@ -741,7 +736,7 @@ pub fn main() !void {
                 if (clock_str.len == 0) {
                     try info_line.addMessage(lang.err_clock_too_long, config.error_bg, config.error_fg);
                     can_draw_clock = false;
-                    try log_writer.writeAll("clock string too long\n");
+                    try log_file.err("tui", "clock string too long", .{});
                     break :draw_clock;
                 }
 
@@ -821,7 +816,7 @@ pub fn main() !void {
                 const lock_state = interop.getLockState() catch |err| {
                     try info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
                     can_get_lock_state = false;
-                    try log_writer.print("failed to get lock state: {s}\n", .{@errorName(err)});
+                    try log_file.err("sys", "failed to get lock state: {s}", .{@errorName(err)});
                     break :draw_lock_state;
                 };
 
@@ -882,7 +877,7 @@ pub fn main() !void {
                     };
                     if (process_result.Exited != 0) {
                         try info_line.addMessage(lang.err_inactivity, config.error_bg, config.error_fg);
-                        try log_writer.print("failed to execute inactivity command: exit code {d}\n", .{process_result.Exited});
+                        try log_file.err("sys", "failed to execute inactivity command: exit code {d}", .{process_result.Exited});
                     }
                 }
 
@@ -940,7 +935,7 @@ pub fn main() !void {
                             };
                             if (process_result.Exited != 0) {
                                 try info_line.addMessage(lang.err_sleep, config.error_bg, config.error_fg);
-                                try log_writer.print("failed to execute sleep command: exit code {d}\n", .{process_result.Exited});
+                                try log_file.err("sys", "failed to execute sleep command: exit code {d}", .{process_result.Exited});
                             }
                         }
                     }
@@ -956,19 +951,19 @@ pub fn main() !void {
                             };
                             if (process_result.Exited != 0) {
                                 try info_line.addMessage(lang.err_hibernate, config.error_bg, config.error_fg);
-                                try log_writer.print("failed to execute hibernate command: exit code {d}\n", .{process_result.Exited});
+                                try log_file.err("sys", "failed to execute hibernate command: exit code {d}", .{process_result.Exited});
                             }
                         }
                     }
                 } else if (brightness_down_key != null and pressed_key == brightness_down_key.?) {
                     adjustBrightness(allocator, config.brightness_down_cmd) catch |err| {
                         try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
-                        try log_writer.print("failed to change brightness: {s}\n", .{@errorName(err)});
+                        try log_file.err("sys", "failed to change brightness: {s}", .{@errorName(err)});
                     };
                 } else if (brightness_up_key != null and pressed_key == brightness_up_key.?) {
                     adjustBrightness(allocator, config.brightness_up_cmd) catch |err| {
                         try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
-                        try log_writer.print("failed to change brightness: {s}\n", .{@errorName(err)});
+                        try log_file.err("sys", "failed to change brightness: {s}", .{@errorName(err)});
                     };
                 }
             },
@@ -994,14 +989,14 @@ pub fn main() !void {
                 update = true;
             },
             termbox.TB_KEY_ENTER => authenticate: {
-                try log_writer.writeAll("authenticating...\n");
+                try log_file.info("auth", "authenticating...", .{});
 
                 if (!config.allow_empty_password and password.text.items.len == 0) {
                     // Let's not log this message for security reasons
                     try info_line.addMessage(lang.err_empty_password, config.error_bg, config.error_fg);
                     InfoLine.clearRendered(allocator, buffer) catch |err| {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                        try log_writer.print("failed to clear info line: {s}\n", .{@errorName(err)});
+                        try log_file.err("tui", "failed to clear info line: {s}", .{@errorName(err)});
                     };
                     info_line.label.draw();
                     _ = TerminalBuffer.presentBufferStatic();
@@ -1011,7 +1006,7 @@ pub fn main() !void {
                 try info_line.addMessage(lang.authenticating, config.bg, config.fg);
                 InfoLine.clearRendered(allocator, buffer) catch |err| {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    try log_writer.print("failed to clear info line: {s}\n", .{@errorName(err)});
+                    try log_file.err("tui", "failed to clear info line: {s}", .{@errorName(err)});
                 };
                 info_line.label.draw();
                 _ = TerminalBuffer.presentBufferStatic();
@@ -1020,10 +1015,10 @@ pub fn main() !void {
                     // It isn't worth cluttering the code with precise error
                     // handling, so let's just report a generic error message,
                     // that should be good enough for debugging anyway.
-                    errdefer log_writer.writeAll("failed to save current user data\n") catch {};
+                    errdefer log_file.err("conf", "failed to save current user data", .{}) catch {};
 
                     var file = std.fs.cwd().createFile(save_path, .{}) catch |err| {
-                        log_writer.print("failed to create save file: {s}\n", .{@errorName(err)}) catch break :save_last_settings;
+                        log_file.err("sys", "failed to create save file: {s}", .{@errorName(err)}) catch break :save_last_settings;
                         break :save_last_settings;
                     };
                     defer file.close();
@@ -1111,7 +1106,7 @@ pub fn main() !void {
                     active_input = .password;
 
                     try info_line.addMessage(getAuthErrorMsg(err, lang), config.error_bg, config.error_fg);
-                    try log_writer.print("failed to authenticate: {s}\n", .{@errorName(err)});
+                    try log_file.err("auth", "failed to authenticate: {s}", .{@errorName(err)});
 
                     if (config.clear_password or err != error.PamAuthError) password.clear();
                 } else {
@@ -1123,7 +1118,7 @@ pub fn main() !void {
                     password.clear();
                     is_autologin = false;
                     try info_line.addMessage(lang.logout, config.bg, config.fg);
-                    try log_writer.writeAll("logged out\n");
+                    try log_file.info("auth", "logged out", .{});
                 }
 
                 if (config.auth_fails == 0 or auth_fails < config.auth_fails) {
@@ -1168,8 +1163,6 @@ pub fn main() !void {
                 update = true;
             },
         }
-
-        try log_writer.flush();
     }
 }
 

@@ -89,16 +89,14 @@ full_color: bool,
 termios: ?std.posix.termios,
 
 pub fn init(options: InitOptions, log_file: *LogFile, random: Random) !TerminalBuffer {
-    var log_writer = &log_file.file_writer.interface;
-
     // Initialize termbox
     _ = termbox.tb_init();
 
     if (options.full_color) {
         _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
-        try log_writer.writeAll("termbox2 set to 24-bit color output mode\n");
+        try log_file.info("tui", "termbox2 set to 24-bit color output mode", .{});
     } else {
-        try log_writer.writeAll("termbox2 set to eight-color output mode\n");
+        try log_file.info("tui", "termbox2 set to eight-color output mode", .{});
     }
 
     _ = termbox.tb_clear();
@@ -109,7 +107,7 @@ pub fn init(options: InitOptions, log_file: *LogFile, random: Random) !TerminalB
     const width: usize = @intCast(termbox.tb_width());
     const height: usize = @intCast(termbox.tb_height());
 
-    try log_writer.print("screen resolution is {d}x{d}\n", .{ width, height });
+    try log_file.info("tui", "screen resolution is {d}x{d}", .{ width, height });
 
     return .{
         .random = random,

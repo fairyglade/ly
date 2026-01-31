@@ -1,15 +1,21 @@
 const std = @import("std");
+const ly_core = @import("ly-core");
 const Animation = @import("../tui/Animation.zig");
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const enums = @import("../enums.zig");
+
 const DurOffsetAlignment = enums.DurOffsetAlignment;
+
 const Color = TerminalBuffer.Color;
 const Styling = TerminalBuffer.Styling;
+
 const Allocator = std.mem.Allocator;
 const Json = std.json;
 const eql = std.mem.eql;
 const flate = std.compress.flate;
+
+const LogFile = ly_core.LogFile;
 
 fn read_decompress_file(allocator: Allocator, file_path: []const u8) ![]u8 {
     const file_buffer = std.fs.cwd().openFile(file_path, .{}) catch {
@@ -310,8 +316,8 @@ offset_alignment: DurOffsetAlignment,
 offset: IVec2,
 
 // if the user has an even number of columns or rows, we will default to the left or higher position (e.g. 4 columns center = .x..)
-fn center(v: u32) i64 { 
-    return @intCast((v / 2) + (v % 2)); 
+fn center(v: u32) i64 {
+    return @intCast((v / 2) + (v % 2));
 }
 
 fn calc_start_position(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat, offset_alignment: DurOffsetAlignment, offset: IVec2) IVec2 {
@@ -333,9 +339,9 @@ fn calc_start_position(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat, 
         DurOffsetAlignment.centerright => .{ buf_width - movie_width, center(buf_height) - center(movie_height) },
         DurOffsetAlignment.bottomleft => .{ 0, buf_height - movie_height },
         DurOffsetAlignment.bottomcenter => .{ center(buf_width) - center(movie_width), buf_height - movie_height },
-        DurOffsetAlignment.bottomright => .{ buf_width - movie_width,  buf_height - movie_height },
+        DurOffsetAlignment.bottomright => .{ buf_width - movie_width, buf_height - movie_height },
     };
-    
+
     return start_pos + offset;
 }
 
@@ -353,16 +359,16 @@ fn calc_frame_size(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat) UVec
     return .{ frame_width, frame_height };
 }
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_writer: *std.io.Writer, file_path: []const u8, offset_alignment: DurOffsetAlignment, x_offset: i32, y_offset: i32, full_color: bool) !DurFile {
+pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_file: *LogFile, file_path: []const u8, offset_alignment: DurOffsetAlignment, x_offset: i32, y_offset: i32, full_color: bool) !DurFile {
     var dur_movie: DurFormat = .init(allocator);
 
     dur_movie.create_from_file(allocator, file_path) catch |err| switch (err) {
         error.FileNotFound => {
-            try log_writer.print("error: dur_file was not found at: {s}\n", .{file_path});
+            try log_file.err("tui", "dur_file was not found at: {s}", .{file_path});
             return err;
         },
         error.NotValidFile => {
-            try log_writer.print("error: dur_file loaded was invalid or not a dur file!\n", .{});
+            try log_file.err("tui", "dur_file loaded was invalid or not a dur file!", .{});
             return err;
         },
         else => return err,
@@ -370,7 +376,7 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_writer: 
 
     // 4 bit mode with 256 color is unsupported
     if (!full_color and eql(u8, dur_movie.colorFormat.?, "256")) {
-        try log_writer.print("error: dur_file can not be 256 color encoded when not using full_color option!\n", .{});
+        try log_file.err("tui", "dur_file can not be 256 color encoded when not using full_color option!", .{});
         dur_movie.deinit();
         return error.InvalidColorFormat;
     }
@@ -424,7 +430,7 @@ fn draw(self: *DurFile) void {
         const y_offset_i = @as(i32, @intCast(y)) + self.start_pos[VEC_Y];
         // we skip the pass if it falls outside of the draw window (ensure no int underflow)
         const cell_y: u32 = if (y_offset_i >= 0 and y_offset_i < buf_height) @intCast(y_offset_i) else continue;
-        
+
         var iter = std.unicode.Utf8View.initUnchecked(current_frame.contents[y]).iterator();
 
         for (0..self.frame_size[VEC_X]) |x| {
@@ -434,7 +440,7 @@ fn draw(self: *DurFile) void {
                 _ = iter.nextCodepoint().?;
                 continue;
             };
-            
+
             const codepoint: u21 = iter.nextCodepoint().?;
             const color_map = current_frame.colorMap[x][y];
 
