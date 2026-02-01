@@ -4,10 +4,13 @@
 
 const std = @import("std");
 const ini = @import("zigini");
+const ly_core = @import("ly-core");
 const Config = @import("Config.zig");
 const OldSave = @import("OldSave.zig");
 const SavedUsers = @import("SavedUsers.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+
+const IniParser = ly_core.IniParser;
 
 const Color = TerminalBuffer.Color;
 const Styling = TerminalBuffer.Styling;
@@ -187,13 +190,40 @@ pub fn lateConfigFieldHandler(config: *Config) void {
     }
 }
 
-pub fn tryMigrateFirstSaveFile(user_buf: *[32]u8) OldSave {
-    var save = OldSave{};
+pub fn tryMigrateIniSaveFile(allocator: std.mem.Allocator, path: []const u8, saved_users: *SavedUsers, usernames: [][]const u8) !?IniParser(OldSave) {
+    var save_parser = try IniParser(OldSave).init(allocator, path, null);
+    errdefer save_parser.deinit();
 
+    var user_buf: [32]u8 = undefined;
+    const maybe_save = if (save_parser.maybe_load_error == null) save_parser.structure else tryMigrateFirstSaveFile(&user_buf);
+
+    if (maybe_save) |save| {
+        // Add all other users to the list
+        for (usernames, 0..) |username, i| {
+            if (save.user) |user| {
+                if (std.mem.eql(u8, user, username)) saved_users.last_username_index = i;
+            }
+
+            try saved_users.user_list.append(allocator, .{
+                .username = username,
+                .session_index = save.session_index orelse 0,
+                .first_run = false,
+                .allocated_username = false,
+            });
+        }
+
+        return save_parser;
+    }
+
+    return null;
+}
+
+fn tryMigrateFirstSaveFile(user_buf: *[32]u8) ?OldSave {
     if (maybe_save_file) |path| {
         defer temporary_allocator.free(path);
 
-        var file = std.fs.openFileAbsolute(path, .{}) catch return save;
+        var save = OldSave{};
+        var file = std.fs.openFileAbsolute(path, .{}) catch return null;
         defer file.close();
 
         var file_buffer: [64]u8 = undefined;
@@ -201,50 +231,21 @@ pub fn tryMigrateFirstSaveFile(user_buf: *[32]u8) OldSave {
         var reader = &file_reader.interface;
 
         var user_writer = std.Io.Writer.fixed(user_buf);
-        var written = reader.streamDelimiter(&user_writer, '\n') catch return save;
+        var written = reader.streamDelimiter(&user_writer, '\n') catch return null;
         if (written > 0) save.user = user_buf[0..written];
 
         var session_buf: [20]u8 = undefined;
         var session_writer = std.Io.Writer.fixed(&session_buf);
-        written = reader.streamDelimiter(&session_writer, '\n') catch return save;
+        written = reader.streamDelimiter(&session_writer, '\n') catch return null;
 
         var session_index: ?usize = null;
         if (written > 0) {
-            session_index = std.fmt.parseUnsigned(usize, session_buf[0..written], 10) catch return save;
+            session_index = std.fmt.parseUnsigned(usize, session_buf[0..written], 10) catch return null;
         }
         save.session_index = session_index;
+
+        return save;
     }
 
-    return save;
-}
-
-pub fn tryMigrateIniSaveFile(allocator: std.mem.Allocator, save_ini: *ini.Ini(OldSave), path: []const u8, saved_users: *SavedUsers, usernames: [][]const u8) !bool {
-    var old_save_file_exists = true;
-
-    var user_buf: [32]u8 = undefined;
-    const save = save_ini.readFileToStruct(path, .{
-        .fieldHandler = null,
-        .comment_characters = "#",
-    }) catch no_save_file: {
-        old_save_file_exists = false;
-        break :no_save_file tryMigrateFirstSaveFile(&user_buf);
-    };
-
-    if (!old_save_file_exists) return false;
-
-    // Add all other users to the list
-    for (usernames, 0..) |username, i| {
-        if (save.user) |user| {
-            if (std.mem.eql(u8, user, username)) saved_users.last_username_index = i;
-        }
-
-        try saved_users.user_list.append(allocator, .{
-            .username = username,
-            .session_index = save.session_index orelse 0,
-            .first_run = false,
-            .allocated_username = false,
-        });
-    }
-
-    return true;
+    return null;
 }

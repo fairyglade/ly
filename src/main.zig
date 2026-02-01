@@ -33,6 +33,7 @@ const interop = ly_core.interop;
 const UidRange = ly_core.UidRange;
 const LogFile = ly_core.LogFile;
 const SharedError = ly_core.SharedError;
+const IniParser = ly_core.IniParser;
 const termbox = TerminalBuffer.termbox;
 const temporary_allocator = std.heap.page_allocator;
 const ly_version_str = "Ly version " ++ build_options.version;
@@ -55,14 +56,6 @@ fn signalHandler(i: c_int) callconv(.c) void {
 fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
     TerminalBuffer.shutdownStatic();
 }
-
-const ConfigError = struct {
-    type_name: []const u8,
-    key: []const u8,
-    value: []const u8,
-    error_name: []const u8,
-};
-var config_errors: std.ArrayList(ConfigError) = .empty;
 
 const UiState = struct {
     auth_fails: u64,
@@ -145,15 +138,15 @@ pub fn main() !void {
     };
     defer if (maybe_res) |*res| res.deinit();
 
-    var config: Config = undefined;
-    var lang: Lang = undefined;
-    var old_save_file_exists = false;
-    var maybe_config_load_error: ?anyerror = null;
+    var old_save_parser: ?IniParser(OldSave) = null;
+    defer if (old_save_parser) |*str| str.deinit();
+
     var start_cmd_exit_code: u8 = 0;
 
     var saved_users = SavedUsers.init();
     defer saved_users.deinit(allocator);
 
+    var config_parent_path: []const u8 = build_options.config_directory ++ "/ly";
     if (maybe_res) |*res| {
         if (res.args.help != 0) {
             try clap.help(stderr, clap.Help, &params, .{});
@@ -167,79 +160,44 @@ pub fn main() !void {
             try stderr.flush();
             std.process.exit(0);
         }
+        if (res.args.config) |path| config_parent_path = path;
     }
 
     // Load configuration file
-    var config_ini = Ini(Config).init(allocator);
-    defer config_ini.deinit();
-
-    var lang_ini = Ini(Lang).init(allocator);
-    defer lang_ini.deinit();
-
-    var old_save_ini = ini.Ini(OldSave).init(allocator);
-    defer old_save_ini.deinit();
-
     var save_path: []const u8 = build_options.config_directory ++ "/ly/save.txt";
     var old_save_path: []const u8 = build_options.config_directory ++ "/ly/save.ini";
     var save_path_alloc = false;
-    defer {
-        if (save_path_alloc) allocator.free(save_path);
-        if (save_path_alloc) allocator.free(old_save_path);
+    defer if (save_path_alloc) {
+        allocator.free(save_path);
+        allocator.free(old_save_path);
+    };
+
+    const config_path = try std.fs.path.join(allocator, &[_][]const u8{ config_parent_path, "config.ini" });
+    defer allocator.free(config_path);
+
+    var config_parser = try IniParser(Config).init(allocator, config_path, migrator.configFieldHandler);
+    defer config_parser.deinit();
+
+    var config = config_parser.structure;
+
+    var lang_buffer: [16]u8 = undefined;
+    const lang_file = try std.fmt.bufPrint(&lang_buffer, "{s}.ini", .{config.lang});
+
+    const lang_path = try std.fs.path.join(allocator, &[_][]const u8{ config_parent_path, "lang", lang_file });
+    defer allocator.free(lang_path);
+
+    var lang_parser = try IniParser(Lang).init(allocator, lang_path, null);
+    defer lang_parser.deinit();
+
+    const lang = lang_parser.structure;
+
+    if (config.save) {
+        save_path = try std.fs.path.join(allocator, &[_][]const u8{ config_parent_path, "save.txt" });
+        old_save_path = try std.fs.path.join(allocator, &[_][]const u8{ config_parent_path, "save.ini" });
+        save_path_alloc = true;
     }
 
-    const comment_characters = "#";
-
-    if (maybe_res != null and maybe_res.?.args.config != null) {
-        const s = maybe_res.?.args.config.?;
-        const trailing_slash = if (s[s.len - 1] != '/') "/" else "";
-
-        const config_path = try std.fmt.allocPrint(allocator, "{s}{s}config.ini", .{ s, trailing_slash });
-        defer allocator.free(config_path);
-
-        config = config_ini.readFileToStruct(config_path, .{
-            .fieldHandler = migrator.configFieldHandler,
-            .errorHandler = configErrorHandler,
-            .comment_characters = comment_characters,
-        }) catch |err| load_error: {
-            maybe_config_load_error = err;
-            break :load_error Config{};
-        };
-
-        const lang_path = try std.fmt.allocPrint(allocator, "{s}{s}lang/{s}.ini", .{ s, trailing_slash, config.lang });
-        defer allocator.free(lang_path);
-
-        lang = lang_ini.readFileToStruct(lang_path, .{
-            .fieldHandler = null,
-            .comment_characters = comment_characters,
-        }) catch Lang{};
-
-        if (config.save) {
-            save_path = try std.fmt.allocPrint(allocator, "{s}{s}save.txt", .{ s, trailing_slash });
-            old_save_path = try std.fmt.allocPrint(allocator, "{s}{s}save.ini", .{ s, trailing_slash });
-            save_path_alloc = true;
-        }
-    } else {
-        const config_path = build_options.config_directory ++ "/ly/config.ini";
-
-        config = config_ini.readFileToStruct(config_path, .{
-            .fieldHandler = migrator.configFieldHandler,
-            .errorHandler = configErrorHandler,
-            .comment_characters = comment_characters,
-        }) catch |err| load_error: {
-            maybe_config_load_error = err;
-            break :load_error Config{};
-        };
-
-        const lang_path = try std.fmt.allocPrint(allocator, "{s}/ly/lang/{s}.ini", .{ build_options.config_directory, config.lang });
-        defer allocator.free(lang_path);
-
-        lang = lang_ini.readFileToStruct(lang_path, .{
-            .fieldHandler = null,
-            .comment_characters = comment_characters,
-        }) catch Lang{};
-    }
-
-    if (maybe_config_load_error == null) {
+    if (config_parser.maybe_load_error == null) {
         migrator.lateConfigFieldHandler(&config);
     }
 
@@ -251,10 +209,10 @@ pub fn main() !void {
     }
 
     if (config.save) read_save_file: {
-        old_save_file_exists = migrator.tryMigrateIniSaveFile(allocator, &old_save_ini, old_save_path, &saved_users, usernames.items) catch break :read_save_file;
+        old_save_parser = migrator.tryMigrateIniSaveFile(allocator, old_save_path, &saved_users, usernames.items) catch break :read_save_file;
 
         // Don't read the new save file if the old one still exists
-        if (old_save_file_exists) break :read_save_file;
+        if (old_save_parser != null) break :read_save_file;
 
         var save_file = std.fs.cwd().openFile(save_path, .{}) catch break :read_save_file;
         defer save_file.close();
@@ -378,22 +336,13 @@ pub fn main() !void {
         try log_file.err("sys", "failed to execute start command: exit code {d}", .{start_cmd_exit_code});
     }
 
-    if (maybe_config_load_error) |err| {
+    if (config_parser.maybe_load_error) |load_error| {
         // We can't localize this since the config failed to load so we'd fallback to the default language anyway
         try info_line.addMessage("unable to parse config file", config.error_bg, config.error_fg);
-        try log_file.err("conf", "unable to parse config file: {s}", .{@errorName(err)});
+        try log_file.err("conf", "unable to parse config file: {s}", .{@errorName(load_error)});
 
-        defer config_errors.deinit(temporary_allocator);
-
-        for (0..config_errors.items.len) |i| {
-            const config_error = config_errors.items[i];
-            defer {
-                temporary_allocator.free(config_error.type_name);
-                temporary_allocator.free(config_error.key);
-                temporary_allocator.free(config_error.value);
-            }
-
-            try log_file.err("conf", "failed to convert value '{s}' of option '{s}' to type '{s}': {s}", .{ config_error.value, config_error.key, config_error.type_name, config_error.error_name });
+        for (config_parser.errors.items) |err| {
+            try log_file.err("conf", "failed to convert value '{s}' of option '{s}' to type '{s}': {s}", .{ err.value, err.key, err.type_name, err.error_name });
         }
     }
 
@@ -866,7 +815,7 @@ pub fn main() !void {
                     // Delete previous save file if it exists
                     if (migrator.maybe_save_file) |path| {
                         std.fs.cwd().deleteFile(path) catch {};
-                    } else if (old_save_file_exists) {
+                    } else if (old_save_parser != null) {
                         std.fs.cwd().deleteFile(old_save_path) catch {};
                     }
                 }
@@ -1199,15 +1148,6 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
 
     _ = TerminalBuffer.presentBufferStatic();
     return true;
-}
-
-fn configErrorHandler(type_name: []const u8, key: []const u8, value: []const u8, err: anyerror) void {
-    config_errors.append(temporary_allocator, .{
-        .type_name = temporary_allocator.dupe(u8, type_name) catch return,
-        .key = temporary_allocator.dupe(u8, key) catch return,
-        .value = temporary_allocator.dupe(u8, value) catch return,
-        .error_name = @errorName(err),
-    }) catch return;
 }
 
 fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplayServer, exec: ?[]const u8) !void {

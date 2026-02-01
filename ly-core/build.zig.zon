@@ -3,7 +3,12 @@
     .version = "1.0.0",
     .fingerprint = 0xddda7afda795472,
     .minimum_zig_version = "0.15.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .zigini = .{
+            .url = "git+https://github.com/AnErrupTion/zigini?ref=zig-0.15.0#9281f47702b57779e831d7618e158abb8eb4d4a2",
+            .hash = "zigini-0.3.3-36M0FRJJAADZVq5HPm-hYKMpFFTr0OgjbEYcK2ijKZ5n",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

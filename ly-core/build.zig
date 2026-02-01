@@ -9,6 +9,9 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const zigini = b.dependency("zigini", .{ .target = target, .optimize = optimize });
+    mod.addImport("zigini", zigini.module("zigini"));
+
     const mod_tests = b.addTest(.{
         .root_module = mod,
     });
