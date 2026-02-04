@@ -590,7 +590,7 @@ pub fn main() !void {
 
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
-        if (!state.update or state.animate) {
+        if (!state.update or state.animate or config.bigclock != .none or config.clock != null) {
             if (!state.update) std.Thread.sleep(std.time.ns_per_ms * 100);
 
             // Required to update tb_width() and tb_height()
@@ -598,14 +598,14 @@ pub fn main() !void {
             const width = new_dimensions.width;
             const height = new_dimensions.height;
 
-            if (width != buffer.width or height != buffer.height) {
+            if (width != state.buffer.width or height != state.buffer.height) {
                 // If it did change, then update the cell buffer, reallocate the current animation's buffers, and force a draw update
                 try log_file.info("tui", "screen resolution updated to {d}x{d}", .{ width, height });
 
-                buffer.width = width;
-                buffer.height = height;
+                state.buffer.width = width;
+                state.buffer.height = height;
 
-                if (animation) |*a| a.realloc() catch |err| {
+                if (state.animation.*) |*a| a.realloc() catch |err| {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     try log_file.err("tui", "failed to reallocate animation buffers: {s}", .{@errorName(err)});
                 };
@@ -630,7 +630,7 @@ pub fn main() !void {
 
             if (config.animation_timeout_sec > 0 and time.seconds - animation_time_start.seconds > config.animation_timeout_sec) {
                 state.animation_timed_out = true;
-                if (animation) |*a| a.deinit();
+                if (state.animation.*) |*a| a.deinit();
             }
         } else if (config.bigclock != .none and config.clock == null) {
             const time = try interop.getTimeOfDay();
