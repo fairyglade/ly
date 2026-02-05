@@ -437,7 +437,7 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
         std.process.exit(1);
     }
 
-    var ok: c_int = undefined;
+    var ok: c_int = -1;
     var xcb: ?*interop.xcb.xcb_connection_t = null;
     while (ok != 0) {
         xcb = interop.xcb.xcb_connect(null, null);
