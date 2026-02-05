@@ -573,10 +573,12 @@ pub fn main() !void {
         try log_file.err("sys", "failed to get active tty: {s}", .{@errorName(err)});
         break :no_tty_found build_options.fallback_tty;
     };
-    interop.switchTty(active_tty) catch |err| {
-        try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
-        try log_file.err("sys", "failed to switch to tty {d}: {s}", .{ active_tty, @errorName(err) });
-    };
+    if (!use_kmscon_vt) {
+        interop.switchTty(active_tty) catch |err| {
+            try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
+            try log_file.err("sys", "failed to switch to tty {d}: {s}", .{ active_tty, @errorName(err) });
+        };
+    }
 
     if (config.initial_info_text) |text| {
         try info_line.addMessage(text, config.bg, config.fg);
