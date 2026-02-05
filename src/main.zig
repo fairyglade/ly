@@ -126,6 +126,7 @@ pub fn main() !void {
         \\-h, --help                Shows all commands.
         \\-v, --version             Shows the version of Ly.
         \\-c, --config <str>        Overrides the default configuration path. Example: --config /usr/share/ly
+        \\--use-kmscon-vt           Use KMSCON instead of kernel VT
     );
 
     var diag = clap.Diagnostic{};
@@ -141,6 +142,7 @@ pub fn main() !void {
     var old_save_parser: ?IniParser(OldSave) = null;
     defer if (old_save_parser) |*str| str.deinit();
 
+    var use_kmscon_vt = false;
     var start_cmd_exit_code: u8 = 0;
 
     var saved_users = SavedUsers.init();
@@ -161,6 +163,7 @@ pub fn main() !void {
             std.process.exit(0);
         }
         if (res.args.config) |path| config_parent_path = path;
+        if (res.args.@"use-kmscon-vt" != 0) use_kmscon_vt = true;
     }
 
     // Load configuration file
@@ -845,6 +848,7 @@ pub fn main() !void {
                             .x_cmd = config.x_cmd,
                             .x_vt = config.x_vt,
                             .session_pid = session_pid,
+                            .use_kmscon_vt = use_kmscon_vt,
                         };
 
                         // Signal action to give up control on the TTY

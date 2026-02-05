@@ -269,6 +269,9 @@ fn install_service(allocator: std.mem.Allocator, patch_map: PatchMap) !void {
 
             const patched_service = try patchFile(allocator, "res/ly@.service", patch_map);
             try installText(patched_service, service_dir, service_path, "ly@.service", .{ .mode = 0o644 });
+
+            const patched_kmsconvt_service = try patchFile(allocator, "res/ly-kmsconvt@.service", patch_map);
+            try installText(patched_kmsconvt_service, service_dir, service_path, "ly-kmsconvt@.service", .{ .mode = 0o644 });
         },
         .openrc => {
             const service_path = try std.fs.path.join(allocator, &[_][]const u8{ dest_directory, config_directory, "/init.d" });

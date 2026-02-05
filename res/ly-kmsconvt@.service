@@ -1,0 +1,17 @@
+[Unit]
+Description=TUI display manager using KMSCON
+After=systemd-user-sessions.service plymouth-quit-wait.service
+After=kmsconvt@%i.service
+Conflicts=kmsconvt@%i.service
+
+[Service]
+ExecStart=$PREFIX_DIRECTORY/bin/kmscon --vt=%I --seats=seat0 --login -- $PREFIX_DIRECTORY/bin/ly --use-kmscon-vt
+StandardInput=tty
+UtmpIdentifier=%I
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+
+[Install]
+WantedBy=multi-user.target

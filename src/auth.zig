@@ -22,6 +22,7 @@ pub const AuthOptions = struct {
     x_cmd: []const u8,
     x_vt: ?u8,
     session_pid: std.posix.pid_t,
+    use_kmscon_vt: bool,
 };
 
 var xorg_pid: std.posix.pid_t = 0;
@@ -475,7 +476,7 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
     xorg_pid = try std.posix.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", desktop_cmd }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s} {s}", .{ if (options.use_kmscon_vt) "kmscon-launch-gui" else "", options.setup_cmd, options.login_cmd orelse "", desktop_cmd }) catch std.process.exit(1);
         try log_file.info("auth/x11", "executing: {s} -c {s}", .{ shell, cmd_str });
 
         const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
@@ -508,7 +509,12 @@ fn executeCmd(global_log_file: *LogFile, allocator: std.mem.Allocator, shell: []
     try global_log_file.info("auth/sys", "launching wayland/shell/custom session", .{});
 
     var maybe_log_file: ?std.fs.File = null;
-    if (!is_terminal) {
+    if (!is_terminal) redirect_streams: {
+        if (options.use_kmscon_vt) {
+            try global_log_file.err("auth/sys", "cannot redirect stdio & stderr with kmscon", .{});
+            break :redirect_streams;
+        }
+
         // For custom desktop entries, the "Terminal" value here determines if
         // we redirect standard output & error or not. That is, we redirect only
         // if it's equal to false (so if it's not running in a TTY).
@@ -523,7 +529,7 @@ fn executeCmd(global_log_file: *LogFile, allocator: std.mem.Allocator, shell: []
     defer allocator.free(shell_z);
 
     var cmd_buffer: [1024]u8 = undefined;
-    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.setup_cmd, options.login_cmd orelse "", exec_cmd orelse shell });
+    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s} {s}", .{ if (!is_terminal and options.use_kmscon_vt) "kmscon-launch-gui" else "", options.setup_cmd, options.login_cmd orelse "", exec_cmd orelse shell });
 
     try global_log_file.info("auth/sys", "executing: {s} -c {s}", .{ shell, cmd_str });
     const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
