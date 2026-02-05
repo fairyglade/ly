@@ -1320,13 +1320,33 @@ fn getAllUsernames(allocator: std.mem.Allocator, login_defs_path: []const u8, ui
         };
     };
 
+    // There's no reliable (and clean) way to check for systemd support, so
+    // let's just define a range and check if a user is within it
+    const SYSTEMD_HOMED_UID_MIN = 60001;
+    const SYSTEMD_HOMED_UID_MAX = 60513;
+    const homed_uid_range = UidRange{
+        .uid_min = SYSTEMD_HOMED_UID_MIN,
+        .uid_max = SYSTEMD_HOMED_UID_MAX,
+    };
+
     var usernames: StringList = .empty;
     var maybe_entry = interop.getNextUsernameEntry();
 
     while (maybe_entry) |entry| {
         // We check if the UID is equal to 0 because we always want to add root
         // as a username (even if you can't log into it)
-        if (entry.uid >= uid_range.uid_min and entry.uid <= uid_range.uid_max or entry.uid == 0 and entry.username != null) {
+        const is_within_range =
+            entry.uid >= uid_range.uid_min and
+            entry.uid <= uid_range.uid_max;
+        const is_within_homed_range =
+            builtin.os.tag == .linux and
+            entry.uid >= homed_uid_range.uid_min and
+            entry.uid <= homed_uid_range.uid_max;
+        const is_root =
+            entry.uid == 0 and
+            entry.username != null;
+
+        if (is_within_range or is_within_homed_range or is_root) {
             const username = try allocator.dupe(u8, entry.username.?);
             try usernames.append(allocator, username);
         }
