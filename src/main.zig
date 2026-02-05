@@ -633,7 +633,7 @@ pub fn main() !void {
 
     while (run) {
         // If there's no input or there's an animation, a resolution change needs to be checked
-        if (!update or animate) {
+        if (!update or animate or config.bigclock != .none or config.clock != null) {
             if (!update) std.Thread.sleep(std.time.ns_per_ms * 100);
 
             _ = termbox.tb_present(); // Required to update tb_width() and tb_height()
