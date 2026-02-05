@@ -96,8 +96,21 @@ fn PlatformStruct() type {
             // 4. Finally, compare the major and minor device numbers with the
             //    extracted values. If they correspond, parse [dir] to get the
             //    TTY ID
-            pub fn getActiveTtyImpl(allocator: std.mem.Allocator) !u8 {
+            pub fn getActiveTtyImpl(allocator: std.mem.Allocator, use_kmscon_vt: bool) !u8 {
                 var file_buffer: [256]u8 = undefined;
+
+                if (use_kmscon_vt) {
+                    var file = try std.fs.openFileAbsolute("/sys/class/tty/tty0/active", .{});
+                    defer file.close();
+
+                    var reader = file.reader(&file_buffer);
+                    var buffer: [16]u8 = undefined;
+                    const read = try readBuffer(&reader.interface, &buffer);
+
+                    const tty = buffer[0..(read - 1)];
+                    return std.fmt.parseInt(u8, tty["tty".len..], 10);
+                }
+
                 var tty_major: u16 = undefined;
                 var tty_minor: u16 = undefined;
 
@@ -242,7 +255,7 @@ fn PlatformStruct() type {
                 if (result != 0) return error.SetUserUidFailed;
             }
 
-            pub fn getActiveTtyImpl(_: std.mem.Allocator) !u8 {
+            pub fn getActiveTtyImpl(_: std.mem.Allocator, _: bool) !u8 {
                 return error.FeatureUnimplemented;
             }
 
@@ -285,8 +298,8 @@ pub fn getTimeOfDay() !TimeOfDay {
     };
 }
 
-pub fn getActiveTty(allocator: std.mem.Allocator) !u8 {
-    return platform_struct.getActiveTtyImpl(allocator);
+pub fn getActiveTty(allocator: std.mem.Allocator, use_kmscon_vt: bool) !u8 {
+    return platform_struct.getActiveTtyImpl(allocator, use_kmscon_vt);
 }
 
 pub fn switchTty(tty: u8) !void {
