@@ -1299,14 +1299,14 @@ fn isValidUsername(username: []const u8, usernames: StringList) bool {
 
 fn findSessionByName(session: *Session, name: []const u8) ?usize {
     for (session.label.list.items, 0..) |env, i| {
+        if (std.ascii.eqlIgnoreCase(env.environment.file_name, name)) return i;
+        if (std.ascii.eqlIgnoreCase(env.environment.name, name)) return i;
         if (env.environment.xdg_session_desktop) |session_desktop| {
             if (session_desktop.len > 0 and std.ascii.eqlIgnoreCase(session_desktop, name)) return i;
         }
         if (env.environment.xdg_desktop_names) |session_desktop_name| {
             if (std.ascii.eqlIgnoreCase(session_desktop_name, name)) return i;
         }
-        if (std.ascii.eqlIgnoreCase(env.environment.name, name)) return i;
-        if (std.ascii.eqlIgnoreCase(env.environment.file_name, name)) return i;
     }
     return null;
 }
