@@ -190,6 +190,8 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
         if (install_config) {
             const patched_config = try patchFile(allocator, "res/config.ini", patch_map);
             try installText(patched_config, config_dir, ly_config_directory, "config.ini", .{});
+
+            try installFile("res/startup.sh", config_dir, ly_config_directory, "startup.sh", .{ .override_mode = 0o755 });
         }
 
         const patched_example_config = try patchFile(allocator, "res/config.ini", patch_map);
@@ -197,8 +199,6 @@ fn install_ly(allocator: std.mem.Allocator, patch_map: PatchMap, install_config:
 
         const patched_setup = try patchFile(allocator, "res/setup.sh", patch_map);
         try installText(patched_setup, config_dir, ly_config_directory, "setup.sh", .{ .mode = 0o755 });
-
-        try installFile("res/startup.sh", config_dir, ly_config_directory, "startup.sh", .{ .override_mode = 0o755 });
 
         try installFile("res/example.dur", config_dir, ly_config_directory, "example.dur", .{ .override_mode = 0o755 });
     }
