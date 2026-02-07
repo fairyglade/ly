@@ -263,6 +263,8 @@ pub fn main() !void {
     var log_file = try LogFile.init(config.ly_log, &log_file_buffer);
     defer log_file.deinit();
 
+    try log_file.info("tui", "using {s} vt", .{if (use_kmscon_vt) "kmscon" else "default"});
+
     // These strings only end up getting freed if the user quits Ly using Ctrl+C, which is fine since in the other cases
     // we end up shutting down or restarting the system
     shutdown_cmd = try temporary_allocator.dupe(u8, config.shutdown_cmd);
