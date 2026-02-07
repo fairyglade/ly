@@ -1,12 +1,12 @@
 const std = @import("std");
-const TerminalBuffer = @import("../TerminalBuffer.zig");
+const Allocator = std.mem.Allocator;
+
 const enums = @import("../../enums.zig");
+const DisplayServer = enums.DisplayServer;
 const Environment = @import("../../Environment.zig");
+const TerminalBuffer = @import("../TerminalBuffer.zig");
 const generic = @import("generic.zig");
 const UserList = @import("UserList.zig");
-
-const Allocator = std.mem.Allocator;
-const DisplayServer = enums.DisplayServer;
 
 const Env = struct {
     environment: Environment,

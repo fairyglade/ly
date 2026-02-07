@@ -1,21 +1,19 @@
 const std = @import("std");
-const ly_core = @import("ly-core");
-const Animation = @import("../tui/Animation.zig");
-const Cell = @import("../tui/Cell.zig");
-const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
-const enums = @import("../enums.zig");
-
-const DurOffsetAlignment = enums.DurOffsetAlignment;
-
-const Color = TerminalBuffer.Color;
-const Styling = TerminalBuffer.Styling;
-
 const Allocator = std.mem.Allocator;
 const Json = std.json;
 const eql = std.mem.eql;
 const flate = std.compress.flate;
 
+const ly_core = @import("ly-core");
 const LogFile = ly_core.LogFile;
+
+const enums = @import("../enums.zig");
+const DurOffsetAlignment = enums.DurOffsetAlignment;
+const Animation = @import("../tui/Animation.zig");
+const Cell = @import("../tui/Cell.zig");
+const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+const Color = TerminalBuffer.Color;
+const Styling = TerminalBuffer.Styling;
 
 fn read_decompress_file(allocator: Allocator, file_path: []const u8) ![]u8 {
     const file_buffer = std.fs.cwd().openFile(file_path, .{}) catch {

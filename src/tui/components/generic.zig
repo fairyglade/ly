@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 
 pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) type {

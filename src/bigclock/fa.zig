@@ -1,5 +1,4 @@
 const Lang = @import("Lang.zig");
-
 const LocaleChars = Lang.LocaleChars;
 const X = Lang.X;
 const O = Lang.O;

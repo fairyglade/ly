@@ -1,16 +1,17 @@
 const std = @import("std");
+
 const ly_core = @import("ly-core");
-const enums = @import("enums.zig");
-const Lang = @import("bigclock/Lang.zig");
+const interop = ly_core.interop;
+
 const en = @import("bigclock/en.zig");
 const fa = @import("bigclock/fa.zig");
-const Cell = @import("tui/Cell.zig");
-
-const interop = ly_core.interop;
-const Bigclock = enums.Bigclock;
+const Lang = @import("bigclock/Lang.zig");
 pub const WIDTH = Lang.WIDTH;
 pub const HEIGHT = Lang.HEIGHT;
 pub const SIZE = Lang.SIZE;
+const enums = @import("enums.zig");
+const Bigclock = enums.Bigclock;
+const Cell = @import("tui/Cell.zig");
 
 pub fn clockCell(animate: bool, char: u8, fg: u32, bg: u32, bigclock: Bigclock) ![SIZE]Cell {
     var cells: [SIZE]Cell = undefined;

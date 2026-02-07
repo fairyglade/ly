@@ -1,8 +1,8 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const generic = @import("generic.zig");
-
-const Allocator = std.mem.Allocator;
 
 const MessageLabel = generic.CyclableLabel(Message, Message);
 

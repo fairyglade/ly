@@ -3,17 +3,18 @@
 // Color codes interpreted differently since 1.1.0
 
 const std = @import("std");
+var temporary_allocator = std.heap.page_allocator;
+
 const ini = @import("zigini");
 const ly_core = @import("ly-core");
+const IniParser = ly_core.IniParser;
+
+const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+const Color = TerminalBuffer.Color;
+const Styling = TerminalBuffer.Styling;
 const Config = @import("Config.zig");
 const OldSave = @import("OldSave.zig");
 const SavedUsers = @import("SavedUsers.zig");
-const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
-
-const IniParser = ly_core.IniParser;
-
-const Color = TerminalBuffer.Color;
-const Styling = TerminalBuffer.Styling;
 
 const color_properties = [_][]const u8{
     "bg",
@@ -43,8 +44,6 @@ const removed_properties = [_][]const u8{
     "console_dev",
     "load",
 };
-
-var temporary_allocator = std.heap.page_allocator;
 
 pub var auto_eight_colors: bool = true;
 

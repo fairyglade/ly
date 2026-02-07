@@ -1,41 +1,43 @@
 const std = @import("std");
-const build_options = @import("build_options");
+const temporary_allocator = std.heap.page_allocator;
 const builtin = @import("builtin");
-const ly_core = @import("ly-core");
+const build_options = @import("build_options");
+
 const clap = @import("clap");
 const ini = @import("zigini");
-const auth = @import("auth.zig");
-const bigclock = @import("bigclock.zig");
-const enums = @import("enums.zig");
-const Environment = @import("Environment.zig");
-const ColorMix = @import("animations/ColorMix.zig");
-const Doom = @import("animations/Doom.zig");
-const Matrix = @import("animations/Matrix.zig");
-const GameOfLife = @import("animations/GameOfLife.zig");
-const DurFile = @import("animations/DurFile.zig");
-const Animation = @import("tui/Animation.zig");
-const TerminalBuffer = @import("tui/TerminalBuffer.zig");
-const Session = @import("tui/components/Session.zig");
-const Text = @import("tui/components/Text.zig");
-const InfoLine = @import("tui/components/InfoLine.zig");
-const UserList = @import("tui/components/UserList.zig");
-const Config = @import("config/Config.zig");
-const Lang = @import("config/Lang.zig");
-const OldSave = @import("config/OldSave.zig");
-const SavedUsers = @import("config/SavedUsers.zig");
-const migrator = @import("config/migrator.zig");
-
-const StringList = std.ArrayListUnmanaged([]const u8);
 const Ini = ini.Ini;
-const DisplayServer = enums.DisplayServer;
-const Entry = Environment.Entry;
+const ly_core = @import("ly-core");
 const interop = ly_core.interop;
 const UidRange = ly_core.UidRange;
 const LogFile = ly_core.LogFile;
 const SharedError = ly_core.SharedError;
 const IniParser = ly_core.IniParser;
+
+const ColorMix = @import("animations/ColorMix.zig");
+const Doom = @import("animations/Doom.zig");
+const DurFile = @import("animations/DurFile.zig");
+const GameOfLife = @import("animations/GameOfLife.zig");
+const Matrix = @import("animations/Matrix.zig");
+const auth = @import("auth.zig");
+const bigclock = @import("bigclock.zig");
+const Config = @import("config/Config.zig");
+const Lang = @import("config/Lang.zig");
+const migrator = @import("config/migrator.zig");
+const OldSave = @import("config/OldSave.zig");
+const SavedUsers = @import("config/SavedUsers.zig");
+const enums = @import("enums.zig");
+const DisplayServer = enums.DisplayServer;
+const Environment = @import("Environment.zig");
+const Entry = Environment.Entry;
+const Animation = @import("tui/Animation.zig");
+const InfoLine = @import("tui/components/InfoLine.zig");
+const Session = @import("tui/components/Session.zig");
+const Text = @import("tui/components/Text.zig");
+const UserList = @import("tui/components/UserList.zig");
+const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const termbox = TerminalBuffer.termbox;
-const temporary_allocator = std.heap.page_allocator;
+
+const StringList = std.ArrayListUnmanaged([]const u8);
 const ly_version_str = "Ly version " ++ build_options.version;
 
 var session_pid: std.posix.pid_t = -1;
@@ -673,7 +675,7 @@ pub fn main() !void {
 
         // Skip event polling if autologin is set, use simulated Enter key press instead
         if (is_autologin) {
-            event = termbox.tb_event{
+            event = .{
                 .type = termbox.TB_EVENT_KEY,
                 .key = termbox.TB_KEY_ENTER,
                 .ch = 0,

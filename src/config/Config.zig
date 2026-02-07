@@ -1,6 +1,6 @@
 const build_options = @import("build_options");
-const enums = @import("../enums.zig");
 
+const enums = @import("../enums.zig");
 const Animation = enums.Animation;
 const Input = enums.Input;
 const ViMode = enums.ViMode;

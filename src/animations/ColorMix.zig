@@ -1,11 +1,12 @@
 const std = @import("std");
+const math = std.math;
+
 const Animation = @import("../tui/Animation.zig");
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 
 const ColorMix = @This();
 
-const math = std.math;
 const Vec2 = @Vector(2, f32);
 
 const time_scale: f32 = 0.01;

@@ -1,13 +1,12 @@
 const std = @import("std");
-const ly_core = @import("ly-core");
-const Cell = @import("Cell.zig");
-
-pub const termbox = @import("termbox2");
-
 const Random = std.Random;
 
+const ly_core = @import("ly-core");
 const interop = ly_core.interop;
 const LogFile = ly_core.LogFile;
+pub const termbox = @import("termbox2");
+
+const Cell = @import("Cell.zig");
 
 const TerminalBuffer = @This();
 

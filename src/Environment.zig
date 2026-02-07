@@ -1,8 +1,8 @@
-const enums = @import("enums.zig");
 const ini = @import("zigini");
-
-const DisplayServer = enums.DisplayServer;
 const Ini = ini.Ini;
+
+const enums = @import("enums.zig");
+const DisplayServer = enums.DisplayServer;
 
 pub const DesktopEntry = struct {
     Exec: []const u8 = "",

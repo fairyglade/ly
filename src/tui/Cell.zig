@@ -1,5 +1,4 @@
 const TerminalBuffer = @import("TerminalBuffer.zig");
-
 const termbox = TerminalBuffer.termbox;
 
 const Cell = @This();

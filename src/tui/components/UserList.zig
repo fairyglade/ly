@@ -1,12 +1,12 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+
+const SavedUsers = @import("../../config/SavedUsers.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const generic = @import("generic.zig");
 const Session = @import("Session.zig");
-const SavedUsers = @import("../../config/SavedUsers.zig");
 
 const StringList = std.ArrayListUnmanaged([]const u8);
-const Allocator = std.mem.Allocator;
-
 pub const User = struct {
     name: []const u8,
     session_index: *usize,

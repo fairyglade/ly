@@ -1,10 +1,10 @@
 const std = @import("std");
-const TerminalBuffer = @import("../TerminalBuffer.zig");
-
 const Allocator = std.mem.Allocator;
-const DynamicString = std.ArrayListUnmanaged(u8);
 
+const TerminalBuffer = @import("../TerminalBuffer.zig");
 const termbox = TerminalBuffer.termbox;
+
+const DynamicString = std.ArrayListUnmanaged(u8);
 
 const Text = @This();
 
@@ -21,12 +21,10 @@ masked: bool,
 maybe_mask: ?u32,
 
 pub fn init(allocator: Allocator, buffer: *TerminalBuffer, masked: bool, maybe_mask: ?u32) Text {
-    const text: DynamicString = .empty;
-
     return .{
         .allocator = allocator,
         .buffer = buffer,
-        .text = text,
+        .text = .empty,
         .end = 0,
         .cursor = 0,
         .visible_start = 0,
