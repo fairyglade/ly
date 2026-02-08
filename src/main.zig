@@ -90,7 +90,6 @@ const UiState = struct {
     box: *CenteredBox,
     info_line: *InfoLine,
     animate: bool,
-    resolution_changed: bool,
     session: *Session,
     login: *UserList,
     password: *Text,
@@ -734,7 +733,6 @@ pub fn main() !void {
         .box = &box,
         .info_line = &info_line,
         .animate = config.animation != .none,
-        .resolution_changed = false,
         .session = &session,
         .login = &login,
         .password = &password,
@@ -856,23 +854,6 @@ pub fn main() !void {
     }
 
     while (run) {
-        if (state.resolution_changed) {
-            state.buffer.width = TerminalBuffer.getWidthStatic();
-            state.buffer.height = TerminalBuffer.getHeightStatic();
-
-            try log_file.info("tui", "screen resolution updated to {d}x{d}", .{ state.buffer.width, state.buffer.height });
-
-            if (state.animation.*) |*a| a.realloc() catch |err| {
-                try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                try log_file.err("tui", "failed to reallocate animation buffers: {s}", .{@errorName(err)});
-            };
-
-            positionComponents(&state);
-
-            state.update = true;
-            state.resolution_changed = false;
-        }
-
         if (state.update) {
             try updateComponents(&state);
 
@@ -955,7 +936,19 @@ pub fn main() !void {
         }
 
         if (event.type == termbox.TB_EVENT_RESIZE) {
-            state.resolution_changed = true;
+            state.buffer.width = TerminalBuffer.getWidthStatic();
+            state.buffer.height = TerminalBuffer.getHeightStatic();
+
+            try log_file.info("tui", "screen resolution updated to {d}x{d}", .{ state.buffer.width, state.buffer.height });
+
+            if (state.animation.*) |*a| a.realloc() catch |err| {
+                try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                try log_file.err("tui", "failed to reallocate animation buffers: {s}", .{@errorName(err)});
+            };
+
+            positionComponents(&state);
+
+            state.update = true;
             continue;
         }
 
