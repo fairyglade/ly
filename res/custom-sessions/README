@@ -17,7 +17,7 @@ redirected to the session log file found in Ly's configuration file. If set to
 true, Ly will consider the program is going to run in a TTY, and thus will not
 redirect standard output & error. It is optional and defaults to false.
 
-Finally, do note that, if the Terminal value is set to true, the
+Finally, do note that if the Terminal value is set to true, the
 XDG_SESSION_TYPE environment variable will be set to "tty". Otherwise, it will
 be set to "unspecified" (without quotes), which is behavior that at least
 systemd recognizes (see pam_systemd's man page).
