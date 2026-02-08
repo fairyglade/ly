@@ -33,7 +33,7 @@ const Animation = @import("tui/Animation.zig");
 const Position = @import("tui/Position.zig");
 const CenteredBox = @import("tui/components/CenteredBox.zig");
 const InfoLine = @import("tui/components/InfoLine.zig");
-const Label = @import("tui/components/Label.zig");
+const label = @import("tui/components/label.zig");
 const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
 const UserList = @import("tui/components/UserList.zig");
@@ -41,6 +41,8 @@ const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const termbox = TerminalBuffer.termbox;
 
 const StringList = std.ArrayListUnmanaged([]const u8);
+
+const Label = label.Label;
 const ly_version_str = "Ly version " ++ build_options.version;
 
 var session_pid: std.posix.pid_t = -1;
@@ -62,6 +64,7 @@ fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
     TerminalBuffer.shutdownStatic();
 }
 
+const NoType = struct {};
 const UiState = struct {
     auth_fails: u64,
     update: bool,
@@ -69,21 +72,20 @@ const UiState = struct {
     labels_max_length: usize,
     animation_timed_out: bool,
     animation: *?Animation,
-    can_draw_battery: bool,
-    shutdown_label: *Label,
-    restart_label: *Label,
-    sleep_label: *Label,
-    hibernate_label: *Label,
-    brightness_down_label: *Label,
-    brightness_up_label: *Label,
-    numlock_label: *Label,
-    capslock_label: *Label,
-    battery_label: *Label,
-    clock_label: *Label,
-    session_specifier_label: *Label,
-    login_label: *Label,
-    password_label: *Label,
-    version_label: *Label,
+    shutdown_label: *Label(NoType),
+    restart_label: *Label(NoType),
+    sleep_label: *Label(NoType),
+    hibernate_label: *Label(NoType),
+    brightness_down_label: *Label(NoType),
+    brightness_up_label: *Label(NoType),
+    numlock_label: *Label(*UiState),
+    capslock_label: *Label(*UiState),
+    battery_label: *Label(*UiState),
+    clock_label: *Label(*UiState),
+    session_specifier_label: *Label(*UiState),
+    login_label: *Label(NoType),
+    password_label: *Label(NoType),
+    version_label: *Label(NoType),
     box: *CenteredBox,
     info_line: *InfoLine,
     animate: bool,
@@ -93,17 +95,12 @@ const UiState = struct {
     password: *Text,
     active_input: enums.Input,
     insert_mode: bool,
-    can_draw_clock: bool,
-    shutdown_len: u8,
-    restart_len: u8,
-    sleep_len: u8,
-    hibernate_len: u8,
-    brightness_down_len: u8,
-    brightness_up_len: u8,
-    can_get_lock_state: bool,
     edge_margin: Position,
-    hide_key_hints: bool,
-    uses_clock: bool,
+    config: Config,
+    lang: Lang,
+    log_file: *LogFile,
+    battery_buf: [16:0]u8,
+    clock_buf: [64:0]u8,
 };
 
 pub fn main() !void {
@@ -339,51 +336,57 @@ pub fn main() !void {
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     // Initialize components
-    var shutdown_label = Label.init(
+    var shutdown_label = Label(NoType).init(
         "",
         null,
         buffer.fg,
         buffer.bg,
+        null,
     );
     defer shutdown_label.deinit(allocator);
 
-    var restart_label = Label.init(
+    var restart_label = Label(NoType).init(
         "",
         null,
         buffer.fg,
         buffer.bg,
+        null,
     );
     defer restart_label.deinit(allocator);
 
-    var sleep_label = Label.init(
+    var sleep_label = Label(NoType).init(
         "",
         null,
         buffer.fg,
         buffer.bg,
+        null,
     );
     defer sleep_label.deinit(allocator);
 
-    var hibernate_label = Label.init(
+    var hibernate_label = Label(NoType).init(
         "",
         null,
         buffer.fg,
         buffer.bg,
+        null,
     );
     defer hibernate_label.deinit(allocator);
 
-    var brightness_down_label = Label.init(
+    var brightness_down_label = Label(NoType).init(
         "",
         null,
         buffer.fg,
         buffer.bg,
+        null,
     );
     defer brightness_down_label.deinit(allocator);
 
-    var brightness_up_label = Label.init(
+    var brightness_up_label = Label(NoType).init(
         "",
         null,
         buffer.fg,
         buffer.bg,
+        null,
     );
     defer brightness_up_label.deinit(allocator);
 
@@ -428,35 +431,39 @@ pub fn main() !void {
         }
     }
 
-    var numlock_label = Label.init(
-        lang.numlock,
+    var numlock_label = Label(*UiState).init(
+        "",
         null,
         buffer.fg,
         buffer.bg,
+        &updateNumlock,
     );
     defer numlock_label.deinit(null);
 
-    var capslock_label = Label.init(
-        lang.capslock,
+    var capslock_label = Label(*UiState).init(
+        "",
         null,
         buffer.fg,
         buffer.bg,
+        &updateCapslock,
     );
     defer capslock_label.deinit(null);
 
-    var battery_label = Label.init(
+    var battery_label = Label(*UiState).init(
         "",
         null,
         buffer.fg,
         buffer.bg,
+        &updateBattery,
     );
     defer battery_label.deinit(null);
 
-    var clock_label = Label.init(
+    var clock_label = Label(*UiState).init(
         "",
         null,
         buffer.fg,
         buffer.bg,
+        &updateClock,
     );
     defer clock_label.deinit(null);
 
@@ -525,11 +532,12 @@ pub fn main() !void {
 
     var login: UserList = undefined;
 
-    var session_specifier_label = Label.init(
+    var session_specifier_label = Label(*UiState).init(
         "",
         null,
         buffer.fg,
         buffer.bg,
+        &updateSessionSpecifier,
     );
     defer session_specifier_label.deinit(null);
 
@@ -544,11 +552,12 @@ pub fn main() !void {
     );
     defer session.deinit();
 
-    var login_label = Label.init(
+    var login_label = Label(NoType).init(
         lang.login,
         null,
         buffer.fg,
         buffer.bg,
+        null,
     );
     defer login_label.deinit(null);
 
@@ -624,11 +633,12 @@ pub fn main() !void {
         try log_file.err("sys", "no users found", .{});
     }
 
-    var password_label = Label.init(
+    var password_label = Label(NoType).init(
         lang.password,
         null,
         buffer.fg,
         buffer.bg,
+        null,
     );
     defer password_label.deinit(null);
 
@@ -643,11 +653,12 @@ pub fn main() !void {
     );
     defer password.deinit();
 
-    var version_label = Label.init(
+    var version_label = Label(NoType).init(
         ly_version_str,
         null,
         buffer.fg,
         buffer.bg,
+        null,
     );
     defer version_label.deinit(null);
 
@@ -688,7 +699,6 @@ pub fn main() !void {
         .labels_max_length = labels_max_length,
         .animation_timed_out = false,
         .animation = &animation,
-        .can_draw_battery = true,
         .shutdown_label = &shutdown_label,
         .restart_label = &restart_label,
         .sleep_label = &sleep_label,
@@ -712,20 +722,15 @@ pub fn main() !void {
         .password = &password,
         .active_input = config.default_input,
         .insert_mode = !config.vi_mode or config.vi_default_mode == .insert,
-        .can_draw_clock = true,
-        .shutdown_len = try TerminalBuffer.strWidth(lang.shutdown),
-        .restart_len = try TerminalBuffer.strWidth(lang.restart),
-        .sleep_len = try TerminalBuffer.strWidth(lang.sleep),
-        .hibernate_len = try TerminalBuffer.strWidth(lang.hibernate),
-        .brightness_down_len = try TerminalBuffer.strWidth(lang.brightness_down),
-        .brightness_up_len = try TerminalBuffer.strWidth(lang.brightness_up),
-        .can_get_lock_state = true,
         .edge_margin = Position.init(
             config.edge_margin,
             config.edge_margin,
         ),
-        .hide_key_hints = config.hide_key_hints,
-        .uses_clock = config.clock != null,
+        .config = config,
+        .lang = lang,
+        .log_file = &log_file,
+        .battery_buf = undefined,
+        .clock_buf = undefined,
     };
 
     // Load last saved username and desktop selection, if any
@@ -753,6 +758,7 @@ pub fn main() !void {
     }
 
     // Position components
+    try updateComponents(&state);
     positionComponents(&state);
 
     switch (state.active_input) {
@@ -857,7 +863,8 @@ pub fn main() !void {
         }
 
         if (state.update) {
-            if (!try drawUi(config, lang, &log_file, &state)) continue;
+            try updateComponents(&state);
+            if (!try drawUi(&log_file, &state)) continue;
         }
 
         var timeout: i32 = -1;
@@ -1188,9 +1195,26 @@ pub fn main() !void {
     }
 }
 
-fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool {
+fn updateComponents(state: *UiState) !void {
+    if (state.config.battery_id != null) {
+        try state.battery_label.update(state);
+    }
+
+    if (state.config.clock != null) {
+        try state.clock_label.update(state);
+    }
+
+    try state.session_specifier_label.update(state);
+
+    if (!state.config.hide_keyboard_locks) {
+        try state.numlock_label.update(state);
+        try state.capslock_label.update(state);
+    }
+}
+
+fn drawUi(log_file: *LogFile, state: *UiState) !bool {
     // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
-    if (config.auth_fails > 0 and state.auth_fails >= config.auth_fails) {
+    if (state.config.auth_fails > 0 and state.auth_fails >= state.config.auth_fails) {
         std.Thread.sleep(std.time.ns_per_ms * 10);
         state.update = state.buffer.cascade();
 
@@ -1207,36 +1231,19 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
 
     if (!state.animation_timed_out) if (state.animation.*) |*a| a.draw();
 
-    if (!config.hide_version_string) state.version_label.draw();
+    if (!state.config.hide_version_string) state.version_label.draw();
 
-    if (config.battery_id) |id| draw_battery: {
-        if (!state.can_draw_battery) break :draw_battery;
+    if (state.config.battery_id != null) state.battery_label.draw();
 
-        const battery_percentage = getBatteryPercentage(id) catch |err| {
-            try log_file.err("sys", "failed to get battery percentage: {s}", .{@errorName(err)});
-            try state.info_line.addMessage(lang.err_battery, config.error_bg, config.error_fg);
-            state.can_draw_battery = false;
-            break :draw_battery;
-        };
-
-        var battery_buf: [16:0]u8 = undefined;
-        state.battery_label.setTextBuf(
-            &battery_buf,
-            "BAT: {d}%",
-            .{battery_percentage},
-        ) catch break :draw_battery;
-        state.battery_label.draw();
-    }
-
-    if (config.bigclock != .none and state.box.height + (bigclock.HEIGHT + 2) * 2 < state.buffer.height) {
+    if (state.config.bigclock != .none and state.box.height + (bigclock.HEIGHT + 2) * 2 < state.buffer.height) {
         var format_buf: [16:0]u8 = undefined;
         var clock_buf: [32:0]u8 = undefined;
         // We need the slice/c-string returned by `bufPrintZ`.
         const format = try std.fmt.bufPrintZ(&format_buf, "{s}{s}{s}{s}", .{
-            if (config.bigclock_12hr) "%I" else "%H",
+            if (state.config.bigclock_12hr) "%I" else "%H",
             ":%M",
-            if (config.bigclock_seconds) ":%S" else "",
-            if (config.bigclock_12hr) "%P" else "",
+            if (state.config.bigclock_seconds) ":%S" else "",
+            if (state.config.bigclock_12hr) "%P" else "",
         });
         const xo = state.buffer.width / 2 - @min(state.buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
         const yo = (state.buffer.height - state.box.height) / 2 - bigclock.HEIGHT - 2;
@@ -1245,7 +1252,7 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
 
         for (clock_str, 0..) |c, i| {
             // TODO: Show error
-            const clock_cell = try bigclock.clockCell(state.animate, c, state.buffer.fg, state.buffer.bg, config.bigclock);
+            const clock_cell = try bigclock.clockCell(state.animate, c, state.buffer.fg, state.buffer.bg, state.config.bigclock);
             bigclock.alphaBlit(xo + i * (bigclock.WIDTH + 1), yo, state.buffer.width, state.buffer.height, clock_cell);
         }
     }
@@ -1262,37 +1269,20 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
         .session => state.session.label.handle(null, state.insert_mode),
         .login => state.login.label.handle(null, state.insert_mode),
         .password => state.password.handle(null, state.insert_mode) catch |err| {
-            try state.info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+            try state.info_line.addMessage(state.lang.err_alloc, state.config.error_bg, state.config.error_fg);
             try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
         },
     }
 
-    if (config.clock) |clock| draw_clock: {
-        if (!state.can_draw_clock) break :draw_clock;
+    if (state.config.clock != null) state.clock_label.draw();
 
-        var clock_buf: [64:0]u8 = undefined;
-        const clock_str = interop.timeAsString(&clock_buf, clock);
-
-        if (clock_str.len == 0) {
-            try state.info_line.addMessage(lang.err_clock_too_long, config.error_bg, config.error_fg);
-            state.can_draw_clock = false;
-            try log_file.err("tui", "clock string too long", .{});
-            break :draw_clock;
-        }
-
-        state.clock_label.setText(clock_str);
-        state.clock_label.draw();
-    }
-
-    const env = state.session.label.list.items[state.session.label.current];
-    state.session_specifier_label.setText(env.environment.specifier);
     state.session_specifier_label.draw();
     state.login_label.draw();
     state.password_label.draw();
 
     state.info_line.label.draw();
 
-    if (!config.hide_key_hints) {
+    if (!state.config.hide_key_hints) {
         state.shutdown_label.draw();
         state.restart_label.draw();
         state.sleep_label.draw();
@@ -1301,20 +1291,13 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
         state.brightness_up_label.draw();
     }
 
-    if (config.vi_mode) {
-        state.box.bottom_title = if (state.insert_mode) lang.insert else lang.normal;
+    if (state.config.vi_mode) {
+        state.box.bottom_title = if (state.insert_mode) state.lang.insert else state.lang.normal;
     }
 
-    if (!config.hide_keyboard_locks and state.can_get_lock_state) draw_lock_state: {
-        const lock_state = interop.getLockState() catch |err| {
-            try state.info_line.addMessage(lang.err_lock_state, config.error_bg, config.error_fg);
-            state.can_get_lock_state = false;
-            try log_file.err("sys", "failed to get lock state: {s}", .{@errorName(err)});
-            break :draw_lock_state;
-        };
-
-        if (lock_state.numlock) state.numlock_label.draw();
-        if (lock_state.capslock) state.capslock_label.draw();
+    if (!state.config.hide_keyboard_locks) {
+        state.numlock_label.draw();
+        state.capslock_label.draw();
     }
 
     state.session.label.draw();
@@ -1325,8 +1308,67 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
     return true;
 }
 
+fn updateNumlock(self: *Label(*UiState), state: *UiState) !void {
+    const lock_state = interop.getLockState() catch |err| {
+        self.update_fn = null;
+        try state.info_line.addMessage(state.lang.err_lock_state, state.config.error_bg, state.config.error_fg);
+        try state.log_file.err("sys", "failed to get lock state: {s}", .{@errorName(err)});
+        return;
+    };
+
+    self.setText(if (lock_state.numlock) state.lang.numlock else "");
+}
+
+fn updateCapslock(self: *Label(*UiState), state: *UiState) !void {
+    const lock_state = interop.getLockState() catch |err| {
+        self.update_fn = null;
+        try state.info_line.addMessage(state.lang.err_lock_state, state.config.error_bg, state.config.error_fg);
+        try state.log_file.err("sys", "failed to get lock state: {s}", .{@errorName(err)});
+        return;
+    };
+
+    self.setText(if (lock_state.capslock) state.lang.capslock else "");
+}
+
+fn updateBattery(self: *Label(*UiState), state: *UiState) !void {
+    if (state.config.battery_id) |id| {
+        const battery_percentage = getBatteryPercentage(id) catch |err| {
+            self.update_fn = null;
+            try state.log_file.err("sys", "failed to get battery percentage: {s}", .{@errorName(err)});
+            try state.info_line.addMessage(state.lang.err_battery, state.config.error_bg, state.config.error_fg);
+            return;
+        };
+
+        try self.setTextBuf(
+            &state.battery_buf,
+            "BAT: {d}%",
+            .{battery_percentage},
+        );
+    }
+}
+
+fn updateClock(self: *Label(*UiState), state: *UiState) !void {
+    if (state.config.clock) |clock| draw_clock: {
+        const clock_str = interop.timeAsString(&state.clock_buf, clock);
+
+        if (clock_str.len == 0) {
+            self.update_fn = null;
+            try state.info_line.addMessage(state.lang.err_clock_too_long, state.config.error_bg, state.config.error_fg);
+            try state.log_file.err("tui", "clock string too long", .{});
+            break :draw_clock;
+        }
+
+        self.setText(clock_str);
+    }
+}
+
+fn updateSessionSpecifier(self: *Label(*UiState), state: *UiState) !void {
+    const env = state.session.label.list.items[state.session.label.current];
+    self.setText(env.environment.specifier);
+}
+
 fn positionComponents(state: *UiState) void {
-    if (!state.hide_key_hints) {
+    if (!state.config.hide_key_hints) {
         state.shutdown_label.positionX(state.edge_margin
             .add(TerminalBuffer.START_POSITION));
         state.restart_label.positionX(state.shutdown_label
@@ -1348,9 +1390,8 @@ fn positionComponents(state: *UiState) void {
 
     state.battery_label.positionXY(state.edge_margin
         .add(TerminalBuffer.START_POSITION)
-        .addYFromIf(state.shutdown_label.childrenPosition(), !state.hide_key_hints)
-        .removeYFromIf(state.edge_margin, !state.hide_key_hints));
-    // TODO: Fix not showing on first try (with separate update function)
+        .addYFromIf(state.shutdown_label.childrenPosition(), !state.config.hide_key_hints)
+        .removeYFromIf(state.edge_margin, !state.config.hide_key_hints));
     state.clock_label.positionXY(state.edge_margin
         .add(TerminalBuffer.START_POSITION)
         .invertX(state.buffer.width)
@@ -1358,8 +1399,8 @@ fn positionComponents(state: *UiState) void {
 
     state.numlock_label.positionX(state.edge_margin
         .add(TerminalBuffer.START_POSITION)
-        .addYFromIf(state.clock_label.childrenPosition(), state.uses_clock)
-        .removeYFromIf(state.edge_margin, state.uses_clock)
+        .addYFromIf(state.clock_label.childrenPosition(), state.config.clock != null)
+        .removeYFromIf(state.edge_margin, state.config.clock != null)
         .invertX(state.buffer.width)
         .removeXIf(state.numlock_label.text.len, state.buffer.width > state.numlock_label.text.len + state.edge_margin.x));
     state.capslock_label.positionX(state.numlock_label
@@ -1371,7 +1412,6 @@ fn positionComponents(state: *UiState) void {
     state.info_line.label.positionY(state.box
         .childrenPosition());
 
-    // TODO: Same as above
     state.session_specifier_label.positionX(state.info_line.label
         .childrenPosition()
         .addY(1));
