@@ -30,8 +30,10 @@ const DisplayServer = enums.DisplayServer;
 const Environment = @import("Environment.zig");
 const Entry = Environment.Entry;
 const Animation = @import("tui/Animation.zig");
+const Position = @import("tui/Position.zig");
 const CenteredBox = @import("tui/components/CenteredBox.zig");
 const InfoLine = @import("tui/components/InfoLine.zig");
+const Label = @import("tui/components/Label.zig");
 const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
 const UserList = @import("tui/components/UserList.zig");
@@ -68,6 +70,20 @@ const UiState = struct {
     animation_timed_out: bool,
     animation: *?Animation,
     can_draw_battery: bool,
+    shutdown_label: *Label,
+    restart_label: *Label,
+    sleep_label: *Label,
+    hibernate_label: *Label,
+    brightness_down_label: *Label,
+    brightness_up_label: *Label,
+    numlock_label: *Label,
+    capslock_label: *Label,
+    battery_label: *Label,
+    clock_label: *Label,
+    session_specifier_label: *Label,
+    login_label: *Label,
+    password_label: *Label,
+    version_label: *Label,
     box: *CenteredBox,
     info_line: *InfoLine,
     animate: bool,
@@ -85,6 +101,9 @@ const UiState = struct {
     brightness_down_len: u8,
     brightness_up_len: u8,
     can_get_lock_state: bool,
+    edge_margin: Position,
+    hide_key_hints: bool,
+    uses_clock: bool,
 };
 
 pub fn main() !void {
@@ -320,6 +339,127 @@ pub fn main() !void {
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     // Initialize components
+    var shutdown_label = Label.init(
+        "",
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer shutdown_label.deinit(allocator);
+
+    var restart_label = Label.init(
+        "",
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer restart_label.deinit(allocator);
+
+    var sleep_label = Label.init(
+        "",
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer sleep_label.deinit(allocator);
+
+    var hibernate_label = Label.init(
+        "",
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer hibernate_label.deinit(allocator);
+
+    var brightness_down_label = Label.init(
+        "",
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer brightness_down_label.deinit(allocator);
+
+    var brightness_up_label = Label.init(
+        "",
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer brightness_up_label.deinit(allocator);
+
+    if (!config.hide_key_hints) {
+        try shutdown_label.setTextAlloc(
+            allocator,
+            "{s} {s}",
+            .{ config.shutdown_key, lang.shutdown },
+        );
+        try restart_label.setTextAlloc(
+            allocator,
+            "{s} {s}",
+            .{ config.restart_key, lang.restart },
+        );
+        if (config.sleep_cmd != null) {
+            try sleep_label.setTextAlloc(
+                allocator,
+                "{s} {s}",
+                .{ config.sleep_key, lang.sleep },
+            );
+        }
+        if (config.hibernate_cmd != null) {
+            try hibernate_label.setTextAlloc(
+                allocator,
+                "{s} {s}",
+                .{ config.hibernate_key, lang.hibernate },
+            );
+        }
+        if (config.brightness_down_key) |key| {
+            try brightness_down_label.setTextAlloc(
+                allocator,
+                "{s} {s}",
+                .{ key, lang.brightness_down },
+            );
+        }
+        if (config.brightness_up_key) |key| {
+            try brightness_up_label.setTextAlloc(
+                allocator,
+                "{s} {s}",
+                .{ key, lang.brightness_up },
+            );
+        }
+    }
+
+    var numlock_label = Label.init(
+        lang.numlock,
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer numlock_label.deinit(null);
+
+    var capslock_label = Label.init(
+        lang.capslock,
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer capslock_label.deinit(null);
+
+    var battery_label = Label.init(
+        "",
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer battery_label.deinit(null);
+
+    var clock_label = Label.init(
+        "",
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer clock_label.deinit(null);
+
     var box = CenteredBox.init(
         &buffer,
         config.margin_box_h,
@@ -330,12 +470,17 @@ pub fn main() !void {
         config.blank_box,
         config.box_title,
         null,
+        buffer.border_fg,
+        buffer.fg,
+        buffer.bg,
     );
 
     var info_line = InfoLine.init(
         allocator,
         &buffer,
         box.width - 2 * box.horizontal_margin,
+        buffer.fg,
+        buffer.bg,
     );
     defer info_line.deinit();
 
@@ -380,14 +525,32 @@ pub fn main() !void {
 
     var login: UserList = undefined;
 
+    var session_specifier_label = Label.init(
+        "",
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer session_specifier_label.deinit(null);
+
     var session = Session.init(
         allocator,
         &buffer,
         &login,
         box.width - 2 * box.horizontal_margin - labels_max_length - 1,
         config.text_in_center,
+        buffer.fg,
+        buffer.bg,
     );
     defer session.deinit();
+
+    var login_label = Label.init(
+        lang.login,
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer login_label.deinit(null);
 
     login = try UserList.init(
         allocator,
@@ -397,6 +560,8 @@ pub fn main() !void {
         &session,
         box.width - 2 * box.horizontal_margin - labels_max_length - 1,
         config.text_in_center,
+        buffer.fg,
+        buffer.bg,
     );
     defer login.deinit();
 
@@ -459,14 +624,32 @@ pub fn main() !void {
         try log_file.err("sys", "no users found", .{});
     }
 
+    var password_label = Label.init(
+        lang.password,
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer password_label.deinit(null);
+
     var password = Text.init(
         allocator,
         &buffer,
         true,
         config.asterisk,
         box.width - 2 * box.horizontal_margin - labels_max_length - 1,
+        buffer.fg,
+        buffer.bg,
     );
     defer password.deinit();
+
+    var version_label = Label.init(
+        ly_version_str,
+        null,
+        buffer.fg,
+        buffer.bg,
+    );
+    defer version_label.deinit(null);
 
     var is_autologin = false;
 
@@ -506,6 +689,20 @@ pub fn main() !void {
         .animation_timed_out = false,
         .animation = &animation,
         .can_draw_battery = true,
+        .shutdown_label = &shutdown_label,
+        .restart_label = &restart_label,
+        .sleep_label = &sleep_label,
+        .hibernate_label = &hibernate_label,
+        .brightness_down_label = &brightness_down_label,
+        .brightness_up_label = &brightness_up_label,
+        .numlock_label = &numlock_label,
+        .capslock_label = &capslock_label,
+        .battery_label = &battery_label,
+        .clock_label = &clock_label,
+        .session_specifier_label = &session_specifier_label,
+        .login_label = &login_label,
+        .password_label = &password_label,
+        .version_label = &version_label,
         .box = &box,
         .info_line = &info_line,
         .animate = config.animation != .none,
@@ -523,6 +720,12 @@ pub fn main() !void {
         .brightness_down_len = try TerminalBuffer.strWidth(lang.brightness_down),
         .brightness_up_len = try TerminalBuffer.strWidth(lang.brightness_up),
         .can_get_lock_state = true,
+        .edge_margin = Position.init(
+            config.edge_margin,
+            config.edge_margin,
+        ),
+        .hide_key_hints = config.hide_key_hints,
+        .uses_clock = config.clock != null,
     };
 
     // Load last saved username and desktop selection, if any
@@ -550,17 +753,13 @@ pub fn main() !void {
     }
 
     // Position components
-    state.box.position(TerminalBuffer.START_POSITION);
-    state.info_line.label.positionY(state.box.childrenPosition());
-    state.session.label.positionY(state.info_line.label.childrenPosition().addY(1).addX(state.labels_max_length + 1));
-    state.login.label.positionY(state.session.label.childrenPosition().addY(1));
-    state.password.positionY(state.login.label.childrenPosition().addY(1));
+    positionComponents(&state);
 
     switch (state.active_input) {
-        .info_line => info_line.label.handle(null, state.insert_mode),
-        .session => session.label.handle(null, state.insert_mode),
-        .login => login.label.handle(null, state.insert_mode),
-        .password => password.handle(null, state.insert_mode) catch |err| {
+        .info_line => state.info_line.label.handle(null, state.insert_mode),
+        .session => state.session.label.handle(null, state.insert_mode),
+        .login => state.login.label.handle(null, state.insert_mode),
+        .password => state.password.handle(null, state.insert_mode) catch |err| {
             try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
             try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
         },
@@ -1006,13 +1205,9 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
 
     try TerminalBuffer.clearScreenStatic(false);
 
-    var length: usize = config.edge_margin;
-
     if (!state.animation_timed_out) if (state.animation.*) |*a| a.draw();
 
-    if (!config.hide_version_string) {
-        state.buffer.drawLabel(ly_version_str, config.edge_margin, state.buffer.height - 1 - config.edge_margin);
-    }
+    if (!config.hide_version_string) state.version_label.draw();
 
     if (config.battery_id) |id| draw_battery: {
         if (!state.can_draw_battery) break :draw_battery;
@@ -1025,14 +1220,12 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
         };
 
         var battery_buf: [16:0]u8 = undefined;
-        const battery_str = std.fmt.bufPrintZ(&battery_buf, "BAT: {d}%", .{battery_percentage}) catch break :draw_battery;
-
-        var battery_y: usize = config.edge_margin;
-        if (!config.hide_key_hints) {
-            battery_y += 1;
-        }
-        state.buffer.drawLabel(battery_str, config.edge_margin, battery_y);
-        state.can_draw_battery = true;
+        state.battery_label.setTextBuf(
+            &battery_buf,
+            "BAT: {d}%",
+            .{battery_percentage},
+        ) catch break :draw_battery;
+        state.battery_label.draw();
     }
 
     if (config.bigclock != .none and state.box.height + (bigclock.HEIGHT + 2) * 2 < state.buffer.height) {
@@ -1060,12 +1253,7 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
     state.box.draw();
 
     if (state.resolution_changed) {
-        state.box.position(TerminalBuffer.START_POSITION);
-        state.info_line.label.positionY(state.box.childrenPosition());
-        state.session.label.positionY(state.info_line.label.childrenPosition().addY(1).addX(state.labels_max_length + 1));
-        state.login.label.positionY(state.session.label.childrenPosition().addY(1));
-        state.password.positionY(state.login.label.childrenPosition().addY(1));
-
+        positionComponents(state);
         state.resolution_changed = false;
     }
 
@@ -1092,78 +1280,25 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
             break :draw_clock;
         }
 
-        state.buffer.drawLabel(clock_str, state.buffer.width - @min(state.buffer.width, clock_str.len) - config.edge_margin, config.edge_margin);
+        state.clock_label.setText(clock_str);
+        state.clock_label.draw();
     }
 
     const env = state.session.label.list.items[state.session.label.current];
-    state.buffer.drawLabel(
-        env.environment.specifier,
-        state.box.childrenPosition().x,
-        state.session.label.component_pos.y,
-    );
-    state.buffer.drawLabel(
-        lang.login,
-        state.box.childrenPosition().x,
-        state.login.label.component_pos.y,
-    );
-    state.buffer.drawLabel(
-        lang.password,
-        state.box.childrenPosition().x,
-        state.password.component_pos.y,
-    );
+    state.session_specifier_label.setText(env.environment.specifier);
+    state.session_specifier_label.draw();
+    state.login_label.draw();
+    state.password_label.draw();
 
     state.info_line.label.draw();
 
     if (!config.hide_key_hints) {
-        state.buffer.drawLabel(config.shutdown_key, length, config.edge_margin);
-        length += config.shutdown_key.len + 1;
-        state.buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-        state.buffer.drawLabel(lang.shutdown, length, config.edge_margin);
-        length += state.shutdown_len + 1;
-
-        state.buffer.drawLabel(config.restart_key, length, config.edge_margin);
-        length += config.restart_key.len + 1;
-        state.buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-        state.buffer.drawLabel(lang.restart, length, config.edge_margin);
-        length += state.restart_len + 1;
-
-        if (config.sleep_cmd != null) {
-            state.buffer.drawLabel(config.sleep_key, length, config.edge_margin);
-            length += config.sleep_key.len + 1;
-            state.buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-            state.buffer.drawLabel(lang.sleep, length, config.edge_margin);
-            length += state.sleep_len + 1;
-        }
-
-        if (config.hibernate_cmd != null) {
-            state.buffer.drawLabel(config.hibernate_key, length, config.edge_margin);
-            length += config.hibernate_key.len + 1;
-            state.buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-            state.buffer.drawLabel(lang.hibernate, length, config.edge_margin);
-            length += state.hibernate_len + 1;
-        }
-
-        if (config.brightness_down_key) |key| {
-            state.buffer.drawLabel(key, length, config.edge_margin);
-            length += key.len + 1;
-            state.buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-            state.buffer.drawLabel(lang.brightness_down, length, config.edge_margin);
-            length += state.brightness_down_len + 1;
-        }
-
-        if (config.brightness_up_key) |key| {
-            state.buffer.drawLabel(key, length, config.edge_margin);
-            length += key.len + 1;
-            state.buffer.drawLabel(" ", length - 1, config.edge_margin);
-
-            state.buffer.drawLabel(lang.brightness_up, length, config.edge_margin);
-            length += state.brightness_up_len + 1;
-        }
+        state.shutdown_label.draw();
+        state.restart_label.draw();
+        state.sleep_label.draw();
+        state.hibernate_label.draw();
+        state.brightness_down_label.draw();
+        state.brightness_up_label.draw();
     }
 
     if (config.vi_mode) {
@@ -1178,17 +1313,8 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
             break :draw_lock_state;
         };
 
-        var lock_state_x = state.buffer.width - @min(state.buffer.width, lang.numlock.len) - config.edge_margin;
-        var lock_state_y: usize = config.edge_margin;
-
-        if (config.clock != null) lock_state_y += 1;
-
-        if (lock_state.numlock) state.buffer.drawLabel(lang.numlock, lock_state_x, lock_state_y);
-
-        if (lock_state_x >= lang.capslock.len + 1) {
-            lock_state_x -= lang.capslock.len + 1;
-            if (lock_state.capslock) state.buffer.drawLabel(lang.capslock, lock_state_x, lock_state_y);
-        }
+        if (lock_state.numlock) state.numlock_label.draw();
+        if (lock_state.capslock) state.capslock_label.draw();
     }
 
     state.session.label.draw();
@@ -1197,6 +1323,81 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
 
     _ = TerminalBuffer.presentBufferStatic();
     return true;
+}
+
+fn positionComponents(state: *UiState) void {
+    if (!state.hide_key_hints) {
+        state.shutdown_label.positionX(state.edge_margin
+            .add(TerminalBuffer.START_POSITION));
+        state.restart_label.positionX(state.shutdown_label
+            .childrenPosition()
+            .addX(1));
+        state.sleep_label.positionX(state.restart_label
+            .childrenPosition()
+            .addX(1));
+        state.hibernate_label.positionX(state.sleep_label
+            .childrenPosition()
+            .addX(1));
+        state.brightness_down_label.positionX(state.hibernate_label
+            .childrenPosition()
+            .addX(1));
+        state.brightness_up_label.positionX(state.brightness_down_label
+            .childrenPosition()
+            .addX(1));
+    }
+
+    state.battery_label.positionXY(state.edge_margin
+        .add(TerminalBuffer.START_POSITION)
+        .addYFromIf(state.shutdown_label.childrenPosition(), !state.hide_key_hints)
+        .removeYFromIf(state.edge_margin, !state.hide_key_hints));
+    // TODO: Fix not showing on first try (with separate update function)
+    state.clock_label.positionXY(state.edge_margin
+        .add(TerminalBuffer.START_POSITION)
+        .invertX(state.buffer.width)
+        .removeXIf(state.clock_label.text.len, state.buffer.width > state.clock_label.text.len + state.edge_margin.x));
+
+    state.numlock_label.positionX(state.edge_margin
+        .add(TerminalBuffer.START_POSITION)
+        .addYFromIf(state.clock_label.childrenPosition(), state.uses_clock)
+        .removeYFromIf(state.edge_margin, state.uses_clock)
+        .invertX(state.buffer.width)
+        .removeXIf(state.numlock_label.text.len, state.buffer.width > state.numlock_label.text.len + state.edge_margin.x));
+    state.capslock_label.positionX(state.numlock_label
+        .childrenPosition()
+        .removeX(state.numlock_label.text.len + state.capslock_label.text.len + 1));
+
+    state.box.positionXY(TerminalBuffer.START_POSITION);
+
+    state.info_line.label.positionY(state.box
+        .childrenPosition());
+
+    // TODO: Same as above
+    state.session_specifier_label.positionX(state.info_line.label
+        .childrenPosition()
+        .addY(1));
+    state.session.label.positionY(state.session_specifier_label
+        .childrenPosition()
+        .addX(state.labels_max_length - state.session_specifier_label.text.len + 1));
+
+    state.login_label.positionX(state.session.label
+        .childrenPosition()
+        .resetXFrom(state.info_line.label.childrenPosition())
+        .addY(1));
+    state.login.label.positionY(state.login_label
+        .childrenPosition()
+        .addX(state.labels_max_length - state.login_label.text.len + 1));
+
+    state.password_label.positionX(state.login.label
+        .childrenPosition()
+        .resetXFrom(state.info_line.label.childrenPosition())
+        .addY(1));
+    state.password.positionY(state.password_label
+        .childrenPosition()
+        .addX(state.labels_max_length - state.password_label.text.len + 1));
+
+    state.version_label.positionXY(state.edge_margin
+        .add(TerminalBuffer.START_POSITION)
+        .invertY(state.buffer.height - 1));
 }
 
 fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplayServer, exec: ?[]const u8) !void {

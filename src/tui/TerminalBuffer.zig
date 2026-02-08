@@ -201,11 +201,13 @@ pub fn cascade(self: TerminalBuffer) bool {
     return changed;
 }
 
-pub fn drawLabel(self: TerminalBuffer, text: []const u8, x: usize, y: usize) void {
-    drawColorLabel(text, x, y, self.fg, self.bg);
-}
-
-pub fn drawColorLabel(text: []const u8, x: usize, y: usize, fg: u32, bg: u32) void {
+pub fn drawText(
+    text: []const u8,
+    x: usize,
+    y: usize,
+    fg: u32,
+    bg: u32,
+) void {
     const yc: c_int = @intCast(y);
     const utf8view = std.unicode.Utf8View.init(text) catch return;
     var utf8 = utf8view.iterator();
@@ -216,7 +218,14 @@ pub fn drawColorLabel(text: []const u8, x: usize, y: usize, fg: u32, bg: u32) vo
     }
 }
 
-pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: usize, y: usize, max_length: usize) void {
+pub fn drawConfinedText(
+    text: []const u8,
+    x: usize,
+    y: usize,
+    max_length: usize,
+    fg: u32,
+    bg: u32,
+) void {
     const yc: c_int = @intCast(y);
     const utf8view = std.unicode.Utf8View.init(text) catch return;
     var utf8 = utf8view.iterator();
@@ -224,12 +233,19 @@ pub fn drawConfinedLabel(self: TerminalBuffer, text: []const u8, x: usize, y: us
     var i: c_int = @intCast(x);
     while (utf8.nextCodepoint()) |codepoint| : (i += termbox.tb_wcwidth(codepoint)) {
         if (i - @as(c_int, @intCast(x)) >= max_length) break;
-        _ = termbox.tb_set_cell(i, yc, codepoint, self.fg, self.bg);
+        _ = termbox.tb_set_cell(i, yc, codepoint, fg, bg);
     }
 }
 
-pub fn drawCharMultiple(self: TerminalBuffer, char: u32, x: usize, y: usize, length: usize) void {
-    const cell = Cell.init(char, self.fg, self.bg);
+pub fn drawCharMultiple(
+    char: u32,
+    x: usize,
+    y: usize,
+    length: usize,
+    fg: u32,
+    bg: u32,
+) void {
+    const cell = Cell.init(char, fg, bg);
     for (0..length) |xx| cell.put(x + xx, y);
 }
 

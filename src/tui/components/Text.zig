@@ -20,6 +20,8 @@ component_pos: Position,
 children_pos: Position,
 masked: bool,
 maybe_mask: ?u32,
+fg: u32,
+bg: u32,
 
 pub fn init(
     allocator: Allocator,
@@ -27,6 +29,8 @@ pub fn init(
     masked: bool,
     maybe_mask: ?u32,
     width: usize,
+    fg: u32,
+    bg: u32,
 ) Text {
     return .{
         .allocator = allocator,
@@ -40,6 +44,8 @@ pub fn init(
         .children_pos = TerminalBuffer.START_POSITION,
         .masked = masked,
         .maybe_mask = maybe_mask,
+        .fg = fg,
+        .bg = bg,
     };
 }
 
@@ -115,14 +121,18 @@ pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, insert_mode: bool) !
 pub fn draw(self: Text) void {
     if (self.masked) {
         if (self.maybe_mask) |mask| {
+            if (self.width < 1) return;
+
             const length = @min(self.text.items.len, self.width - 1);
             if (length == 0) return;
 
-            self.buffer.drawCharMultiple(
+            TerminalBuffer.drawCharMultiple(
                 mask,
                 self.component_pos.x,
                 self.component_pos.y,
                 length,
+                self.fg,
+                self.bg,
             );
         }
         return;
@@ -139,7 +149,13 @@ pub fn draw(self: Text) void {
         }
     };
 
-    self.buffer.drawLabel(visible_slice, self.component_pos.x, self.component_pos.y);
+    TerminalBuffer.drawText(
+        visible_slice,
+        self.component_pos.x,
+        self.component_pos.y,
+        self.fg,
+        self.bg,
+    );
 }
 
 pub fn clear(self: *Text) void {

@@ -27,8 +27,10 @@ pub fn init(
     session: *Session,
     width: usize,
     text_in_center: bool,
+    fg: u32,
+    bg: u32,
 ) !UserList {
-    var userList = UserList{
+    var user_list = UserList{
         .label = UserLabel.init(
             allocator,
             buffer,
@@ -37,6 +39,8 @@ pub fn init(
             session,
             width,
             text_in_center,
+            fg,
+            bg,
         ),
     };
 
@@ -60,7 +64,7 @@ pub fn init(
             allocated_index = true;
         }
 
-        try userList.label.addItem(.{
+        try user_list.label.addItem(.{
             .name = username,
             .session_index = maybe_session_index.?,
             .allocated_index = allocated_index,
@@ -68,7 +72,7 @@ pub fn init(
         });
     }
 
-    return userList;
+    return user_list;
 }
 
 pub fn deinit(self: *UserList) void {
@@ -92,11 +96,20 @@ fn usernameChanged(user: User, maybe_session: ?*Session) void {
 }
 
 fn drawItem(label: *UserLabel, user: User, x: usize, y: usize, width: usize) void {
+    if (width < 3) return;
+
     const length = @min(user.name.len, width - 3);
     if (length == 0) return;
 
-    const x_offset = if (label.text_in_center) (width - length - 1) / 2 else 0;
+    const x_offset = if (label.text_in_center and width >= length) (width - length) / 2 else 0;
 
-    label.item_width = length + x_offset;
-    label.buffer.drawLabel(user.name, x + x_offset, y);
+    label.cursor = length + x_offset;
+    TerminalBuffer.drawConfinedText(
+        user.name,
+        x + x_offset,
+        y,
+        width,
+        label.fg,
+        label.bg,
+    );
 }

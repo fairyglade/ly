@@ -1,9 +1,8 @@
 const std = @import("std");
-const Allocator = std.mem.Allocator;
 
 const Cell = @import("../Cell.zig");
-const TerminalBuffer = @import("../TerminalBuffer.zig");
 const Position = @import("../Position.zig");
+const TerminalBuffer = @import("../TerminalBuffer.zig");
 const termbox = TerminalBuffer.termbox;
 
 const CenteredBox = @This();
@@ -17,6 +16,9 @@ show_borders: bool,
 blank_box: bool,
 top_title: ?[]const u8,
 bottom_title: ?[]const u8,
+border_fg: u32,
+title_fg: u32,
+bg: u32,
 left_pos: Position,
 right_pos: Position,
 children_pos: Position,
@@ -31,6 +33,9 @@ pub fn init(
     blank_box: bool,
     top_title: ?[]const u8,
     bottom_title: ?[]const u8,
+    border_fg: u32,
+    title_fg: u32,
+    bg: u32,
 ) CenteredBox {
     return .{
         .buffer = buffer,
@@ -42,13 +47,16 @@ pub fn init(
         .blank_box = blank_box,
         .top_title = top_title,
         .bottom_title = bottom_title,
+        .border_fg = border_fg,
+        .title_fg = title_fg,
+        .bg = bg,
         .left_pos = TerminalBuffer.START_POSITION,
         .right_pos = TerminalBuffer.START_POSITION,
         .children_pos = TerminalBuffer.START_POSITION,
     };
 }
 
-pub fn position(self: *CenteredBox, original_pos: Position) void {
+pub fn positionXY(self: *CenteredBox, original_pos: Position) void {
     if (self.buffer.width < 2 or self.buffer.height < 2) return;
 
     self.left_pos = Position.init(
@@ -77,33 +85,33 @@ pub fn draw(self: CenteredBox) void {
             @intCast(self.left_pos.x - 1),
             @intCast(self.left_pos.y - 1),
             self.buffer.box_chars.left_up,
-            self.buffer.border_fg,
-            self.buffer.bg,
+            self.border_fg,
+            self.bg,
         );
         _ = termbox.tb_set_cell(
             @intCast(self.right_pos.x),
             @intCast(self.left_pos.y - 1),
             self.buffer.box_chars.right_up,
-            self.buffer.border_fg,
-            self.buffer.bg,
+            self.border_fg,
+            self.bg,
         );
         _ = termbox.tb_set_cell(
             @intCast(self.left_pos.x - 1),
             @intCast(self.right_pos.y),
             self.buffer.box_chars.left_down,
-            self.buffer.border_fg,
-            self.buffer.bg,
+            self.border_fg,
+            self.bg,
         );
         _ = termbox.tb_set_cell(
             @intCast(self.right_pos.x),
             @intCast(self.right_pos.y),
             self.buffer.box_chars.right_down,
-            self.buffer.border_fg,
-            self.buffer.bg,
+            self.border_fg,
+            self.bg,
         );
 
-        var c1 = Cell.init(self.buffer.box_chars.top, self.buffer.border_fg, self.buffer.bg);
-        var c2 = Cell.init(self.buffer.box_chars.bottom, self.buffer.border_fg, self.buffer.bg);
+        var c1 = Cell.init(self.buffer.box_chars.top, self.border_fg, self.bg);
+        var c2 = Cell.init(self.buffer.box_chars.bottom, self.border_fg, self.bg);
 
         for (0..self.width) |i| {
             c1.put(self.left_pos.x + i, self.left_pos.y - 1);
@@ -128,20 +136,24 @@ pub fn draw(self: CenteredBox) void {
     }
 
     if (self.top_title) |title| {
-        self.buffer.drawConfinedLabel(
+        TerminalBuffer.drawConfinedText(
             title,
             self.left_pos.x,
             self.left_pos.y - 1,
             self.width,
+            self.title_fg,
+            self.bg,
         );
     }
 
     if (self.bottom_title) |title| {
-        self.buffer.drawConfinedLabel(
+        TerminalBuffer.drawConfinedText(
             title,
             self.left_pos.x,
             self.left_pos.y + self.height,
             self.width,
+            self.title_fg,
+            self.bg,
         );
     }
 }

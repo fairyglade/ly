@@ -22,7 +22,9 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
         component_pos: Position,
         children_pos: Position,
         text_in_center: bool,
-        item_width: usize,
+        fg: u32,
+        bg: u32,
+        cursor: usize,
         draw_item_fn: DrawItemFn,
         change_item_fn: ?ChangeItemFn,
         change_item_arg: ?ChangeItemType,
@@ -35,6 +37,8 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
             change_item_arg: ?ChangeItemType,
             width: usize,
             text_in_center: bool,
+            fg: u32,
+            bg: u32,
         ) Self {
             return .{
                 .allocator = allocator,
@@ -45,7 +49,9 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
                 .component_pos = TerminalBuffer.START_POSITION,
                 .children_pos = TerminalBuffer.START_POSITION,
                 .text_in_center = text_in_center,
-                .item_width = 0,
+                .fg = fg,
+                .bg = bg,
+                .cursor = 0,
                 .draw_item_fn = draw_item_fn,
                 .change_item_fn = change_item_fn,
                 .change_item_arg = change_item_arg,
@@ -58,19 +64,19 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
 
         pub fn positionX(self: *Self, original_pos: Position) void {
             self.component_pos = original_pos;
-            self.item_width = self.component_pos.x + 2;
+            self.cursor = self.component_pos.x + 2;
             self.children_pos = original_pos.addX(self.width);
         }
 
         pub fn positionY(self: *Self, original_pos: Position) void {
             self.component_pos = original_pos;
-            self.item_width = self.component_pos.x + 2;
+            self.cursor = self.component_pos.x + 2;
             self.children_pos = original_pos.addY(1);
         }
 
         pub fn positionXY(self: *Self, original_pos: Position) void {
             self.component_pos = original_pos;
-            self.item_width = self.component_pos.x + 2;
+            self.cursor = self.component_pos.x + 2;
             self.children_pos = Position.init(
                 self.width,
                 1,
@@ -106,27 +112,28 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
             }
 
             _ = termbox.tb_set_cursor(
-                @intCast(self.component_pos.x + self.item_width + 2),
+                @intCast(self.component_pos.x + self.cursor + 2),
                 @intCast(self.component_pos.y),
             );
         }
 
         pub fn draw(self: *Self) void {
             if (self.list.items.len == 0) return;
+            if (self.width < 2) return;
 
             _ = termbox.tb_set_cell(
                 @intCast(self.component_pos.x),
                 @intCast(self.component_pos.y),
                 '<',
-                self.buffer.fg,
-                self.buffer.bg,
+                self.fg,
+                self.bg,
             );
             _ = termbox.tb_set_cell(
                 @intCast(self.component_pos.x + self.width - 1),
                 @intCast(self.component_pos.y),
                 '>',
-                self.buffer.fg,
-                self.buffer.bg,
+                self.fg,
+                self.bg,
             );
 
             const current_item = self.list.items[self.current];

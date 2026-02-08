@@ -25,6 +25,8 @@ pub fn init(
     user_list: *UserList,
     width: usize,
     text_in_center: bool,
+    fg: u32,
+    bg: u32,
 ) Session {
     return .{
         .label = EnvironmentLabel.init(
@@ -35,6 +37,8 @@ pub fn init(
             user_list,
             width,
             text_in_center,
+            fg,
+            bg,
         ),
         .user_list = user_list,
     };
@@ -70,11 +74,20 @@ fn sessionChanged(env: Env, maybe_user_list: ?*UserList) void {
 }
 
 fn drawItem(label: *EnvironmentLabel, env: Env, x: usize, y: usize, width: usize) void {
+    if (width < 3) return;
+
     const length = @min(env.environment.name.len, width - 3);
     if (length == 0) return;
 
-    const x_offset = if (label.text_in_center) (width - length - 1) / 2 else 0;
+    const x_offset = if (label.text_in_center and width >= length) (width - length) / 2 else 0;
 
-    label.item_width = length + x_offset;
-    label.buffer.drawLabel(env.environment.name, x + x_offset, y);
+    label.cursor = length + x_offset;
+    TerminalBuffer.drawConfinedText(
+        env.environment.name,
+        x + x_offset,
+        y,
+        width,
+        label.fg,
+        label.bg,
+    );
 }

@@ -21,6 +21,8 @@ pub fn init(
     allocator: Allocator,
     buffer: *TerminalBuffer,
     width: usize,
+    arrow_fg: u32,
+    arrow_bg: u32,
 ) InfoLine {
     return .{
         .label = MessageLabel.init(
@@ -31,6 +33,8 @@ pub fn init(
             null,
             width,
             true,
+            arrow_fg,
+            arrow_bg,
         ),
     };
 }
@@ -57,23 +61,26 @@ pub fn clearRendered(self: InfoLine, allocator: Allocator) !void {
 
     @memset(spaces, ' ');
 
-    self.label.buffer.drawLabel(
+    TerminalBuffer.drawText(
         spaces,
         self.label.component_pos.x + 2,
         self.label.component_pos.y,
+        TerminalBuffer.Color.DEFAULT,
+        TerminalBuffer.Color.DEFAULT,
     );
 }
 
 fn drawItem(label: *MessageLabel, message: Message, x: usize, y: usize, width: usize) void {
-    if (message.width == 0 or width <= message.width) return;
+    if (message.width == 0) return;
 
-    const x_offset = if (label.text_in_center) (width - message.width - 1) / 2 else 0;
+    const x_offset = if (label.text_in_center and width >= message.width) (width - message.width) / 2 else 0;
 
-    label.item_width = message.width + x_offset;
-    TerminalBuffer.drawColorLabel(
+    label.cursor = message.width + x_offset;
+    TerminalBuffer.drawConfinedText(
         message.text,
         x + x_offset,
         y,
+        width,
         message.fg,
         message.bg,
     );
