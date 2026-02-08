@@ -1,4 +1,5 @@
 const std = @import("std");
+const StringList = std.ArrayListUnmanaged([]const u8);
 const temporary_allocator = std.heap.page_allocator;
 const builtin = @import("builtin");
 const build_options = @import("build_options");
@@ -19,7 +20,6 @@ const DurFile = @import("animations/DurFile.zig");
 const GameOfLife = @import("animations/GameOfLife.zig");
 const Matrix = @import("animations/Matrix.zig");
 const auth = @import("auth.zig");
-const bigclock = @import("bigclock.zig");
 const Config = @import("config/Config.zig");
 const Lang = @import("config/Lang.zig");
 const migrator = @import("config/migrator.zig");
@@ -31,18 +31,19 @@ const Environment = @import("Environment.zig");
 const Entry = Environment.Entry;
 const Animation = @import("tui/Animation.zig");
 const Position = @import("tui/Position.zig");
+const bigLabel = @import("tui/components/bigLabel.zig");
+const BigclockLabel = bigLabel.BigLabel(*UiState);
 const CenteredBox = @import("tui/components/CenteredBox.zig");
 const InfoLine = @import("tui/components/InfoLine.zig");
 const label = @import("tui/components/label.zig");
+const RegularLabel = label.Label(struct {});
+const UpdatableLabel = label.Label(*UiState);
 const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
 const UserList = @import("tui/components/UserList.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
 const termbox = TerminalBuffer.termbox;
 
-const StringList = std.ArrayListUnmanaged([]const u8);
-
-const Label = label.Label;
 const ly_version_str = "Ly version " ++ build_options.version;
 
 var session_pid: std.posix.pid_t = -1;
@@ -64,7 +65,6 @@ fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
     TerminalBuffer.shutdownStatic();
 }
 
-const NoType = struct {};
 const UiState = struct {
     auth_fails: u64,
     update: bool,
@@ -72,20 +72,21 @@ const UiState = struct {
     labels_max_length: usize,
     animation_timed_out: bool,
     animation: *?Animation,
-    shutdown_label: *Label(NoType),
-    restart_label: *Label(NoType),
-    sleep_label: *Label(NoType),
-    hibernate_label: *Label(NoType),
-    brightness_down_label: *Label(NoType),
-    brightness_up_label: *Label(NoType),
-    numlock_label: *Label(*UiState),
-    capslock_label: *Label(*UiState),
-    battery_label: *Label(*UiState),
-    clock_label: *Label(*UiState),
-    session_specifier_label: *Label(*UiState),
-    login_label: *Label(NoType),
-    password_label: *Label(NoType),
-    version_label: *Label(NoType),
+    shutdown_label: *RegularLabel,
+    restart_label: *RegularLabel,
+    sleep_label: *RegularLabel,
+    hibernate_label: *RegularLabel,
+    brightness_down_label: *RegularLabel,
+    brightness_up_label: *RegularLabel,
+    numlock_label: *UpdatableLabel,
+    capslock_label: *UpdatableLabel,
+    battery_label: *UpdatableLabel,
+    clock_label: *UpdatableLabel,
+    session_specifier_label: *UpdatableLabel,
+    login_label: *RegularLabel,
+    password_label: *RegularLabel,
+    version_label: *RegularLabel,
+    bigclock_label: *BigclockLabel,
     box: *CenteredBox,
     info_line: *InfoLine,
     animate: bool,
@@ -100,7 +101,9 @@ const UiState = struct {
     lang: Lang,
     log_file: *LogFile,
     battery_buf: [16:0]u8,
+    bigclock_format_buf: [16:0]u8,
     clock_buf: [64:0]u8,
+    bigclock_buf: [32:0]u8,
 };
 
 pub fn main() !void {
@@ -336,7 +339,7 @@ pub fn main() !void {
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     // Initialize components
-    var shutdown_label = Label(NoType).init(
+    var shutdown_label = RegularLabel.init(
         "",
         null,
         buffer.fg,
@@ -345,7 +348,7 @@ pub fn main() !void {
     );
     defer shutdown_label.deinit(allocator);
 
-    var restart_label = Label(NoType).init(
+    var restart_label = RegularLabel.init(
         "",
         null,
         buffer.fg,
@@ -354,7 +357,7 @@ pub fn main() !void {
     );
     defer restart_label.deinit(allocator);
 
-    var sleep_label = Label(NoType).init(
+    var sleep_label = RegularLabel.init(
         "",
         null,
         buffer.fg,
@@ -363,7 +366,7 @@ pub fn main() !void {
     );
     defer sleep_label.deinit(allocator);
 
-    var hibernate_label = Label(NoType).init(
+    var hibernate_label = RegularLabel.init(
         "",
         null,
         buffer.fg,
@@ -372,7 +375,7 @@ pub fn main() !void {
     );
     defer hibernate_label.deinit(allocator);
 
-    var brightness_down_label = Label(NoType).init(
+    var brightness_down_label = RegularLabel.init(
         "",
         null,
         buffer.fg,
@@ -381,7 +384,7 @@ pub fn main() !void {
     );
     defer brightness_down_label.deinit(allocator);
 
-    var brightness_up_label = Label(NoType).init(
+    var brightness_up_label = RegularLabel.init(
         "",
         null,
         buffer.fg,
@@ -431,7 +434,7 @@ pub fn main() !void {
         }
     }
 
-    var numlock_label = Label(*UiState).init(
+    var numlock_label = UpdatableLabel.init(
         "",
         null,
         buffer.fg,
@@ -440,7 +443,7 @@ pub fn main() !void {
     );
     defer numlock_label.deinit(null);
 
-    var capslock_label = Label(*UiState).init(
+    var capslock_label = UpdatableLabel.init(
         "",
         null,
         buffer.fg,
@@ -449,7 +452,7 @@ pub fn main() !void {
     );
     defer capslock_label.deinit(null);
 
-    var battery_label = Label(*UiState).init(
+    var battery_label = UpdatableLabel.init(
         "",
         null,
         buffer.fg,
@@ -458,7 +461,7 @@ pub fn main() !void {
     );
     defer battery_label.deinit(null);
 
-    var clock_label = Label(*UiState).init(
+    var clock_label = UpdatableLabel.init(
         "",
         null,
         buffer.fg,
@@ -466,6 +469,20 @@ pub fn main() !void {
         &updateClock,
     );
     defer clock_label.deinit(null);
+
+    var bigclock_label = BigclockLabel.init(
+        &buffer,
+        "",
+        null,
+        buffer.fg,
+        buffer.bg,
+        switch (config.bigclock) {
+            .none, .en => .en,
+            .fa => .fa,
+        },
+        &updateBigClock,
+    );
+    defer bigclock_label.deinit(null);
 
     var box = CenteredBox.init(
         &buffer,
@@ -532,7 +549,7 @@ pub fn main() !void {
 
     var login: UserList = undefined;
 
-    var session_specifier_label = Label(*UiState).init(
+    var session_specifier_label = UpdatableLabel.init(
         "",
         null,
         buffer.fg,
@@ -552,7 +569,7 @@ pub fn main() !void {
     );
     defer session.deinit();
 
-    var login_label = Label(NoType).init(
+    var login_label = RegularLabel.init(
         lang.login,
         null,
         buffer.fg,
@@ -633,7 +650,7 @@ pub fn main() !void {
         try log_file.err("sys", "no users found", .{});
     }
 
-    var password_label = Label(NoType).init(
+    var password_label = RegularLabel.init(
         lang.password,
         null,
         buffer.fg,
@@ -653,7 +670,7 @@ pub fn main() !void {
     );
     defer password.deinit();
 
-    var version_label = Label(NoType).init(
+    var version_label = RegularLabel.init(
         ly_version_str,
         null,
         buffer.fg,
@@ -713,6 +730,7 @@ pub fn main() !void {
         .login_label = &login_label,
         .password_label = &password_label,
         .version_label = &version_label,
+        .bigclock_label = &bigclock_label,
         .box = &box,
         .info_line = &info_line,
         .animate = config.animation != .none,
@@ -730,7 +748,9 @@ pub fn main() !void {
         .lang = lang,
         .log_file = &log_file,
         .battery_buf = undefined,
+        .bigclock_format_buf = undefined,
         .clock_buf = undefined,
+        .bigclock_buf = undefined,
     };
 
     // Load last saved username and desktop selection, if any
@@ -1204,6 +1224,10 @@ fn updateComponents(state: *UiState) !void {
         try state.clock_label.update(state);
     }
 
+    if (state.config.bigclock != .none) {
+        try state.bigclock_label.update(state);
+    }
+
     try state.session_specifier_label.update(state);
 
     if (!state.config.hide_keyboard_locks) {
@@ -1230,32 +1254,9 @@ fn drawUi(log_file: *LogFile, state: *UiState) !bool {
     try TerminalBuffer.clearScreenStatic(false);
 
     if (!state.animation_timed_out) if (state.animation.*) |*a| a.draw();
-
     if (!state.config.hide_version_string) state.version_label.draw();
-
     if (state.config.battery_id != null) state.battery_label.draw();
-
-    if (state.config.bigclock != .none and state.box.height + (bigclock.HEIGHT + 2) * 2 < state.buffer.height) {
-        var format_buf: [16:0]u8 = undefined;
-        var clock_buf: [32:0]u8 = undefined;
-        // We need the slice/c-string returned by `bufPrintZ`.
-        const format = try std.fmt.bufPrintZ(&format_buf, "{s}{s}{s}{s}", .{
-            if (state.config.bigclock_12hr) "%I" else "%H",
-            ":%M",
-            if (state.config.bigclock_seconds) ":%S" else "",
-            if (state.config.bigclock_12hr) "%P" else "",
-        });
-        const xo = state.buffer.width / 2 - @min(state.buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
-        const yo = (state.buffer.height - state.box.height) / 2 - bigclock.HEIGHT - 2;
-
-        const clock_str = interop.timeAsString(&clock_buf, format);
-
-        for (clock_str, 0..) |c, i| {
-            // TODO: Show error
-            const clock_cell = try bigclock.clockCell(state.animate, c, state.buffer.fg, state.buffer.bg, state.config.bigclock);
-            bigclock.alphaBlit(xo + i * (bigclock.WIDTH + 1), yo, state.buffer.width, state.buffer.height, clock_cell);
-        }
-    }
+    if (state.config.bigclock != .none) state.bigclock_label.draw();
 
     state.box.draw();
 
@@ -1308,7 +1309,7 @@ fn drawUi(log_file: *LogFile, state: *UiState) !bool {
     return true;
 }
 
-fn updateNumlock(self: *Label(*UiState), state: *UiState) !void {
+fn updateNumlock(self: *UpdatableLabel, state: *UiState) !void {
     const lock_state = interop.getLockState() catch |err| {
         self.update_fn = null;
         try state.info_line.addMessage(state.lang.err_lock_state, state.config.error_bg, state.config.error_fg);
@@ -1319,7 +1320,7 @@ fn updateNumlock(self: *Label(*UiState), state: *UiState) !void {
     self.setText(if (lock_state.numlock) state.lang.numlock else "");
 }
 
-fn updateCapslock(self: *Label(*UiState), state: *UiState) !void {
+fn updateCapslock(self: *UpdatableLabel, state: *UiState) !void {
     const lock_state = interop.getLockState() catch |err| {
         self.update_fn = null;
         try state.info_line.addMessage(state.lang.err_lock_state, state.config.error_bg, state.config.error_fg);
@@ -1330,7 +1331,7 @@ fn updateCapslock(self: *Label(*UiState), state: *UiState) !void {
     self.setText(if (lock_state.capslock) state.lang.capslock else "");
 }
 
-fn updateBattery(self: *Label(*UiState), state: *UiState) !void {
+fn updateBattery(self: *UpdatableLabel, state: *UiState) !void {
     if (state.config.battery_id) |id| {
         const battery_percentage = getBatteryPercentage(id) catch |err| {
             self.update_fn = null;
@@ -1347,7 +1348,7 @@ fn updateBattery(self: *Label(*UiState), state: *UiState) !void {
     }
 }
 
-fn updateClock(self: *Label(*UiState), state: *UiState) !void {
+fn updateClock(self: *UpdatableLabel, state: *UiState) !void {
     if (state.config.clock) |clock| draw_clock: {
         const clock_str = interop.timeAsString(&state.clock_buf, clock);
 
@@ -1362,7 +1363,30 @@ fn updateClock(self: *Label(*UiState), state: *UiState) !void {
     }
 }
 
-fn updateSessionSpecifier(self: *Label(*UiState), state: *UiState) !void {
+fn updateBigClock(self: *BigclockLabel, state: *UiState) !void {
+    if (state.box.height + (bigLabel.CHAR_HEIGHT + 2) * 2 >= state.buffer.height) return;
+
+    const time = try interop.getTimeOfDay();
+    const animate_time = @divTrunc(time.microseconds, 500_000);
+    const separator = if (state.animate and animate_time != 0) " " else ":";
+    const format = try std.fmt.bufPrintZ(
+        &state.bigclock_format_buf,
+        "{s}{s}{s}{s}{s}{s}",
+        .{
+            if (state.config.bigclock_12hr) "%I" else "%H",
+            separator,
+            "%M",
+            if (state.config.bigclock_seconds) separator else "",
+            if (state.config.bigclock_seconds) "%S" else "",
+            if (state.config.bigclock_12hr) "%P" else "",
+        },
+    );
+
+    const clock_str = interop.timeAsString(&state.bigclock_buf, format);
+    self.setText(clock_str);
+}
+
+fn updateSessionSpecifier(self: *UpdatableLabel, state: *UiState) !void {
     const env = state.session.label.list.items[state.session.label.current];
     self.setText(env.environment.specifier);
 }
@@ -1408,6 +1432,13 @@ fn positionComponents(state: *UiState) void {
         .removeX(state.numlock_label.text.len + state.capslock_label.text.len + 1));
 
     state.box.positionXY(TerminalBuffer.START_POSITION);
+
+    if (state.config.bigclock != .none) {
+        state.bigclock_label.positionXY(Position.init(
+            state.buffer.width / 2 - @min(state.buffer.width, (state.bigclock_label.text.len * (bigLabel.CHAR_WIDTH + 1))) / 2,
+            (state.buffer.height - state.box.height) / 2 - bigLabel.CHAR_HEIGHT - 2,
+        ).add(TerminalBuffer.START_POSITION));
+    }
 
     state.info_line.label.positionY(state.box
         .childrenPosition());

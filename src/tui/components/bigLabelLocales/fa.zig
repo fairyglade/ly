@@ -1,7 +1,7 @@
-const Lang = @import("Lang.zig");
-const LocaleChars = Lang.LocaleChars;
-const X = Lang.X;
-const O = Lang.O;
+const bigLabel = @import("../bigLabel.zig");
+const LocaleChars = bigLabel.LocaleChars;
+const X = bigLabel.X;
+const O = bigLabel.O;
 
 // zig fmt: off
 pub const locale_chars = LocaleChars{
