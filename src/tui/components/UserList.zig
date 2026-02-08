@@ -95,7 +95,7 @@ fn drawItem(label: *UserLabel, user: User, x: usize, y: usize, width: usize) voi
     const length = @min(user.name.len, width - 3);
     if (length == 0) return;
 
-    const x_offset = if (label.text_in_center) (width - length) / 2 else 0;
+    const x_offset = if (label.text_in_center) (width - length - 1) / 2 else 0;
 
     label.item_width = length + x_offset;
     label.buffer.drawLabel(user.name, x + x_offset, y);

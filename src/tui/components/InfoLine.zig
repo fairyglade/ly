@@ -67,7 +67,7 @@ pub fn clearRendered(self: InfoLine, allocator: Allocator) !void {
 fn drawItem(label: *MessageLabel, message: Message, x: usize, y: usize, width: usize) void {
     if (message.width == 0 or width <= message.width) return;
 
-    const x_offset = if (label.text_in_center) (width - message.width) / 2 else 0;
+    const x_offset = if (label.text_in_center) (width - message.width - 1) / 2 else 0;
 
     label.item_width = message.width + x_offset;
     TerminalBuffer.drawColorLabel(
