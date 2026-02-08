@@ -19,9 +19,23 @@ const Session = @This();
 label: EnvironmentLabel,
 user_list: *UserList,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, user_list: *UserList) Session {
+pub fn init(
+    allocator: Allocator,
+    buffer: *TerminalBuffer,
+    user_list: *UserList,
+    width: usize,
+    text_in_center: bool,
+) Session {
     return .{
-        .label = EnvironmentLabel.init(allocator, buffer, drawItem, sessionChanged, user_list),
+        .label = EnvironmentLabel.init(
+            allocator,
+            buffer,
+            drawItem,
+            sessionChanged,
+            user_list,
+            width,
+            text_in_center,
+        ),
         .user_list = user_list,
     };
 }
@@ -55,14 +69,12 @@ fn sessionChanged(env: Env, maybe_user_list: ?*UserList) void {
     }
 }
 
-fn drawItem(label: *EnvironmentLabel, env: Env, x: usize, y: usize) bool {
-    const length = @min(env.environment.name.len, label.visible_length - 3);
-    if (length == 0) return false;
+fn drawItem(label: *EnvironmentLabel, env: Env, x: usize, y: usize, width: usize) void {
+    const length = @min(env.environment.name.len, width - 3);
+    if (length == 0) return;
 
-    const nx = if (label.text_in_center) (label.x + (label.visible_length - env.environment.name.len) / 2) else (label.x + 2);
-    label.first_char_x = nx + env.environment.name.len;
+    const x_offset = if (label.text_in_center) (width - length) / 2 else 0;
 
-    label.buffer.drawLabel(env.environment.specifier, x, y);
-    label.buffer.drawLabel(env.environment.name, nx, label.y);
-    return true;
+    label.item_width = length + x_offset;
+    label.buffer.drawLabel(env.environment.name, x + x_offset, y);
 }

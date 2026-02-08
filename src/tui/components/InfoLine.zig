@@ -17,9 +17,21 @@ const Message = struct {
 
 label: MessageLabel,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer) InfoLine {
+pub fn init(
+    allocator: Allocator,
+    buffer: *TerminalBuffer,
+    width: usize,
+) InfoLine {
     return .{
-        .label = MessageLabel.init(allocator, buffer, drawItem, null, null),
+        .label = MessageLabel.init(
+            allocator,
+            buffer,
+            drawItem,
+            null,
+            null,
+            width,
+            true,
+        ),
     };
 }
 
@@ -38,23 +50,31 @@ pub fn addMessage(self: *InfoLine, text: []const u8, bg: u32, fg: u32) !void {
     });
 }
 
-pub fn clearRendered(allocator: Allocator, buffer: TerminalBuffer) !void {
+pub fn clearRendered(self: InfoLine, allocator: Allocator) !void {
     // Draw over the area
-    const y = buffer.box_y + buffer.margin_box_v;
-    const spaces = try allocator.alloc(u8, buffer.box_width);
+    const spaces = try allocator.alloc(u8, self.label.width - 2);
     defer allocator.free(spaces);
 
     @memset(spaces, ' ');
 
-    buffer.drawLabel(spaces, buffer.box_x, y);
+    self.label.buffer.drawLabel(
+        spaces,
+        self.label.component_pos.x + 2,
+        self.label.component_pos.y,
+    );
 }
 
-fn drawItem(label: *MessageLabel, message: Message, _: usize, _: usize) bool {
-    if (message.width == 0 or label.buffer.box_width <= message.width) return false;
+fn drawItem(label: *MessageLabel, message: Message, x: usize, y: usize, width: usize) void {
+    if (message.width == 0 or width <= message.width) return;
 
-    const x = label.buffer.box_x + ((label.buffer.box_width - message.width) / 2);
-    label.first_char_x = x + message.width;
+    const x_offset = if (label.text_in_center) (width - message.width) / 2 else 0;
 
-    TerminalBuffer.drawColorLabel(message.text, x, label.y, message.fg, message.bg);
-    return true;
+    label.item_width = message.width + x_offset;
+    TerminalBuffer.drawColorLabel(
+        message.text,
+        x + x_offset,
+        y,
+        message.fg,
+        message.bg,
+    );
 }

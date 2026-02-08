@@ -7,6 +7,7 @@ const LogFile = ly_core.LogFile;
 pub const termbox = @import("termbox2");
 
 const Cell = @import("Cell.zig");
+const Position = @import("Position.zig");
 
 const TerminalBuffer = @This();
 
@@ -14,11 +15,7 @@ pub const InitOptions = struct {
     fg: u32,
     bg: u32,
     border_fg: u32,
-    margin_box_h: u8,
-    margin_box_v: u8,
-    input_len: u8,
     full_color: bool,
-    labels_max_length: usize,
     is_tty: bool,
 };
 
@@ -60,6 +57,8 @@ pub const Color = struct {
     pub const ECOL_WHITE = 8;
 };
 
+pub const START_POSITION = Position.init(0, 0);
+
 random: Random,
 width: usize,
 height: usize,
@@ -76,13 +75,6 @@ box_chars: struct {
     left: u32,
     right: u32,
 },
-labels_max_length: usize,
-box_x: usize,
-box_y: usize,
-box_width: usize,
-box_height: usize,
-margin_box_v: u8,
-margin_box_h: u8,
 blank_cell: Cell,
 full_color: bool,
 termios: ?std.posix.termios,
@@ -134,13 +126,6 @@ pub fn init(options: InitOptions, log_file: *LogFile, random: Random) !TerminalB
             .left = '|',
             .right = '|',
         },
-        .labels_max_length = options.labels_max_length,
-        .box_x = 0,
-        .box_y = 0,
-        .box_width = (2 * options.margin_box_h) + options.input_len + 1 + options.labels_max_length,
-        .box_height = 7 + (2 * options.margin_box_v),
-        .margin_box_v = options.margin_box_v,
-        .margin_box_h = options.margin_box_h,
         .blank_cell = Cell.init(' ', options.fg, options.bg),
         .full_color = options.full_color,
         // Needed to reclaim the TTY after giving up its control
@@ -214,70 +199,6 @@ pub fn cascade(self: TerminalBuffer) bool {
     }
 
     return changed;
-}
-
-pub fn drawBoxCenter(self: *TerminalBuffer, show_borders: bool, blank_box: bool) void {
-    if (self.width < 2 or self.height < 2) return;
-    const x1 = (self.width - @min(self.width - 2, self.box_width)) / 2;
-    const y1 = (self.height - @min(self.height - 2, self.box_height)) / 2;
-    const x2 = (self.width + @min(self.width, self.box_width)) / 2;
-    const y2 = (self.height + @min(self.height, self.box_height)) / 2;
-
-    self.box_x = x1;
-    self.box_y = y1;
-
-    if (show_borders) {
-        _ = termbox.tb_set_cell(@intCast(x1 - 1), @intCast(y1 - 1), self.box_chars.left_up, self.border_fg, self.bg);
-        _ = termbox.tb_set_cell(@intCast(x2), @intCast(y1 - 1), self.box_chars.right_up, self.border_fg, self.bg);
-        _ = termbox.tb_set_cell(@intCast(x1 - 1), @intCast(y2), self.box_chars.left_down, self.border_fg, self.bg);
-        _ = termbox.tb_set_cell(@intCast(x2), @intCast(y2), self.box_chars.right_down, self.border_fg, self.bg);
-
-        var c1 = Cell.init(self.box_chars.top, self.border_fg, self.bg);
-        var c2 = Cell.init(self.box_chars.bottom, self.border_fg, self.bg);
-
-        for (0..self.box_width) |i| {
-            c1.put(x1 + i, y1 - 1);
-            c2.put(x1 + i, y2);
-        }
-
-        c1.ch = self.box_chars.left;
-        c2.ch = self.box_chars.right;
-
-        for (0..self.box_height) |i| {
-            c1.put(x1 - 1, y1 + i);
-            c2.put(x2, y1 + i);
-        }
-    }
-
-    if (blank_box) {
-        for (0..self.box_height) |y| {
-            for (0..self.box_width) |x| {
-                self.blank_cell.put(x1 + x, y1 + y);
-            }
-        }
-    }
-}
-
-pub fn calculateComponentCoordinates(self: TerminalBuffer) struct {
-    start_x: usize,
-    x: usize,
-    y: usize,
-    full_visible_length: usize,
-    visible_length: usize,
-} {
-    const start_x = self.box_x + self.margin_box_h;
-    const x = start_x + self.labels_max_length + 1;
-    const y = self.box_y + self.margin_box_v;
-    const full_visible_length = self.box_x + self.box_width - self.margin_box_h - start_x;
-    const visible_length = self.box_x + self.box_width - self.margin_box_h - x;
-
-    return .{
-        .start_x = start_x,
-        .x = x,
-        .y = y,
-        .full_visible_length = full_visible_length,
-        .visible_length = visible_length,
-    };
 }
 
 pub fn drawLabel(self: TerminalBuffer, text: []const u8, x: usize, y: usize) void {

@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const TerminalBuffer = @import("../TerminalBuffer.zig");
+const Position = @import("../Position.zig");
 const termbox = TerminalBuffer.termbox;
 
 const DynamicString = std.ArrayListUnmanaged(u8);
@@ -14,13 +15,19 @@ text: DynamicString,
 end: usize,
 cursor: usize,
 visible_start: usize,
-visible_length: usize,
-x: usize,
-y: usize,
+width: usize,
+component_pos: Position,
+children_pos: Position,
 masked: bool,
 maybe_mask: ?u32,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, masked: bool, maybe_mask: ?u32) Text {
+pub fn init(
+    allocator: Allocator,
+    buffer: *TerminalBuffer,
+    masked: bool,
+    maybe_mask: ?u32,
+    width: usize,
+) Text {
     return .{
         .allocator = allocator,
         .buffer = buffer,
@@ -28,9 +35,9 @@ pub fn init(allocator: Allocator, buffer: *TerminalBuffer, masked: bool, maybe_m
         .end = 0,
         .cursor = 0,
         .visible_start = 0,
-        .visible_length = 0,
-        .x = 0,
-        .y = 0,
+        .width = width,
+        .component_pos = TerminalBuffer.START_POSITION,
+        .children_pos = TerminalBuffer.START_POSITION,
         .masked = masked,
         .maybe_mask = maybe_mask,
     };
@@ -40,10 +47,26 @@ pub fn deinit(self: *Text) void {
     self.text.deinit(self.allocator);
 }
 
-pub fn position(self: *Text, x: usize, y: usize, visible_length: usize) void {
-    self.x = x;
-    self.y = y;
-    self.visible_length = visible_length;
+pub fn positionX(self: *Text, original_pos: Position) void {
+    self.component_pos = original_pos;
+    self.children_pos = original_pos.addX(self.width);
+}
+
+pub fn positionY(self: *Text, original_pos: Position) void {
+    self.component_pos = original_pos;
+    self.children_pos = original_pos.addY(1);
+}
+
+pub fn positionXY(self: *Text, original_pos: Position) void {
+    self.component_pos = original_pos;
+    self.children_pos = Position.init(
+        self.width,
+        1,
+    ).add(original_pos);
+}
+
+pub fn childrenPosition(self: Text) Position {
+    return self.children_pos;
 }
 
 pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, insert_mode: bool) !void {
@@ -79,36 +102,44 @@ pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, insert_mode: bool) !
     }
 
     if (self.masked and self.maybe_mask == null) {
-        _ = termbox.tb_set_cursor(@intCast(self.x), @intCast(self.y));
+        _ = termbox.tb_set_cursor(@intCast(self.component_pos.x), @intCast(self.component_pos.y));
         return;
     }
 
-    _ = termbox.tb_set_cursor(@intCast(self.x + (self.cursor - self.visible_start)), @intCast(self.y));
+    _ = termbox.tb_set_cursor(
+        @intCast(self.component_pos.x + (self.cursor - self.visible_start)),
+        @intCast(self.component_pos.y),
+    );
 }
 
 pub fn draw(self: Text) void {
     if (self.masked) {
         if (self.maybe_mask) |mask| {
-            const length = @min(self.text.items.len, self.visible_length - 1);
+            const length = @min(self.text.items.len, self.width - 1);
             if (length == 0) return;
 
-            self.buffer.drawCharMultiple(mask, self.x, self.y, length);
+            self.buffer.drawCharMultiple(
+                mask,
+                self.component_pos.x,
+                self.component_pos.y,
+                length,
+            );
         }
         return;
     }
 
-    const length = @min(self.text.items.len, self.visible_length);
+    const length = @min(self.text.items.len, self.width);
     if (length == 0) return;
 
     const visible_slice = vs: {
-        if (self.text.items.len > self.visible_length and self.cursor < self.text.items.len) {
-            break :vs self.text.items[self.visible_start..(self.visible_length + self.visible_start)];
+        if (self.text.items.len > self.width and self.cursor < self.text.items.len) {
+            break :vs self.text.items[self.visible_start..(self.width + self.visible_start)];
         } else {
             break :vs self.text.items[self.visible_start..];
         }
     };
 
-    self.buffer.drawLabel(visible_slice, self.x, self.y);
+    self.buffer.drawLabel(visible_slice, self.component_pos.x, self.component_pos.y);
 }
 
 pub fn clear(self: *Text) void {
@@ -127,7 +158,7 @@ fn goLeft(self: *Text) void {
 
 fn goRight(self: *Text) void {
     if (self.cursor >= self.end) return;
-    if (self.cursor - self.visible_start == self.visible_length - 1) self.visible_start += 1;
+    if (self.cursor - self.visible_start == self.width - 1) self.visible_start += 1;
 
     self.cursor += 1;
 }

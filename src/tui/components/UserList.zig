@@ -19,9 +19,25 @@ const UserList = @This();
 
 label: UserLabel,
 
-pub fn init(allocator: Allocator, buffer: *TerminalBuffer, usernames: StringList, saved_users: *SavedUsers, session: *Session) !UserList {
+pub fn init(
+    allocator: Allocator,
+    buffer: *TerminalBuffer,
+    usernames: StringList,
+    saved_users: *SavedUsers,
+    session: *Session,
+    width: usize,
+    text_in_center: bool,
+) !UserList {
     var userList = UserList{
-        .label = UserLabel.init(allocator, buffer, drawItem, usernameChanged, session),
+        .label = UserLabel.init(
+            allocator,
+            buffer,
+            drawItem,
+            usernameChanged,
+            session,
+            width,
+            text_in_center,
+        ),
     };
 
     for (usernames.items) |username| {
@@ -75,13 +91,12 @@ fn usernameChanged(user: User, maybe_session: ?*Session) void {
     }
 }
 
-fn drawItem(label: *UserLabel, user: User, _: usize, _: usize) bool {
-    const length = @min(user.name.len, label.visible_length - 3);
-    if (length == 0) return false;
+fn drawItem(label: *UserLabel, user: User, x: usize, y: usize, width: usize) void {
+    const length = @min(user.name.len, width - 3);
+    if (length == 0) return;
 
-    const x = if (label.text_in_center) (label.x + (label.visible_length - user.name.len) / 2) else (label.x + 2);
-    label.first_char_x = x + user.name.len;
+    const x_offset = if (label.text_in_center) (width - length) / 2 else 0;
 
-    label.buffer.drawLabel(user.name, x, label.y);
-    return true;
+    label.item_width = length + x_offset;
+    label.buffer.drawLabel(user.name, x + x_offset, y);
 }

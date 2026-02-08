@@ -30,6 +30,7 @@ const DisplayServer = enums.DisplayServer;
 const Environment = @import("Environment.zig");
 const Entry = Environment.Entry;
 const Animation = @import("tui/Animation.zig");
+const CenteredBox = @import("tui/components/CenteredBox.zig");
 const InfoLine = @import("tui/components/InfoLine.zig");
 const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
@@ -63,9 +64,11 @@ const UiState = struct {
     auth_fails: u64,
     update: bool,
     buffer: *TerminalBuffer,
+    labels_max_length: usize,
     animation_timed_out: bool,
     animation: *?Animation,
     can_draw_battery: bool,
+    box: *CenteredBox,
     info_line: *InfoLine,
     animate: bool,
     resolution_changed: bool,
@@ -300,11 +303,7 @@ pub fn main() !void {
         .fg = config.fg,
         .bg = config.bg,
         .border_fg = config.border_fg,
-        .margin_box_h = config.margin_box_h,
-        .margin_box_v = config.margin_box_v,
-        .input_len = config.input_len,
         .full_color = config.full_color,
-        .labels_max_length = labels_max_length,
         .is_tty = true,
     };
     var buffer = try TerminalBuffer.init(buffer_options, &log_file, random);
@@ -321,7 +320,23 @@ pub fn main() !void {
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     // Initialize components
-    var info_line = InfoLine.init(allocator, &buffer);
+    var box = CenteredBox.init(
+        &buffer,
+        config.margin_box_h,
+        config.margin_box_v,
+        (2 * config.margin_box_h) + config.input_len + 1 + labels_max_length,
+        7 + (2 * config.margin_box_v),
+        !config.hide_borders,
+        config.blank_box,
+        config.box_title,
+        null,
+    );
+
+    var info_line = InfoLine.init(
+        allocator,
+        &buffer,
+        box.width - 2 * box.horizontal_margin,
+    );
     defer info_line.deinit();
 
     if (maybe_res == null) {
@@ -365,10 +380,24 @@ pub fn main() !void {
 
     var login: UserList = undefined;
 
-    var session = Session.init(allocator, &buffer, &login);
+    var session = Session.init(
+        allocator,
+        &buffer,
+        &login,
+        box.width - 2 * box.horizontal_margin - labels_max_length - 1,
+        config.text_in_center,
+    );
     defer session.deinit();
 
-    login = try UserList.init(allocator, &buffer, usernames, &saved_users, &session);
+    login = try UserList.init(
+        allocator,
+        &buffer,
+        usernames,
+        &saved_users,
+        &session,
+        box.width - 2 * box.horizontal_margin - labels_max_length - 1,
+        config.text_in_center,
+    );
     defer login.deinit();
 
     addOtherEnvironment(&session, lang, .shell, null) catch |err| {
@@ -430,7 +459,13 @@ pub fn main() !void {
         try log_file.err("sys", "no users found", .{});
     }
 
-    var password = Text.init(allocator, &buffer, true, config.asterisk);
+    var password = Text.init(
+        allocator,
+        &buffer,
+        true,
+        config.asterisk,
+        box.width - 2 * box.horizontal_margin - labels_max_length - 1,
+    );
     defer password.deinit();
 
     var is_autologin = false;
@@ -467,9 +502,11 @@ pub fn main() !void {
         .auth_fails = 0,
         .update = true,
         .buffer = &buffer,
+        .labels_max_length = labels_max_length,
         .animation_timed_out = false,
         .animation = &animation,
         .can_draw_battery = true,
+        .box = &box,
         .info_line = &info_line,
         .animate = config.animation != .none,
         .resolution_changed = false,
@@ -512,25 +549,21 @@ pub fn main() !void {
         }
     }
 
-    // Place components on the screen
-    {
-        buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
+    // Position components
+    state.box.position(TerminalBuffer.START_POSITION);
+    state.info_line.label.positionY(state.box.childrenPosition());
+    state.session.label.positionY(state.info_line.label.childrenPosition().addY(1).addX(state.labels_max_length + 1));
+    state.login.label.positionY(state.session.label.childrenPosition().addY(1));
+    state.password.positionY(state.login.label.childrenPosition().addY(1));
 
-        const coordinates = buffer.calculateComponentCoordinates();
-        info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length, null);
-        session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length, config.text_in_center);
-        login.label.position(coordinates.x, coordinates.y + 4, coordinates.visible_length, config.text_in_center);
-        password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
-
-        switch (state.active_input) {
-            .info_line => info_line.label.handle(null, state.insert_mode),
-            .session => session.label.handle(null, state.insert_mode),
-            .login => login.label.handle(null, state.insert_mode),
-            .password => password.handle(null, state.insert_mode) catch |err| {
-                try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
-            },
-        }
+    switch (state.active_input) {
+        .info_line => info_line.label.handle(null, state.insert_mode),
+        .session => session.label.handle(null, state.insert_mode),
+        .login => login.label.handle(null, state.insert_mode),
+        .password => password.handle(null, state.insert_mode) catch |err| {
+            try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+            try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
+        },
     }
 
     // Initialize the animation, if any
@@ -782,7 +815,7 @@ pub fn main() !void {
                 if (!config.allow_empty_password and password.text.items.len == 0) {
                     // Let's not log this message for security reasons
                     try info_line.addMessage(lang.err_empty_password, config.error_bg, config.error_fg);
-                    InfoLine.clearRendered(allocator, buffer) catch |err| {
+                    info_line.clearRendered(allocator) catch |err| {
                         try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                         try log_file.err("tui", "failed to clear info line: {s}", .{@errorName(err)});
                     };
@@ -792,7 +825,7 @@ pub fn main() !void {
                 }
 
                 try info_line.addMessage(lang.authenticating, config.bg, config.fg);
-                InfoLine.clearRendered(allocator, buffer) catch |err| {
+                info_line.clearRendered(allocator) catch |err| {
                     try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
                     try log_file.err("tui", "failed to clear info line: {s}", .{@errorName(err)});
                 };
@@ -1002,7 +1035,7 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
         state.can_draw_battery = true;
     }
 
-    if (config.bigclock != .none and state.buffer.box_height + (bigclock.HEIGHT + 2) * 2 < state.buffer.height) {
+    if (config.bigclock != .none and state.box.height + (bigclock.HEIGHT + 2) * 2 < state.buffer.height) {
         var format_buf: [16:0]u8 = undefined;
         var clock_buf: [32:0]u8 = undefined;
         // We need the slice/c-string returned by `bufPrintZ`.
@@ -1013,7 +1046,7 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
             if (config.bigclock_12hr) "%P" else "",
         });
         const xo = state.buffer.width / 2 - @min(state.buffer.width, (format.len * (bigclock.WIDTH + 1))) / 2;
-        const yo = (state.buffer.height - state.buffer.box_height) / 2 - bigclock.HEIGHT - 2;
+        const yo = (state.buffer.height - state.box.height) / 2 - bigclock.HEIGHT - 2;
 
         const clock_str = interop.timeAsString(&clock_buf, format);
 
@@ -1024,14 +1057,14 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
         }
     }
 
-    state.buffer.drawBoxCenter(!config.hide_borders, config.blank_box);
+    state.box.draw();
 
     if (state.resolution_changed) {
-        const coordinates = state.buffer.calculateComponentCoordinates();
-        state.info_line.label.position(coordinates.start_x, coordinates.y, coordinates.full_visible_length, null);
-        state.session.label.position(coordinates.x, coordinates.y + 2, coordinates.visible_length, config.text_in_center);
-        state.login.label.position(coordinates.x, coordinates.y + 4, coordinates.visible_length, config.text_in_center);
-        state.password.position(coordinates.x, coordinates.y + 6, coordinates.visible_length);
+        state.box.position(TerminalBuffer.START_POSITION);
+        state.info_line.label.positionY(state.box.childrenPosition());
+        state.session.label.positionY(state.info_line.label.childrenPosition().addY(1).addX(state.labels_max_length + 1));
+        state.login.label.positionY(state.session.label.childrenPosition().addY(1));
+        state.password.positionY(state.login.label.childrenPosition().addY(1));
 
         state.resolution_changed = false;
     }
@@ -1062,11 +1095,22 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
         state.buffer.drawLabel(clock_str, state.buffer.width - @min(state.buffer.width, clock_str.len) - config.edge_margin, config.edge_margin);
     }
 
-    const label_x = state.buffer.box_x + state.buffer.margin_box_h;
-    const label_y = state.buffer.box_y + state.buffer.margin_box_v;
-
-    state.buffer.drawLabel(lang.login, label_x, label_y + 4);
-    state.buffer.drawLabel(lang.password, label_x, label_y + 6);
+    const env = state.session.label.list.items[state.session.label.current];
+    state.buffer.drawLabel(
+        env.environment.specifier,
+        state.box.childrenPosition().x,
+        state.session.label.component_pos.y,
+    );
+    state.buffer.drawLabel(
+        lang.login,
+        state.box.childrenPosition().x,
+        state.login.label.component_pos.y,
+    );
+    state.buffer.drawLabel(
+        lang.password,
+        state.box.childrenPosition().x,
+        state.password.component_pos.y,
+    );
 
     state.info_line.label.draw();
 
@@ -1122,13 +1166,8 @@ fn drawUi(config: Config, lang: Lang, log_file: *LogFile, state: *UiState) !bool
         }
     }
 
-    if (config.box_title) |title| {
-        state.buffer.drawConfinedLabel(title, state.buffer.box_x, state.buffer.box_y - 1, state.buffer.box_width);
-    }
-
     if (config.vi_mode) {
-        const label_txt = if (state.insert_mode) lang.insert else lang.normal;
-        state.buffer.drawLabel(label_txt, state.buffer.box_x, state.buffer.box_y + state.buffer.box_height);
+        state.box.bottom_title = if (state.insert_mode) lang.insert else lang.normal;
     }
 
     if (!config.hide_keyboard_locks and state.can_get_lock_state) draw_lock_state: {
