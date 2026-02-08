@@ -9,7 +9,7 @@ const MessageLabel = generic.CyclableLabel(Message, Message);
 const InfoLine = @This();
 
 const Message = struct {
-    width: u8,
+    width: usize,
     text: []const u8,
     bg: u32,
     fg: u32,
@@ -47,7 +47,7 @@ pub fn addMessage(self: *InfoLine, text: []const u8, bg: u32, fg: u32) !void {
     if (text.len == 0) return;
 
     try self.label.addItem(.{
-        .width = try TerminalBuffer.strWidth(text),
+        .width = TerminalBuffer.strWidth(text),
         .text = text,
         .bg = bg,
         .fg = fg,

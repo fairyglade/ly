@@ -251,13 +251,16 @@ pub fn drawCharMultiple(
 
 // Every codepoint is assumed to have a width of 1.
 // Since Ly is normally running in a TTY, this should be fine.
-pub fn strWidth(str: []const u8) !u8 {
-    const utf8view = try std.unicode.Utf8View.init(str);
+pub fn strWidth(str: []const u8) usize {
+    const utf8view = std.unicode.Utf8View.init(str) catch return str.len;
     var utf8 = utf8view.iterator();
-    var i: c_int = 0;
-    while (utf8.nextCodepoint()) |codepoint| i += termbox.tb_wcwidth(codepoint);
+    var length: c_int = 0;
 
-    return @intCast(i);
+    while (utf8.nextCodepoint()) |codepoint| {
+        length += termbox.tb_wcwidth(codepoint);
+    }
+
+    return @intCast(length);
 }
 
 fn clearBackBuffer() !void {

@@ -76,7 +76,7 @@ fn sessionChanged(env: Env, maybe_user_list: ?*UserList) void {
 fn drawItem(label: *EnvironmentLabel, env: Env, x: usize, y: usize, width: usize) void {
     if (width < 3) return;
 
-    const length = @min(env.environment.name.len, width - 3);
+    const length = @min(TerminalBuffer.strWidth(env.environment.name), width - 3);
     if (length == 0) return;
 
     const x_offset = if (label.text_in_center and width >= length) (width - length) / 2 else 0;

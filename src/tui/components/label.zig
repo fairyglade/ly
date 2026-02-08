@@ -71,7 +71,7 @@ pub fn Label(comptime ContextType: type) type {
 
         pub fn positionX(self: *Self, original_pos: Position) void {
             self.component_pos = original_pos;
-            self.children_pos = original_pos.addX(self.text.len);
+            self.children_pos = original_pos.addX(TerminalBuffer.strWidth(self.text));
         }
 
         pub fn positionY(self: *Self, original_pos: Position) void {
@@ -82,7 +82,7 @@ pub fn Label(comptime ContextType: type) type {
         pub fn positionXY(self: *Self, original_pos: Position) void {
             self.component_pos = original_pos;
             self.children_pos = Position.init(
-                self.text.len,
+                TerminalBuffer.strWidth(self.text),
                 1,
             ).add(original_pos);
         }

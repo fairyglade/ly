@@ -113,7 +113,7 @@ pub fn BigLabel(comptime ContextType: type) type {
 
         pub fn positionX(self: *Self, original_pos: Position) void {
             self.component_pos = original_pos;
-            self.children_pos = original_pos.addX(self.text.len * CHAR_WIDTH);
+            self.children_pos = original_pos.addX(TerminalBuffer.strWidth(self.text) * CHAR_WIDTH);
         }
 
         pub fn positionY(self: *Self, original_pos: Position) void {
@@ -124,7 +124,7 @@ pub fn BigLabel(comptime ContextType: type) type {
         pub fn positionXY(self: *Self, original_pos: Position) void {
             self.component_pos = original_pos;
             self.children_pos = Position.init(
-                self.text.len * CHAR_WIDTH,
+                TerminalBuffer.strWidth(self.text) * CHAR_WIDTH,
                 CHAR_HEIGHT,
             ).add(original_pos);
         }

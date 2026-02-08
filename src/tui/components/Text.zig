@@ -123,7 +123,7 @@ pub fn draw(self: Text) void {
         if (self.maybe_mask) |mask| {
             if (self.width < 1) return;
 
-            const length = @min(self.text.items.len, self.width - 1);
+            const length = @min(TerminalBuffer.strWidth(self.text.items), self.width - 1);
             if (length == 0) return;
 
             TerminalBuffer.drawCharMultiple(
@@ -138,11 +138,12 @@ pub fn draw(self: Text) void {
         return;
     }
 
-    const length = @min(self.text.items.len, self.width);
+    const str_length = TerminalBuffer.strWidth(self.text.items);
+    const length = @min(str_length, self.width);
     if (length == 0) return;
 
     const visible_slice = vs: {
-        if (self.text.items.len > self.width and self.cursor < self.text.items.len) {
+        if (str_length > self.width and self.cursor < str_length) {
             break :vs self.text.items[self.visible_start..(self.width + self.visible_start)];
         } else {
             break :vs self.text.items[self.visible_start..];

@@ -310,7 +310,7 @@ pub fn main() !void {
 
     // Initialize terminal buffer
     try log_file.info("tui", "initializing terminal buffer", .{});
-    const labels_max_length = @max(lang.login.len, lang.password.len);
+    const labels_max_length = @max(TerminalBuffer.strWidth(lang.login), TerminalBuffer.strWidth(lang.password));
 
     var seed: u64 = undefined;
     std.crypto.random.bytes(std.mem.asBytes(&seed)); // Get a random seed for the PRNG (used by animations)
@@ -1419,23 +1419,23 @@ fn positionComponents(state: *UiState) void {
     state.clock_label.positionXY(state.edge_margin
         .add(TerminalBuffer.START_POSITION)
         .invertX(state.buffer.width)
-        .removeXIf(state.clock_label.text.len, state.buffer.width > state.clock_label.text.len + state.edge_margin.x));
+        .removeXIf(TerminalBuffer.strWidth(state.clock_label.text), state.buffer.width > TerminalBuffer.strWidth(state.clock_label.text) + state.edge_margin.x));
 
     state.numlock_label.positionX(state.edge_margin
         .add(TerminalBuffer.START_POSITION)
         .addYFromIf(state.clock_label.childrenPosition(), state.config.clock != null)
         .removeYFromIf(state.edge_margin, state.config.clock != null)
         .invertX(state.buffer.width)
-        .removeXIf(state.numlock_label.text.len, state.buffer.width > state.numlock_label.text.len + state.edge_margin.x));
+        .removeXIf(TerminalBuffer.strWidth(state.numlock_label.text), state.buffer.width > TerminalBuffer.strWidth(state.numlock_label.text) + state.edge_margin.x));
     state.capslock_label.positionX(state.numlock_label
         .childrenPosition()
-        .removeX(state.numlock_label.text.len + state.capslock_label.text.len + 1));
+        .removeX(TerminalBuffer.strWidth(state.numlock_label.text) + TerminalBuffer.strWidth(state.capslock_label.text) + 1));
 
     state.box.positionXY(TerminalBuffer.START_POSITION);
 
     if (state.config.bigclock != .none) {
         const half_width = state.buffer.width / 2;
-        const half_label_width = (state.bigclock_label.text.len * (bigLabel.CHAR_WIDTH + 1)) / 2;
+        const half_label_width = (TerminalBuffer.strWidth(state.bigclock_label.text) * (bigLabel.CHAR_WIDTH + 1)) / 2;
         const half_height = (if (state.buffer.height > state.box.height) state.buffer.height - state.box.height else state.buffer.height) / 2;
 
         state.bigclock_label.positionXY(TerminalBuffer.START_POSITION
@@ -1453,7 +1453,7 @@ fn positionComponents(state: *UiState) void {
         .addY(1));
     state.session.label.positionY(state.session_specifier_label
         .childrenPosition()
-        .addX(state.labels_max_length - state.session_specifier_label.text.len + 1));
+        .addX(state.labels_max_length - TerminalBuffer.strWidth(state.session_specifier_label.text) + 1));
 
     state.login_label.positionX(state.session.label
         .childrenPosition()
@@ -1461,7 +1461,7 @@ fn positionComponents(state: *UiState) void {
         .addY(1));
     state.login.label.positionY(state.login_label
         .childrenPosition()
-        .addX(state.labels_max_length - state.login_label.text.len + 1));
+        .addX(state.labels_max_length - TerminalBuffer.strWidth(state.login_label.text) + 1));
 
     state.password_label.positionX(state.login.label
         .childrenPosition()
@@ -1469,7 +1469,7 @@ fn positionComponents(state: *UiState) void {
         .addY(1));
     state.password.positionY(state.password_label
         .childrenPosition()
-        .addX(state.labels_max_length - state.password_label.text.len + 1));
+        .addX(state.labels_max_length - TerminalBuffer.strWidth(state.password_label.text) + 1));
 
     state.version_label.positionXY(state.edge_margin
         .add(TerminalBuffer.START_POSITION)

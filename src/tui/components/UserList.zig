@@ -98,7 +98,7 @@ fn usernameChanged(user: User, maybe_session: ?*Session) void {
 fn drawItem(label: *UserLabel, user: User, x: usize, y: usize, width: usize) void {
     if (width < 3) return;
 
-    const length = @min(user.name.len, width - 3);
+    const length = @min(TerminalBuffer.strWidth(user.name), width - 3);
     if (length == 0) return;
 
     const x_offset = if (label.text_in_center and width >= length) (width - length) / 2 else 0;
