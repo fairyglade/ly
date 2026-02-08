@@ -133,6 +133,14 @@ pub fn init(options: InitOptions, log_file: *LogFile, random: Random) !TerminalB
     };
 }
 
+pub fn getWidthStatic() usize {
+    return @intCast(termbox.tb_width());
+}
+
+pub fn getHeightStatic() usize {
+    return @intCast(termbox.tb_height());
+}
+
 pub fn setCursorStatic(x: usize, y: usize) void {
     _ = termbox.tb_set_cursor(@intCast(x), @intCast(y));
 }
@@ -146,12 +154,8 @@ pub fn shutdownStatic() void {
     _ = termbox.tb_shutdown();
 }
 
-pub fn presentBufferStatic() struct { width: usize, height: usize } {
+pub fn presentBufferStatic() void {
     _ = termbox.tb_present();
-    return .{
-        .width = @intCast(termbox.tb_width()),
-        .height = @intCast(termbox.tb_height()),
-    };
 }
 
 pub fn reclaim(self: TerminalBuffer) !void {

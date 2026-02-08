@@ -856,35 +856,37 @@ pub fn main() !void {
     }
 
     while (run) {
-        // If there's no input or there's an animation, a resolution change needs to be checked
-        if (!state.update or state.animate or config.bigclock != .none or config.clock != null) {
-            if (!state.update) std.Thread.sleep(std.time.ns_per_ms * 100);
+        if (state.resolution_changed) {
+            state.buffer.width = TerminalBuffer.getWidthStatic();
+            state.buffer.height = TerminalBuffer.getHeightStatic();
 
-            // Required to update tb_width() and tb_height()
-            const new_dimensions = TerminalBuffer.presentBufferStatic();
-            const width = new_dimensions.width;
-            const height = new_dimensions.height;
+            try log_file.info("tui", "screen resolution updated to {d}x{d}", .{ state.buffer.width, state.buffer.height });
 
-            if (width != state.buffer.width or height != state.buffer.height) {
-                // If it did change, then update the cell buffer, reallocate the current animation's buffers, and force a draw update
-                try log_file.info("tui", "screen resolution updated to {d}x{d}", .{ width, height });
+            if (state.animation.*) |*a| a.realloc() catch |err| {
+                try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
+                try log_file.err("tui", "failed to reallocate animation buffers: {s}", .{@errorName(err)});
+            };
 
-                state.buffer.width = width;
-                state.buffer.height = height;
+            positionComponents(&state);
 
-                if (state.animation.*) |*a| a.realloc() catch |err| {
-                    try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    try log_file.err("tui", "failed to reallocate animation buffers: {s}", .{@errorName(err)});
-                };
-
-                state.update = true;
-                state.resolution_changed = true;
-            }
+            state.update = true;
+            state.resolution_changed = false;
         }
 
         if (state.update) {
             try updateComponents(&state);
-            if (!try drawUi(&log_file, &state)) continue;
+
+            switch (state.active_input) {
+                .info_line => state.info_line.label.handle(null, state.insert_mode),
+                .session => state.session.label.handle(null, state.insert_mode),
+                .login => state.login.label.handle(null, state.insert_mode),
+                .password => state.password.handle(null, state.insert_mode) catch |err| {
+                    try state.info_line.addMessage(state.lang.err_alloc, state.config.error_bg, state.config.error_fg);
+                    try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
+                },
+            }
+
+            if (!try drawUi(&state)) continue;
         }
 
         var timeout: i32 = -1;
@@ -949,7 +951,12 @@ pub fn main() !void {
 
             state.update = timeout != -1;
 
-            if (event_error < 0 or event.type != termbox.TB_EVENT_KEY) continue;
+            if (event_error < 0) continue;
+        }
+
+        if (event.type == termbox.TB_EVENT_RESIZE) {
+            state.resolution_changed = true;
+            continue;
         }
 
         // Input of some kind was detected, so reset the inactivity timer
@@ -1236,7 +1243,7 @@ fn updateComponents(state: *UiState) !void {
     }
 }
 
-fn drawUi(log_file: *LogFile, state: *UiState) !bool {
+fn drawUi(state: *UiState) !bool {
     // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
     if (state.config.auth_fails > 0 and state.auth_fails >= state.config.auth_fails) {
         std.Thread.sleep(std.time.ns_per_ms * 10);
@@ -1259,21 +1266,6 @@ fn drawUi(log_file: *LogFile, state: *UiState) !bool {
     if (state.config.bigclock != .none) state.bigclock_label.draw();
 
     state.box.draw();
-
-    if (state.resolution_changed) {
-        positionComponents(state);
-        state.resolution_changed = false;
-    }
-
-    switch (state.active_input) {
-        .info_line => state.info_line.label.handle(null, state.insert_mode),
-        .session => state.session.label.handle(null, state.insert_mode),
-        .login => state.login.label.handle(null, state.insert_mode),
-        .password => state.password.handle(null, state.insert_mode) catch |err| {
-            try state.info_line.addMessage(state.lang.err_alloc, state.config.error_bg, state.config.error_fg);
-            try log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
-        },
-    }
 
     if (state.config.clock != null) state.clock_label.draw();
 
