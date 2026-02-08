@@ -1434,10 +1434,15 @@ fn positionComponents(state: *UiState) void {
     state.box.positionXY(TerminalBuffer.START_POSITION);
 
     if (state.config.bigclock != .none) {
-        state.bigclock_label.positionXY(Position.init(
-            state.buffer.width / 2 - @min(state.buffer.width, (state.bigclock_label.text.len * (bigLabel.CHAR_WIDTH + 1))) / 2,
-            (state.buffer.height - state.box.height) / 2 - bigLabel.CHAR_HEIGHT - 2,
-        ).add(TerminalBuffer.START_POSITION));
+        const half_width = state.buffer.width / 2;
+        const half_label_width = (state.bigclock_label.text.len * (bigLabel.CHAR_WIDTH + 1)) / 2;
+        const half_height = (if (state.buffer.height > state.box.height) state.buffer.height - state.box.height else state.buffer.height) / 2;
+
+        state.bigclock_label.positionXY(TerminalBuffer.START_POSITION
+            .addX(half_width)
+            .removeXIf(half_label_width, half_width > half_label_width)
+            .addY(half_height)
+            .removeYIf(bigLabel.CHAR_HEIGHT + 2, half_height > bigLabel.CHAR_HEIGHT + 2));
     }
 
     state.info_line.label.positionY(state.box
