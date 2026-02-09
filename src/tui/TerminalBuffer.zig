@@ -144,32 +144,48 @@ pub fn init(allocator: Allocator, options: InitOptions, log_file: *LogFile, rand
 
 pub fn deinit(self: *TerminalBuffer) void {
     self.keybinds.deinit();
-    TerminalBuffer.shutdownStatic();
+    TerminalBuffer.shutdown();
 }
 
-pub fn getWidthStatic() usize {
+pub fn getWidth() usize {
     return @intCast(termbox.tb_width());
 }
 
-pub fn getHeightStatic() usize {
+pub fn getHeight() usize {
     return @intCast(termbox.tb_height());
 }
 
-pub fn setCursorStatic(x: usize, y: usize) void {
+pub fn setCursor(x: usize, y: usize) void {
     _ = termbox.tb_set_cursor(@intCast(x), @intCast(y));
 }
 
-pub fn clearScreenStatic(clear_back_buffer: bool) !void {
+pub fn clearScreen(clear_back_buffer: bool) !void {
     _ = termbox.tb_clear();
     if (clear_back_buffer) try clearBackBuffer();
 }
 
-pub fn shutdownStatic() void {
+pub fn shutdown() void {
     _ = termbox.tb_shutdown();
 }
 
-pub fn presentBufferStatic() void {
+pub fn presentBuffer() void {
     _ = termbox.tb_present();
+}
+
+pub fn setCell(
+    x: usize,
+    y: usize,
+    ch: u32,
+    fg: u32,
+    bg: u32,
+) void {
+    _ = termbox.tb_set_cell(
+        @intCast(x),
+        @intCast(y),
+        ch,
+        fg,
+        bg,
+    );
 }
 
 pub fn reclaim(self: TerminalBuffer) !void {
@@ -257,17 +273,22 @@ pub fn handleKeybind(
     allocator: Allocator,
     tb_event: termbox.tb_event,
     context: *anyopaque,
-) !bool {
+) !?std.ArrayList(keyboard.Key) {
     var keys = try keyboard.getKeyList(allocator, tb_event);
-    defer keys.deinit(allocator);
 
     for (keys.items) |key| {
         if (self.keybinds.get(key)) |callback| {
-            return @call(.auto, callback, .{context});
+            const passthrough_event = try @call(.auto, callback, .{context});
+            if (!passthrough_event) {
+                keys.deinit(allocator);
+                return null;
+            }
+
+            return keys;
         }
     }
 
-    return true;
+    return keys;
 }
 
 pub fn drawText(

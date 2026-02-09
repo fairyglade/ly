@@ -9,11 +9,11 @@ const LogFile = ly_core.LogFile;
 
 const enums = @import("../enums.zig");
 const DurOffsetAlignment = enums.DurOffsetAlignment;
-const Animation = @import("../tui/Animation.zig");
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const Color = TerminalBuffer.Color;
 const Styling = TerminalBuffer.Styling;
+const Widget = @import("../tui/Widget.zig");
 
 fn read_decompress_file(allocator: Allocator, file_path: []const u8) ![]u8 {
     const file_buffer = std.fs.cwd().openFile(file_path, .{}) catch {
@@ -403,15 +403,22 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_file: *L
     };
 }
 
-pub fn animation(self: *DurFile) Animation {
-    return Animation.init(self, deinit, realloc, draw);
+pub fn widget(self: *DurFile) Widget {
+    return Widget.init(
+        self,
+        deinit,
+        realloc,
+        draw,
+        null,
+        null,
+    );
 }
 
 fn deinit(self: *DurFile) void {
     self.dur_movie.deinit();
 }
 
-fn realloc(self: *DurFile) anyerror!void {
+fn realloc(self: *DurFile) !void {
     // when terminal size changes, we need to recalculate the start_pos and frame_size based on the new size
     self.start_pos = calc_start_position(self.terminal_buffer, &self.dur_movie, self.offset_alignment, self.offset);
     self.frame_size = calc_frame_size(self.terminal_buffer, &self.dur_movie);

@@ -1,9 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const Animation = @import("../tui/Animation.zig");
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+const Widget = @import("../tui/Widget.zig");
 
 const GameOfLife = @This();
 
@@ -60,8 +60,15 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_color: u3
     return game;
 }
 
-pub fn animation(self: *GameOfLife) Animation {
-    return Animation.init(self, deinit, realloc, draw);
+pub fn widget(self: *GameOfLife) Widget {
+    return Widget.init(
+        self,
+        deinit,
+        realloc,
+        draw,
+        null,
+        null,
+    );
 }
 
 fn deinit(self: *GameOfLife) void {
@@ -69,7 +76,7 @@ fn deinit(self: *GameOfLife) void {
     self.allocator.free(self.next_grid);
 }
 
-fn realloc(self: *GameOfLife) anyerror!void {
+fn realloc(self: *GameOfLife) !void {
     const new_width = self.terminal_buffer.width;
     const new_height = self.terminal_buffer.height;
     const new_size = new_width * new_height;

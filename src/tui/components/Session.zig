@@ -4,7 +4,9 @@ const Allocator = std.mem.Allocator;
 const enums = @import("../../enums.zig");
 const DisplayServer = enums.DisplayServer;
 const Environment = @import("../../Environment.zig");
+const keyboard = @import("../keyboard.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
+const Widget = @import("../Widget.zig");
 const generic = @import("generic.zig");
 const UserList = @import("UserList.zig");
 
@@ -51,6 +53,25 @@ pub fn deinit(self: *Session) void {
     }
 
     self.label.deinit();
+}
+
+pub fn widget(self: *Session) Widget {
+    return Widget.init(
+        self,
+        deinit,
+        null,
+        draw,
+        null,
+        handle,
+    );
+}
+
+pub fn draw(self: *Session) void {
+    self.label.draw();
+}
+
+pub fn handle(self: *Session, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
+    self.label.handle(maybe_key, insert_mode);
 }
 
 pub fn addEnvironment(self: *Session, environment: Environment) !void {

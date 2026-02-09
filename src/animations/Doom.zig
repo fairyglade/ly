@@ -1,9 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const Animation = @import("../tui/Animation.zig");
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+const Widget = @import("../tui/Widget.zig");
 
 const Doom = @This();
 
@@ -49,15 +49,22 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u
     };
 }
 
-pub fn animation(self: *Doom) Animation {
-    return Animation.init(self, deinit, realloc, draw);
+pub fn widget(self: *Doom) Widget {
+    return Widget.init(
+        self,
+        deinit,
+        realloc,
+        draw,
+        null,
+        null,
+    );
 }
 
 fn deinit(self: *Doom) void {
     self.allocator.free(self.buffer);
 }
 
-fn realloc(self: *Doom) anyerror!void {
+fn realloc(self: *Doom) !void {
     const buffer = try self.allocator.realloc(self.buffer, self.terminal_buffer.width * self.terminal_buffer.height);
     initBuffer(buffer, self.terminal_buffer.width);
     self.buffer = buffer;

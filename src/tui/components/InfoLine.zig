@@ -1,7 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const keyboard = @import("../keyboard.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
+const Widget = @import("../Widget.zig");
 const generic = @import("generic.zig");
 
 const MessageLabel = generic.CyclableLabel(Message, Message);
@@ -41,6 +43,25 @@ pub fn init(
 
 pub fn deinit(self: *InfoLine) void {
     self.label.deinit();
+}
+
+pub fn widget(self: *InfoLine) Widget {
+    return Widget.init(
+        self,
+        deinit,
+        null,
+        draw,
+        null,
+        handle,
+    );
+}
+
+pub fn draw(self: *InfoLine) void {
+    self.label.draw();
+}
+
+pub fn handle(self: *InfoLine, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
+    self.label.handle(maybe_key, insert_mode);
 }
 
 pub fn addMessage(self: *InfoLine, text: []const u8, bg: u32, fg: u32) !void {

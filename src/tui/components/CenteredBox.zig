@@ -3,7 +3,7 @@ const std = @import("std");
 const Cell = @import("../Cell.zig");
 const Position = @import("../Position.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
-const termbox = TerminalBuffer.termbox;
+const Widget = @import("../Widget.zig");
 
 const CenteredBox = @This();
 
@@ -56,6 +56,17 @@ pub fn init(
     };
 }
 
+pub fn widget(self: *CenteredBox) Widget {
+    return Widget.init(
+        self,
+        null,
+        null,
+        draw,
+        null,
+        null,
+    );
+}
+
 pub fn positionXY(self: *CenteredBox, original_pos: Position) void {
     if (self.buffer.width < 2 or self.buffer.height < 2) return;
 
@@ -79,51 +90,55 @@ pub fn childrenPosition(self: CenteredBox) Position {
     return self.children_pos;
 }
 
-pub fn draw(self: CenteredBox) void {
+pub fn draw(self: *CenteredBox) void {
     if (self.show_borders) {
-        _ = termbox.tb_set_cell(
-            @intCast(self.left_pos.x - 1),
-            @intCast(self.left_pos.y - 1),
+        var left_up = Cell.init(
             self.buffer.box_chars.left_up,
             self.border_fg,
             self.bg,
         );
-        _ = termbox.tb_set_cell(
-            @intCast(self.right_pos.x),
-            @intCast(self.left_pos.y - 1),
+        var right_up = Cell.init(
             self.buffer.box_chars.right_up,
             self.border_fg,
             self.bg,
         );
-        _ = termbox.tb_set_cell(
-            @intCast(self.left_pos.x - 1),
-            @intCast(self.right_pos.y),
+        var left_down = Cell.init(
             self.buffer.box_chars.left_down,
             self.border_fg,
             self.bg,
         );
-        _ = termbox.tb_set_cell(
-            @intCast(self.right_pos.x),
-            @intCast(self.right_pos.y),
+        var right_down = Cell.init(
             self.buffer.box_chars.right_down,
             self.border_fg,
             self.bg,
         );
+        var top = Cell.init(
+            self.buffer.box_chars.top,
+            self.border_fg,
+            self.bg,
+        );
+        var bottom = Cell.init(
+            self.buffer.box_chars.bottom,
+            self.border_fg,
+            self.bg,
+        );
 
-        var c1 = Cell.init(self.buffer.box_chars.top, self.border_fg, self.bg);
-        var c2 = Cell.init(self.buffer.box_chars.bottom, self.border_fg, self.bg);
+        left_up.put(self.left_pos.x - 1, self.left_pos.y - 1);
+        right_up.put(self.right_pos.x, self.left_pos.y - 1);
+        left_down.put(self.left_pos.x - 1, self.right_pos.y);
+        right_down.put(self.right_pos.x, self.right_pos.y);
 
         for (0..self.width) |i| {
-            c1.put(self.left_pos.x + i, self.left_pos.y - 1);
-            c2.put(self.left_pos.x + i, self.right_pos.y);
+            top.put(self.left_pos.x + i, self.left_pos.y - 1);
+            bottom.put(self.left_pos.x + i, self.right_pos.y);
         }
 
-        c1.ch = self.buffer.box_chars.left;
-        c2.ch = self.buffer.box_chars.right;
+        top.ch = self.buffer.box_chars.left;
+        bottom.ch = self.buffer.box_chars.right;
 
         for (0..self.height) |i| {
-            c1.put(self.left_pos.x - 1, self.left_pos.y + i);
-            c2.put(self.right_pos.x, self.left_pos.y + i);
+            top.put(self.left_pos.x - 1, self.left_pos.y + i);
+            bottom.put(self.right_pos.x, self.left_pos.y + i);
         }
     }
 

@@ -36,8 +36,8 @@ pub const Key = packed struct {
     tab: bool,
     backspace: bool,
     enter: bool,
-    space: bool,
 
+    @" ": bool,
     @"!": bool,
     @"`": bool,
     esc: bool,
@@ -109,6 +109,18 @@ pub const Key = packed struct {
     x: bool,
     y: bool,
     z: bool,
+
+    pub fn getEnabledPrintableAscii(self: Key) ?u8 {
+        if (self.ctrl or self.shift or self.alt) return null;
+
+        inline for (std.meta.fields(Key)) |field| {
+            if (field.name.len == 1 and std.ascii.isPrint(field.name[0]) and @field(self, field.name)) {
+                return field.name[0];
+            }
+        }
+
+        return null;
+    }
 };
 
 pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
@@ -326,7 +338,7 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
                 key._ = true;
             },
             32 => {
-                key.space = true;
+                key.@" " = true;
             },
             33 => {
                 key.shift = true;

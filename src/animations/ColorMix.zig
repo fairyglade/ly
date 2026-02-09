@@ -1,9 +1,9 @@
 const std = @import("std");
 const math = std.math;
 
-const Animation = @import("../tui/Animation.zig");
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+const Widget = @import("../tui/Widget.zig");
 
 const ColorMix = @This();
 
@@ -45,13 +45,16 @@ pub fn init(terminal_buffer: *TerminalBuffer, col1: u32, col2: u32, col3: u32) C
     };
 }
 
-pub fn animation(self: *ColorMix) Animation {
-    return Animation.init(self, deinit, realloc, draw);
+pub fn widget(self: *ColorMix) Widget {
+    return Widget.init(
+        self,
+        null,
+        null,
+        draw,
+        null,
+        null,
+    );
 }
-
-fn deinit(_: *ColorMix) void {}
-
-fn realloc(_: *ColorMix) anyerror!void {}
 
 fn draw(self: *ColorMix) void {
     self.frames +%= 1;

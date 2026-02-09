@@ -2,9 +2,9 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Random = std.Random;
 
-const Animation = @import("../tui/Animation.zig");
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+const Widget = @import("../tui/Widget.zig");
 
 pub const FRAME_DELAY: usize = 8;
 
@@ -57,8 +57,15 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg: u32, hea
     };
 }
 
-pub fn animation(self: *Matrix) Animation {
-    return Animation.init(self, deinit, realloc, draw);
+pub fn widget(self: *Matrix) Widget {
+    return Widget.init(
+        self,
+        deinit,
+        realloc,
+        draw,
+        null,
+        null,
+    );
 }
 
 fn deinit(self: *Matrix) void {
@@ -66,7 +73,7 @@ fn deinit(self: *Matrix) void {
     self.allocator.free(self.lines);
 }
 
-fn realloc(self: *Matrix) anyerror!void {
+fn realloc(self: *Matrix) !void {
     const dots = try self.allocator.realloc(self.dots, self.terminal_buffer.width * (self.terminal_buffer.height + 1));
     const lines = try self.allocator.realloc(self.lines, self.terminal_buffer.width);
 

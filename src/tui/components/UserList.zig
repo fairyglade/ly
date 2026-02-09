@@ -2,7 +2,9 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const SavedUsers = @import("../../config/SavedUsers.zig");
+const keyboard = @import("../keyboard.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
+const Widget = @import("../Widget.zig");
 const generic = @import("generic.zig");
 const Session = @import("Session.zig");
 
@@ -85,8 +87,27 @@ pub fn deinit(self: *UserList) void {
     self.label.deinit();
 }
 
+pub fn widget(self: *UserList) Widget {
+    return Widget.init(
+        self,
+        deinit,
+        null,
+        draw,
+        null,
+        handle,
+    );
+}
+
 pub fn getCurrentUsername(self: UserList) []const u8 {
     return self.label.list.items[self.label.current].name;
+}
+
+fn draw(self: *UserList) void {
+    self.label.draw();
+}
+
+fn handle(self: *UserList, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
+    self.label.handle(maybe_key, insert_mode);
 }
 
 fn usernameChanged(user: User, maybe_session: ?*Session) void {

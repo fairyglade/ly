@@ -1,5 +1,4 @@
 const TerminalBuffer = @import("TerminalBuffer.zig");
-const termbox = TerminalBuffer.termbox;
 
 const Cell = @This();
 
@@ -18,5 +17,5 @@ pub fn init(ch: u32, fg: u32, bg: u32) Cell {
 pub fn put(self: Cell, x: usize, y: usize) void {
     if (self.ch == 0) return;
 
-    _ = termbox.tb_set_cell(@intCast(x), @intCast(y), self.ch, self.fg, self.bg);
+    TerminalBuffer.setCell(x, y, self.ch, self.fg, self.bg);
 }

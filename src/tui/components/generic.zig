@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Cell = @import("../Cell.zig");
+const keyboard = @import("../keyboard.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const Position = @import("../Position.zig");
 
@@ -9,8 +11,6 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
         const ItemList = std.ArrayListUnmanaged(ItemType);
         const DrawItemFn = *const fn (*Self, ItemType, usize, usize, usize) void;
         const ChangeItemFn = *const fn (ItemType, ?ChangeItemType) void;
-
-        const termbox = TerminalBuffer.termbox;
 
         const Self = @This();
 
@@ -92,28 +92,18 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
             self.current = self.list.items.len - 1;
         }
 
-        pub fn handle(self: *Self, maybe_event: ?*termbox.tb_event, insert_mode: bool) void {
-            if (maybe_event) |event| blk: {
-                if (event.type != termbox.TB_EVENT_KEY) break :blk;
-
-                switch (event.key) {
-                    termbox.TB_KEY_ARROW_LEFT, termbox.TB_KEY_CTRL_H => self.goLeft(),
-                    termbox.TB_KEY_ARROW_RIGHT, termbox.TB_KEY_CTRL_L => self.goRight(),
-                    else => {
-                        if (!insert_mode) {
-                            switch (event.ch) {
-                                'h' => self.goLeft(),
-                                'l' => self.goRight(),
-                                else => {},
-                            }
-                        }
-                    },
+        pub fn handle(self: *Self, maybe_key: ?keyboard.Key, insert_mode: bool) void {
+            if (maybe_key) |key| {
+                if (key.left or (key.ctrl and key.h) or (!insert_mode and key.h)) {
+                    self.goLeft();
+                } else if (key.right or (key.ctrl and key.l) or (!insert_mode and key.l)) {
+                    self.goRight();
                 }
             }
 
-            _ = termbox.tb_set_cursor(
-                @intCast(self.component_pos.x + self.cursor + 2),
-                @intCast(self.component_pos.y),
+            TerminalBuffer.setCursor(
+                self.component_pos.x + self.cursor + 2,
+                self.component_pos.y,
             );
         }
 
@@ -121,19 +111,13 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
             if (self.list.items.len == 0) return;
             if (self.width < 2) return;
 
-            _ = termbox.tb_set_cell(
-                @intCast(self.component_pos.x),
-                @intCast(self.component_pos.y),
-                '<',
-                self.fg,
-                self.bg,
-            );
-            _ = termbox.tb_set_cell(
-                @intCast(self.component_pos.x + self.width - 1),
-                @intCast(self.component_pos.y),
-                '>',
-                self.fg,
-                self.bg,
+            var left_arrow = Cell.init('<', self.fg, self.bg);
+            var right_arrow = Cell.init('>', self.fg, self.bg);
+
+            left_arrow.put(self.component_pos.x, self.component_pos.y);
+            right_arrow.put(
+                self.component_pos.x + self.width - 1,
+                self.component_pos.y,
             );
 
             const current_item = self.list.items[self.current];

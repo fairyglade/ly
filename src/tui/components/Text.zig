@@ -1,9 +1,10 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const keyboard = @import("../keyboard.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const Position = @import("../Position.zig");
-const termbox = TerminalBuffer.termbox;
+const Widget = @import("../Widget.zig");
 
 const DynamicString = std.ArrayListUnmanaged(u8);
 
@@ -53,6 +54,17 @@ pub fn deinit(self: *Text) void {
     self.text.deinit(self.allocator);
 }
 
+pub fn widget(self: *Text) Widget {
+    return Widget.init(
+        self,
+        deinit,
+        null,
+        draw,
+        null,
+        handle,
+    );
+}
+
 pub fn positionX(self: *Text, original_pos: Position) void {
     self.component_pos = original_pos;
     self.children_pos = original_pos.addX(self.width);
@@ -75,50 +87,37 @@ pub fn childrenPosition(self: Text) Position {
     return self.children_pos;
 }
 
-pub fn handle(self: *Text, maybe_event: ?*termbox.tb_event, insert_mode: bool) !void {
-    if (maybe_event) |event| blk: {
-        if (event.type != termbox.TB_EVENT_KEY) break :blk;
-
-        switch (event.key) {
-            termbox.TB_KEY_ARROW_LEFT => self.goLeft(),
-            termbox.TB_KEY_ARROW_RIGHT => self.goRight(),
-            termbox.TB_KEY_DELETE => self.delete(),
-            termbox.TB_KEY_BACKSPACE, termbox.TB_KEY_BACKSPACE2 => {
-                if (insert_mode) {
-                    self.backspace();
-                } else {
-                    self.goLeft();
-                }
-            },
-            termbox.TB_KEY_SPACE => try self.write(' '),
-            else => {
-                if (event.ch > 31 and event.ch < 127) {
-                    if (insert_mode) {
-                        try self.write(@intCast(event.ch));
-                    } else {
-                        switch (event.ch) {
-                            'h' => self.goLeft(),
-                            'l' => self.goRight(),
-                            else => {},
-                        }
-                    }
-                }
-            },
+pub fn handle(self: *Text, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
+    if (maybe_key) |key| {
+        if (key.left or (!insert_mode and (key.h or key.backspace))) {
+            self.goLeft();
+        } else if (key.right or (!insert_mode and key.l)) {
+            self.goRight();
+        } else if (key.delete) {
+            self.delete();
+        } else if (key.backspace) {
+            self.backspace();
+        } else if (insert_mode) {
+            const maybe_character = key.getEnabledPrintableAscii();
+            if (maybe_character) |character| try self.write(character);
         }
     }
 
     if (self.masked and self.maybe_mask == null) {
-        _ = termbox.tb_set_cursor(@intCast(self.component_pos.x), @intCast(self.component_pos.y));
+        TerminalBuffer.setCursor(
+            self.component_pos.x,
+            self.component_pos.y,
+        );
         return;
     }
 
-    _ = termbox.tb_set_cursor(
-        @intCast(self.component_pos.x + (self.cursor - self.visible_start)),
-        @intCast(self.component_pos.y),
+    TerminalBuffer.setCursor(
+        self.component_pos.x + (self.cursor - self.visible_start),
+        self.component_pos.y,
     );
 }
 
-pub fn draw(self: Text) void {
+pub fn draw(self: *Text) void {
     if (self.masked) {
         if (self.maybe_mask) |mask| {
             if (self.width < 1) return;
