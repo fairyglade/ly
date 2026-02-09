@@ -1603,10 +1603,10 @@ fn positionComponents(state: *UiState) void {
         .addYFromIf(state.clock_label.childrenPosition(), state.config.clock != null)
         .removeYFromIf(state.edge_margin, state.config.clock != null)
         .invertX(state.buffer.width)
-        .removeXIf(TerminalBuffer.strWidth(state.numlock_label.text), state.buffer.width > TerminalBuffer.strWidth(state.numlock_label.text) + state.edge_margin.x));
+        .removeXIf(TerminalBuffer.strWidth(state.lang.numlock), state.buffer.width > TerminalBuffer.strWidth(state.lang.numlock) + state.edge_margin.x));
     state.capslock_label.positionX(state.numlock_label
         .childrenPosition()
-        .removeX(TerminalBuffer.strWidth(state.numlock_label.text) + TerminalBuffer.strWidth(state.capslock_label.text) + 1));
+        .removeX(TerminalBuffer.strWidth(state.lang.numlock) + TerminalBuffer.strWidth(state.lang.capslock) + 1));
 
     state.box.positionXY(TerminalBuffer.START_POSITION);
 
