@@ -916,7 +916,7 @@ pub fn main() !void {
 
         // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for the event indefinitely instead
         if (state.animate and !state.animation_timed_out) {
-            timeout = config.min_refresh_delta;
+            timeout = config.animation_frame_delay;
 
             // Check how long we've been running so we can turn off the animation
             const time = try interop.getTimeOfDay();
@@ -1132,7 +1132,7 @@ fn authenticate(ptr: *anyopaque) !bool {
             );
         };
         state.info_line.label.draw();
-        _ = TerminalBuffer.presentBufferStatic();
+        TerminalBuffer.presentBufferStatic();
         return false;
     }
 
@@ -1154,7 +1154,7 @@ fn authenticate(ptr: *anyopaque) !bool {
         );
     };
     state.info_line.label.draw();
-    _ = TerminalBuffer.presentBufferStatic();
+    TerminalBuffer.presentBufferStatic();
 
     if (state.config.save) save_last_settings: {
         // It isn't worth cluttering the code with precise error
@@ -1301,7 +1301,7 @@ fn authenticate(ptr: *anyopaque) !bool {
 
     // Restore the cursor
     TerminalBuffer.setCursorStatic(0, 0);
-    _ = TerminalBuffer.presentBufferStatic();
+    TerminalBuffer.presentBufferStatic();
     return false;
 }
 
@@ -1439,7 +1439,7 @@ fn drawUi(state: *UiState) !bool {
             state.auth_fails = 0;
         }
 
-        _ = TerminalBuffer.presentBufferStatic();
+        TerminalBuffer.presentBufferStatic();
         return false;
     }
 
@@ -1482,7 +1482,7 @@ fn drawUi(state: *UiState) !bool {
     state.login.label.draw();
     state.password.draw();
 
-    _ = TerminalBuffer.presentBufferStatic();
+    TerminalBuffer.presentBufferStatic();
     return true;
 }
 

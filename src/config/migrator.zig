@@ -153,6 +153,14 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         return field;
     }
 
+    if (std.mem.eql(u8, field.key, "min_refresh_delta")) {
+        // The option has simply been renamed
+        var mapped_field = field;
+        mapped_field.key = "animation_frame_delay";
+
+        return mapped_field;
+    }
+
     return field;
 }
 
