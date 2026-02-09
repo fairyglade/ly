@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const Random = std.Random;
 
 const ly_core = @import("ly-core");
@@ -7,9 +8,13 @@ const LogFile = ly_core.LogFile;
 pub const termbox = @import("termbox2");
 
 const Cell = @import("Cell.zig");
+const keyboard = @import("keyboard.zig");
 const Position = @import("Position.zig");
 
 const TerminalBuffer = @This();
+
+const KeybindCallbackFn = *const fn (*anyopaque) anyerror!bool;
+const KeybindMap = std.AutoHashMap(keyboard.Key, KeybindCallbackFn);
 
 pub const InitOptions = struct {
     fg: u32,
@@ -59,6 +64,7 @@ pub const Color = struct {
 
 pub const START_POSITION = Position.init(0, 0);
 
+log_file: *LogFile,
 random: Random,
 width: usize,
 height: usize,
@@ -78,8 +84,9 @@ box_chars: struct {
 blank_cell: Cell,
 full_color: bool,
 termios: ?std.posix.termios,
+keybinds: KeybindMap,
 
-pub fn init(options: InitOptions, log_file: *LogFile, random: Random) !TerminalBuffer {
+pub fn init(allocator: Allocator, options: InitOptions, log_file: *LogFile, random: Random) !TerminalBuffer {
     // Initialize termbox
     _ = termbox.tb_init();
 
@@ -101,6 +108,7 @@ pub fn init(options: InitOptions, log_file: *LogFile, random: Random) !TerminalB
     try log_file.info("tui", "screen resolution is {d}x{d}", .{ width, height });
 
     return .{
+        .log_file = log_file,
         .random = random,
         .width = width,
         .height = height,
@@ -130,7 +138,13 @@ pub fn init(options: InitOptions, log_file: *LogFile, random: Random) !TerminalB
         .full_color = options.full_color,
         // Needed to reclaim the TTY after giving up its control
         .termios = try std.posix.tcgetattr(std.posix.STDIN_FILENO),
+        .keybinds = KeybindMap.init(allocator),
     };
+}
+
+pub fn deinit(self: *TerminalBuffer) void {
+    self.keybinds.deinit();
+    TerminalBuffer.shutdownStatic();
 }
 
 pub fn getWidthStatic() usize {
@@ -203,6 +217,57 @@ pub fn cascade(self: TerminalBuffer) bool {
     }
 
     return changed;
+}
+
+pub fn registerKeybind(self: *TerminalBuffer, keybind: []const u8, callback: KeybindCallbackFn) !void {
+    var key = std.mem.zeroes(keyboard.Key);
+    var iterator = std.mem.splitScalar(u8, keybind, '+');
+
+    while (iterator.next()) |item| {
+        var found = false;
+
+        inline for (std.meta.fields(keyboard.Key)) |field| {
+            if (std.ascii.eqlIgnoreCase(field.name, item)) {
+                @field(key, field.name) = true;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            try self.log_file.err(
+                "tui",
+                "failed to parse key {s} of keybind {s}",
+                .{ item, keybind },
+            );
+        }
+    }
+
+    self.keybinds.put(key, callback) catch |err| {
+        try self.log_file.err(
+            "tui",
+            "failed to register keybind {s}: {s}",
+            .{ keybind, @errorName(err) },
+        );
+    };
+}
+
+pub fn handleKeybind(
+    self: *TerminalBuffer,
+    allocator: Allocator,
+    tb_event: termbox.tb_event,
+    context: *anyopaque,
+) !bool {
+    var keys = try keyboard.getKeyList(allocator, tb_event);
+    defer keys.deinit(allocator);
+
+    for (keys.items) |key| {
+        if (self.keybinds.get(key)) |callback| {
+            return @call(.auto, callback, .{context});
+        }
+    }
+
+    return true;
 }
 
 pub fn drawText(

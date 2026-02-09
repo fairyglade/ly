@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const StringList = std.ArrayListUnmanaged([]const u8);
 const temporary_allocator = std.heap.page_allocator;
 const builtin = @import("builtin");
@@ -66,8 +67,13 @@ fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
 }
 
 const UiState = struct {
+    allocator: Allocator,
     auth_fails: u64,
+    run: bool,
     update: bool,
+    is_autologin: bool,
+    use_kmscon_vt: bool,
+    active_tty: u8,
     buffer: *TerminalBuffer,
     labels_max_length: usize,
     animation_timed_out: bool,
@@ -91,6 +97,7 @@ const UiState = struct {
     info_line: *InfoLine,
     animate: bool,
     session: *Session,
+    saved_users: SavedUsers,
     login: *UserList,
     password: *Text,
     active_input: enums.Input,
@@ -99,15 +106,18 @@ const UiState = struct {
     config: Config,
     lang: Lang,
     log_file: *LogFile,
+    save_path: []const u8,
+    old_save_path: ?[]const u8,
     battery_buf: [16:0]u8,
     bigclock_format_buf: [16:0]u8,
     clock_buf: [64:0]u8,
     bigclock_buf: [32:0]u8,
 };
 
+var shutdown = false;
+var restart = false;
+
 pub fn main() !void {
-    var shutdown = false;
-    var restart = false;
     var shutdown_cmd: []const u8 = undefined;
     var restart_cmd: []const u8 = undefined;
     var commands_allocated = false;
@@ -324,10 +334,15 @@ pub fn main() !void {
         .full_color = config.full_color,
         .is_tty = true,
     };
-    var buffer = try TerminalBuffer.init(buffer_options, &log_file, random);
+    var buffer = try TerminalBuffer.init(
+        allocator,
+        buffer_options,
+        &log_file,
+        random,
+    );
     defer {
         log_file.info("tui", "shutting down terminal buffer", .{}) catch {};
-        TerminalBuffer.shutdownStatic();
+        buffer.deinit();
     }
 
     const act = std.posix.Sigaction{
@@ -707,10 +722,28 @@ pub fn main() !void {
         is_autologin = true;
     }
 
+    // Switch to selected TTY
+    const active_tty = interop.getActiveTty(allocator, use_kmscon_vt) catch |err| no_tty_found: {
+        try info_line.addMessage(lang.err_get_active_tty, config.error_bg, config.error_fg);
+        try log_file.err("sys", "failed to get active tty: {s}", .{@errorName(err)});
+        break :no_tty_found build_options.fallback_tty;
+    };
+    if (!use_kmscon_vt) {
+        interop.switchTty(active_tty) catch |err| {
+            try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
+            try log_file.err("sys", "failed to switch to tty {d}: {s}", .{ active_tty, @errorName(err) });
+        };
+    }
+
     var animation: ?Animation = null;
     var state = UiState{
+        .allocator = allocator,
         .auth_fails = 0,
+        .run = true,
         .update = true,
+        .is_autologin = is_autologin,
+        .use_kmscon_vt = use_kmscon_vt,
+        .active_tty = active_tty,
         .buffer = &buffer,
         .labels_max_length = labels_max_length,
         .animation_timed_out = false,
@@ -734,6 +767,7 @@ pub fn main() !void {
         .info_line = &info_line,
         .animate = config.animation != .none,
         .session = &session,
+        .saved_users = saved_users,
         .login = &login,
         .password = &password,
         .active_input = config.default_input,
@@ -745,6 +779,8 @@ pub fn main() !void {
         .config = config,
         .lang = lang,
         .log_file = &log_file,
+        .save_path = save_path,
+        .old_save_path = if (old_save_parser != null) old_save_path else null,
         .battery_buf = undefined,
         .bigclock_format_buf = undefined,
         .clock_buf = undefined,
@@ -775,7 +811,7 @@ pub fn main() !void {
         }
     }
 
-    // Position components
+    // Position components and place cursor accordingly
     try updateComponents(&state);
     positionComponents(&state);
 
@@ -815,30 +851,36 @@ pub fn main() !void {
     }
     defer if (animation) |*a| a.deinit();
 
-    const shutdown_key = try std.fmt.parseInt(u8, config.shutdown_key[1..], 10);
-    const restart_key = try std.fmt.parseInt(u8, config.restart_key[1..], 10);
-    const sleep_key = try std.fmt.parseInt(u8, config.sleep_key[1..], 10);
-    const hibernate_key = try std.fmt.parseInt(u8, config.hibernate_key[1..], 10);
-    const brightness_down_key = if (config.brightness_down_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
-    const brightness_up_key = if (config.brightness_up_key) |key| try std.fmt.parseInt(u8, key[1..], 10) else null;
+    try buffer.registerKeybind("Esc", &disableInsertMode);
+    try buffer.registerKeybind("I", &enableInsertMode);
+
+    try buffer.registerKeybind("Ctrl+C", &quit);
+
+    try buffer.registerKeybind("Ctrl+U", &clearPassword);
+
+    try buffer.registerKeybind("Ctrl+K", &moveCursorUp);
+    try buffer.registerKeybind("Up", &moveCursorUp);
+    try buffer.registerKeybind("J", &viMoseCursorUp);
+
+    try buffer.registerKeybind("Ctrl+J", &moveCursorDown);
+    try buffer.registerKeybind("Down", &moveCursorDown);
+    try buffer.registerKeybind("K", &viMoveCursorDown);
+
+    try buffer.registerKeybind("Tab", &wrapCursor);
+    try buffer.registerKeybind("Shift+Tab", &wrapCursorReverse);
+
+    try buffer.registerKeybind("Enter", &authenticate);
+
+    try buffer.registerKeybind(config.shutdown_key, &shutdownCmd);
+    try buffer.registerKeybind(config.restart_key, &restartCmd);
+    if (config.sleep_cmd != null) try buffer.registerKeybind(config.sleep_key, &sleepCmd);
+    if (config.hibernate_cmd != null) try buffer.registerKeybind(config.hibernate_key, &hibernateCmd);
+    if (config.brightness_down_key) |key| try buffer.registerKeybind(key, &decreaseBrightnessCmd);
+    if (config.brightness_up_key) |key| try buffer.registerKeybind(key, &increaseBrightnessCmd);
 
     var event: termbox.tb_event = undefined;
-    var run = true;
     var inactivity_time_start = try interop.getTimeOfDay();
     var inactivity_cmd_ran = false;
-
-    // Switch to selected TTY
-    const active_tty = interop.getActiveTty(allocator, use_kmscon_vt) catch |err| no_tty_found: {
-        try info_line.addMessage(lang.err_get_active_tty, config.error_bg, config.error_fg);
-        try log_file.err("sys", "failed to get active tty: {s}", .{@errorName(err)});
-        break :no_tty_found build_options.fallback_tty;
-    };
-    if (!use_kmscon_vt) {
-        interop.switchTty(active_tty) catch |err| {
-            try info_line.addMessage(lang.err_switch_tty, config.error_bg, config.error_fg);
-            try log_file.err("sys", "failed to switch to tty {d}: {s}", .{ active_tty, @errorName(err) });
-        };
-    }
 
     if (config.initial_info_text) |text| {
         try info_line.addMessage(text, config.bg, config.fg);
@@ -853,7 +895,7 @@ pub fn main() !void {
         try info_line.addMessage(hostname, config.bg, config.fg);
     }
 
-    while (run) {
+    while (state.run) {
         if (state.update) {
             try updateComponents(&state);
 
@@ -935,6 +977,9 @@ pub fn main() !void {
             if (event_error < 0) continue;
         }
 
+        // Input of some kind was detected, so reset the inactivity timer
+        inactivity_time_start = try interop.getTimeOfDay();
+
         if (event.type == termbox.TB_EVENT_RESIZE) {
             state.buffer.width = TerminalBuffer.getWidthStatic();
             state.buffer.height = TerminalBuffer.getHeightStatic();
@@ -952,267 +997,414 @@ pub fn main() !void {
             continue;
         }
 
-        // Input of some kind was detected, so reset the inactivity timer
-        inactivity_time_start = try interop.getTimeOfDay();
+        const passthrough_event = try buffer.handleKeybind(
+            allocator,
+            event,
+            &state,
+        );
+        if (passthrough_event) {
+            switch (state.active_input) {
+                .info_line => info_line.label.handle(&event, state.insert_mode),
+                .session => session.label.handle(&event, state.insert_mode),
+                .login => login.label.handle(&event, state.insert_mode),
+                .password => password.handle(&event, state.insert_mode) catch {
+                    try info_line.addMessage(
+                        lang.err_alloc,
+                        config.error_bg,
+                        config.error_fg,
+                    );
+                },
+            }
 
-        switch (event.key) {
-            termbox.TB_KEY_ESC => {
-                if (config.vi_mode and state.insert_mode) {
-                    state.insert_mode = false;
-                    state.update = true;
-                }
-            },
-            termbox.TB_KEY_F12...termbox.TB_KEY_F1 => {
-                const pressed_key = 0xFFFF - event.key + 1;
-                if (pressed_key == shutdown_key) {
-                    shutdown = true;
-                    run = false;
-                } else if (pressed_key == restart_key) {
-                    restart = true;
-                    run = false;
-                } else if (pressed_key == sleep_key) {
-                    if (config.sleep_cmd) |sleep_cmd| {
-                        var sleep = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, allocator);
-                        sleep.stdout_behavior = .Ignore;
-                        sleep.stderr_behavior = .Ignore;
-
-                        handle_sleep_cmd: {
-                            const process_result = sleep.spawnAndWait() catch {
-                                break :handle_sleep_cmd;
-                            };
-                            if (process_result.Exited != 0) {
-                                try info_line.addMessage(lang.err_sleep, config.error_bg, config.error_fg);
-                                try log_file.err("sys", "failed to execute sleep command: exit code {d}", .{process_result.Exited});
-                            }
-                        }
-                    }
-                } else if (pressed_key == hibernate_key) {
-                    if (config.hibernate_cmd) |hibernate_cmd| {
-                        var hibernate = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", hibernate_cmd }, allocator);
-                        hibernate.stdout_behavior = .Ignore;
-                        hibernate.stderr_behavior = .Ignore;
-
-                        handle_hibernate_cmd: {
-                            const process_result = hibernate.spawnAndWait() catch {
-                                break :handle_hibernate_cmd;
-                            };
-                            if (process_result.Exited != 0) {
-                                try info_line.addMessage(lang.err_hibernate, config.error_bg, config.error_fg);
-                                try log_file.err("sys", "failed to execute hibernate command: exit code {d}", .{process_result.Exited});
-                            }
-                        }
-                    }
-                } else if (brightness_down_key != null and pressed_key == brightness_down_key.?) {
-                    adjustBrightness(allocator, config.brightness_down_cmd) catch |err| {
-                        try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
-                        try log_file.err("sys", "failed to change brightness: {s}", .{@errorName(err)});
-                    };
-                } else if (brightness_up_key != null and pressed_key == brightness_up_key.?) {
-                    adjustBrightness(allocator, config.brightness_up_cmd) catch |err| {
-                        try info_line.addMessage(lang.err_brightness_change, config.error_bg, config.error_fg);
-                        try log_file.err("sys", "failed to change brightness: {s}", .{@errorName(err)});
-                    };
-                }
-            },
-            termbox.TB_KEY_CTRL_C => run = false,
-            termbox.TB_KEY_CTRL_U => if (state.active_input == .password) {
-                password.clear();
-                state.update = true;
-            },
-            termbox.TB_KEY_CTRL_K, termbox.TB_KEY_ARROW_UP => {
-                state.active_input.move(true, false);
-                state.update = true;
-            },
-            termbox.TB_KEY_CTRL_J, termbox.TB_KEY_ARROW_DOWN => {
-                state.active_input.move(false, false);
-                state.update = true;
-            },
-            termbox.TB_KEY_TAB => {
-                state.active_input.move(false, true);
-                state.update = true;
-            },
-            termbox.TB_KEY_BACK_TAB => {
-                state.active_input.move(true, true);
-                state.update = true;
-            },
-            termbox.TB_KEY_ENTER => authenticate: {
-                try log_file.info("auth", "starting authentication", .{});
-
-                if (!config.allow_empty_password and password.text.items.len == 0) {
-                    // Let's not log this message for security reasons
-                    try info_line.addMessage(lang.err_empty_password, config.error_bg, config.error_fg);
-                    info_line.clearRendered(allocator) catch |err| {
-                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                        try log_file.err("tui", "failed to clear info line: {s}", .{@errorName(err)});
-                    };
-                    info_line.label.draw();
-                    _ = TerminalBuffer.presentBufferStatic();
-                    break :authenticate;
-                }
-
-                try info_line.addMessage(lang.authenticating, config.bg, config.fg);
-                info_line.clearRendered(allocator) catch |err| {
-                    try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    try log_file.err("tui", "failed to clear info line: {s}", .{@errorName(err)});
-                };
-                info_line.label.draw();
-                _ = TerminalBuffer.presentBufferStatic();
-
-                if (config.save) save_last_settings: {
-                    // It isn't worth cluttering the code with precise error
-                    // handling, so let's just report a generic error message,
-                    // that should be good enough for debugging anyway.
-                    errdefer log_file.err("conf", "failed to save current user data", .{}) catch {};
-
-                    var file = std.fs.cwd().createFile(save_path, .{}) catch |err| {
-                        log_file.err("sys", "failed to create save file: {s}", .{@errorName(err)}) catch break :save_last_settings;
-                        break :save_last_settings;
-                    };
-                    defer file.close();
-
-                    var file_buffer: [256]u8 = undefined;
-                    var file_writer = file.writer(&file_buffer);
-                    var writer = &file_writer.interface;
-
-                    try writer.print("{d}\n", .{login.label.current});
-                    for (saved_users.user_list.items) |user| {
-                        try writer.print("{s}:{d}\n", .{ user.username, user.session_index });
-                    }
-                    try writer.flush();
-
-                    // Delete previous save file if it exists
-                    if (migrator.maybe_save_file) |path| {
-                        std.fs.cwd().deleteFile(path) catch {};
-                    } else if (old_save_parser != null) {
-                        std.fs.cwd().deleteFile(old_save_path) catch {};
-                    }
-                }
-
-                var shared_err = try SharedError.init();
-                defer shared_err.deinit();
-
-                {
-                    log_file.deinit();
-
-                    session_pid = try std.posix.fork();
-                    if (session_pid == 0) {
-                        const current_environment = session.label.list.items[session.label.current].environment;
-
-                        // Use auto_login_service for autologin, otherwise use configured service
-                        const service_name = if (is_autologin) config.auto_login_service else config.service_name;
-                        const password_text = if (is_autologin) "" else password.text.items;
-
-                        const auth_options = auth.AuthOptions{
-                            .tty = active_tty,
-                            .service_name = service_name,
-                            .path = config.path,
-                            .session_log = config.session_log,
-                            .xauth_cmd = config.xauth_cmd,
-                            .setup_cmd = config.setup_cmd,
-                            .login_cmd = config.login_cmd,
-                            .x_cmd = config.x_cmd,
-                            .x_vt = config.x_vt,
-                            .session_pid = session_pid,
-                            .use_kmscon_vt = use_kmscon_vt,
-                        };
-
-                        // Signal action to give up control on the TTY
-                        const tty_control_transfer_act = std.posix.Sigaction{
-                            .handler = .{ .handler = &ttyControlTransferSignalHandler },
-                            .mask = std.posix.sigemptyset(),
-                            .flags = 0,
-                        };
-                        std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);
-
-                        try log_file.reinit();
-
-                        auth.authenticate(allocator, &log_file, auth_options, current_environment, login.getCurrentUsername(), password_text) catch |err| {
-                            shared_err.writeError(err);
-
-                            log_file.deinit();
-                            std.process.exit(1);
-                        };
-
-                        log_file.deinit();
-                        std.process.exit(0);
-                    }
-
-                    _ = std.posix.waitpid(session_pid, 0);
-                    // HACK: It seems like the session process is not exiting immediately after the waitpid call.
-                    // This is a workaround to ensure the session process has exited before re-initializing the TTY.
-                    std.Thread.sleep(std.time.ns_per_s * 1);
-                    session_pid = -1;
-
-                    try log_file.reinit();
-                }
-
-                try buffer.reclaim();
-
-                const auth_err = shared_err.readError();
-                if (auth_err) |err| {
-                    state.auth_fails += 1;
-                    state.active_input = .password;
-
-                    try info_line.addMessage(getAuthErrorMsg(err, lang), config.error_bg, config.error_fg);
-                    try log_file.err("auth", "failed to authenticate: {s}", .{@errorName(err)});
-
-                    if (config.clear_password or err != error.PamAuthError) password.clear();
-                } else {
-                    if (config.logout_cmd) |logout_cmd| {
-                        var logout_process = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", logout_cmd }, allocator);
-                        _ = logout_process.spawnAndWait() catch .{};
-                    }
-
-                    password.clear();
-                    is_autologin = false;
-                    try info_line.addMessage(lang.logout, config.bg, config.fg);
-                    try log_file.info("auth", "logged out", .{});
-                }
-
-                if (config.auth_fails == 0 or state.auth_fails < config.auth_fails) {
-                    try TerminalBuffer.clearScreenStatic(true);
-                    state.update = true;
-                }
-
-                // Restore the cursor
-                TerminalBuffer.setCursorStatic(0, 0);
-                _ = TerminalBuffer.presentBufferStatic();
-            },
-            else => {
-                if (!state.insert_mode) {
-                    switch (event.ch) {
-                        'k' => {
-                            state.active_input.move(true, false);
-                            state.update = true;
-                            continue;
-                        },
-                        'j' => {
-                            state.active_input.move(false, false);
-                            state.update = true;
-                            continue;
-                        },
-                        'i' => {
-                            state.insert_mode = true;
-                            state.update = true;
-                            continue;
-                        },
-                        else => {},
-                    }
-                }
-
-                switch (state.active_input) {
-                    .info_line => info_line.label.handle(&event, state.insert_mode),
-                    .session => session.label.handle(&event, state.insert_mode),
-                    .login => login.label.handle(&event, state.insert_mode),
-                    .password => password.handle(&event, state.insert_mode) catch {
-                        try info_line.addMessage(lang.err_alloc, config.error_bg, config.error_fg);
-                    },
-                }
-
-                state.update = true;
-            },
+            state.update = true;
         }
     }
+}
+
+fn disableInsertMode(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    if (state.config.vi_mode and state.insert_mode) {
+        state.insert_mode = false;
+        state.update = true;
+    }
+    return false;
+}
+
+fn enableInsertMode(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+    if (state.insert_mode) return true;
+
+    state.insert_mode = true;
+    state.update = true;
+    return false;
+}
+
+fn clearPassword(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    if (state.active_input == .password) {
+        state.password.clear();
+        state.update = true;
+    }
+    return false;
+}
+
+fn moveCursorUp(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    state.active_input.move(true, false);
+    state.update = true;
+    return false;
+}
+
+fn viMoseCursorUp(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+    if (state.insert_mode) return true;
+
+    state.active_input.move(false, false);
+    state.update = true;
+    return false;
+}
+
+fn moveCursorDown(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    state.active_input.move(false, false);
+    state.update = true;
+    return false;
+}
+
+fn viMoveCursorDown(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+    if (state.insert_mode) return true;
+
+    state.active_input.move(true, false);
+    state.update = true;
+    return false;
+}
+
+fn wrapCursor(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    state.active_input.move(false, true);
+    state.update = true;
+    return false;
+}
+
+fn wrapCursorReverse(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    state.active_input.move(true, true);
+    state.update = true;
+    return false;
+}
+
+fn quit(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    state.run = false;
+    return false;
+}
+
+fn authenticate(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    try state.log_file.info("auth", "starting authentication", .{});
+
+    if (!state.config.allow_empty_password and state.password.text.items.len == 0) {
+        // Let's not log this message for security reasons
+        try state.info_line.addMessage(
+            state.lang.err_empty_password,
+            state.config.error_bg,
+            state.config.error_fg,
+        );
+        state.info_line.clearRendered(state.allocator) catch |err| {
+            try state.info_line.addMessage(
+                state.lang.err_alloc,
+                state.config.error_bg,
+                state.config.error_fg,
+            );
+            try state.log_file.err(
+                "tui",
+                "failed to clear info line: {s}",
+                .{@errorName(err)},
+            );
+        };
+        state.info_line.label.draw();
+        _ = TerminalBuffer.presentBufferStatic();
+        return false;
+    }
+
+    try state.info_line.addMessage(
+        state.lang.authenticating,
+        state.config.bg,
+        state.config.fg,
+    );
+    state.info_line.clearRendered(state.allocator) catch |err| {
+        try state.info_line.addMessage(
+            state.lang.err_alloc,
+            state.config.error_bg,
+            state.config.error_fg,
+        );
+        try state.log_file.err(
+            "tui",
+            "failed to clear info line: {s}",
+            .{@errorName(err)},
+        );
+    };
+    state.info_line.label.draw();
+    _ = TerminalBuffer.presentBufferStatic();
+
+    if (state.config.save) save_last_settings: {
+        // It isn't worth cluttering the code with precise error
+        // handling, so let's just report a generic error message,
+        // that should be good enough for debugging anyway.
+        errdefer state.log_file.err(
+            "conf",
+            "failed to save current user data",
+            .{},
+        ) catch {};
+
+        var file = std.fs.cwd().createFile(state.save_path, .{}) catch |err| {
+            state.log_file.err(
+                "sys",
+                "failed to create save file: {s}",
+                .{@errorName(err)},
+            ) catch break :save_last_settings;
+            break :save_last_settings;
+        };
+        defer file.close();
+
+        var file_buffer: [256]u8 = undefined;
+        var file_writer = file.writer(&file_buffer);
+        var writer = &file_writer.interface;
+
+        try writer.print("{d}\n", .{state.login.label.current});
+        for (state.saved_users.user_list.items) |user| {
+            try writer.print("{s}:{d}\n", .{ user.username, user.session_index });
+        }
+        try writer.flush();
+
+        // Delete previous save file if it exists
+        if (migrator.maybe_save_file) |path| {
+            std.fs.cwd().deleteFile(path) catch {};
+        } else if (state.old_save_path) |path| {
+            std.fs.cwd().deleteFile(path) catch {};
+        }
+    }
+
+    var shared_err = try SharedError.init();
+    defer shared_err.deinit();
+
+    {
+        state.log_file.deinit();
+
+        session_pid = try std.posix.fork();
+        if (session_pid == 0) {
+            const current_environment = state.session.label.list.items[state.session.label.current].environment;
+
+            // Use auto_login_service for autologin, otherwise use configured service
+            const service_name = if (state.is_autologin) state.config.auto_login_service else state.config.service_name;
+            const password_text = if (state.is_autologin) "" else state.password.text.items;
+
+            const auth_options = auth.AuthOptions{
+                .tty = state.active_tty,
+                .service_name = service_name,
+                .path = state.config.path,
+                .session_log = state.config.session_log,
+                .xauth_cmd = state.config.xauth_cmd,
+                .setup_cmd = state.config.setup_cmd,
+                .login_cmd = state.config.login_cmd,
+                .x_cmd = state.config.x_cmd,
+                .x_vt = state.config.x_vt,
+                .session_pid = session_pid,
+                .use_kmscon_vt = state.use_kmscon_vt,
+            };
+
+            // Signal action to give up control on the TTY
+            const tty_control_transfer_act = std.posix.Sigaction{
+                .handler = .{ .handler = &ttyControlTransferSignalHandler },
+                .mask = std.posix.sigemptyset(),
+                .flags = 0,
+            };
+            std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);
+
+            try state.log_file.reinit();
+
+            auth.authenticate(
+                state.allocator,
+                state.log_file,
+                auth_options,
+                current_environment,
+                state.login.getCurrentUsername(),
+                password_text,
+            ) catch |err| {
+                shared_err.writeError(err);
+
+                state.log_file.deinit();
+                std.process.exit(1);
+            };
+
+            state.log_file.deinit();
+            std.process.exit(0);
+        }
+
+        _ = std.posix.waitpid(session_pid, 0);
+        // HACK: It seems like the session process is not exiting immediately after the waitpid call.
+        // This is a workaround to ensure the session process has exited before re-initializing the TTY.
+        std.Thread.sleep(std.time.ns_per_s * 1);
+        session_pid = -1;
+
+        try state.log_file.reinit();
+    }
+
+    try state.buffer.reclaim();
+
+    const auth_err = shared_err.readError();
+    if (auth_err) |err| {
+        state.auth_fails += 1;
+        state.active_input = .password;
+
+        try state.info_line.addMessage(
+            getAuthErrorMsg(err, state.lang),
+            state.config.error_bg,
+            state.config.error_fg,
+        );
+        try state.log_file.err(
+            "auth",
+            "failed to authenticate: {s}",
+            .{@errorName(err)},
+        );
+
+        if (state.config.clear_password or err != error.PamAuthError) state.password.clear();
+    } else {
+        if (state.config.logout_cmd) |logout_cmd| {
+            var logout_process = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", logout_cmd }, state.allocator);
+            _ = logout_process.spawnAndWait() catch .{};
+        }
+
+        state.password.clear();
+        state.is_autologin = false;
+        try state.info_line.addMessage(
+            state.lang.logout,
+            state.config.bg,
+            state.config.fg,
+        );
+        try state.log_file.info("auth", "logged out", .{});
+    }
+
+    if (state.config.auth_fails == 0 or state.auth_fails < state.config.auth_fails) {
+        try TerminalBuffer.clearScreenStatic(true);
+        state.update = true;
+    }
+
+    // Restore the cursor
+    TerminalBuffer.setCursorStatic(0, 0);
+    _ = TerminalBuffer.presentBufferStatic();
+    return false;
+}
+
+fn shutdownCmd(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    shutdown = true;
+    state.run = false;
+    return false;
+}
+
+fn restartCmd(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    restart = true;
+    state.run = false;
+    return false;
+}
+
+fn sleepCmd(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    if (state.config.sleep_cmd) |sleep_cmd| {
+        var sleep = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, state.allocator);
+        sleep.stdout_behavior = .Ignore;
+        sleep.stderr_behavior = .Ignore;
+
+        const process_result = sleep.spawnAndWait() catch return false;
+        if (process_result.Exited != 0) {
+            try state.info_line.addMessage(
+                state.lang.err_sleep,
+                state.config.error_bg,
+                state.config.error_fg,
+            );
+            try state.log_file.err(
+                "sys",
+                "failed to execute sleep command: exit code {d}",
+                .{process_result.Exited},
+            );
+        }
+    }
+    return false;
+}
+
+fn hibernateCmd(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    if (state.config.hibernate_cmd) |hibernate_cmd| {
+        var hibernate = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", hibernate_cmd }, state.allocator);
+        hibernate.stdout_behavior = .Ignore;
+        hibernate.stderr_behavior = .Ignore;
+
+        const process_result = hibernate.spawnAndWait() catch return false;
+        if (process_result.Exited != 0) {
+            try state.info_line.addMessage(
+                state.lang.err_hibernate,
+                state.config.error_bg,
+                state.config.error_fg,
+            );
+            try state.log_file.err(
+                "sys",
+                "failed to execute hibernate command: exit code {d}",
+                .{process_result.Exited},
+            );
+        }
+    }
+    return false;
+}
+
+fn decreaseBrightnessCmd(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    adjustBrightness(state.allocator, state.config.brightness_down_cmd) catch |err| {
+        try state.info_line.addMessage(
+            state.lang.err_brightness_change,
+            state.config.error_bg,
+            state.config.error_fg,
+        );
+        try state.log_file.err(
+            "sys",
+            "failed to decrease brightness: {s}",
+            .{@errorName(err)},
+        );
+    };
+    return false;
+}
+
+fn increaseBrightnessCmd(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    adjustBrightness(state.allocator, state.config.brightness_up_cmd) catch |err| {
+        try state.info_line.addMessage(
+            state.lang.err_brightness_change,
+            state.config.error_bg,
+            state.config.error_fg,
+        );
+        try state.log_file.err(
+            "sys",
+            "failed to increase brightness: {s}",
+            .{@errorName(err)},
+        );
+    };
+    return false;
 }
 
 fn updateComponents(state: *UiState) !void {
@@ -1559,7 +1751,7 @@ fn findSessionByName(session: *Session, name: []const u8) ?usize {
     return null;
 }
 
-fn getAllUsernames(allocator: std.mem.Allocator, login_defs_path: []const u8, uid_range_error: *?anyerror) !StringList {
+fn getAllUsernames(allocator: Allocator, login_defs_path: []const u8, uid_range_error: *?anyerror) !StringList {
     const uid_range = interop.getUserIdRange(allocator, login_defs_path) catch |err| no_uid_range: {
         uid_range_error.* = err;
         break :no_uid_range UidRange{
@@ -1606,18 +1798,14 @@ fn getAllUsernames(allocator: std.mem.Allocator, login_defs_path: []const u8, ui
     return usernames;
 }
 
-fn adjustBrightness(allocator: std.mem.Allocator, cmd: []const u8) !void {
+fn adjustBrightness(allocator: Allocator, cmd: []const u8) !void {
     var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", cmd }, allocator);
     brightness.stdout_behavior = .Ignore;
     brightness.stderr_behavior = .Ignore;
 
-    handle_brightness_cmd: {
-        const process_result = brightness.spawnAndWait() catch {
-            break :handle_brightness_cmd;
-        };
-        if (process_result.Exited != 0) {
-            return error.BrightnessChangeFailed;
-        }
+    const process_result = brightness.spawnAndWait() catch return;
+    if (process_result.Exited != 0) {
+        return error.BrightnessChangeFailed;
     }
 }
 
