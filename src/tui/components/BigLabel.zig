@@ -140,7 +140,7 @@ pub fn childrenPosition(self: BigLabel) Position {
     return self.children_pos;
 }
 
-pub fn draw(self: *BigLabel) void {
+fn draw(self: *BigLabel) void {
     for (self.text, 0..) |c, i| {
         const clock_cell = clockCell(
             c,
@@ -159,7 +159,7 @@ pub fn draw(self: *BigLabel) void {
     }
 }
 
-pub fn update(self: *BigLabel, context: *anyopaque) !void {
+fn update(self: *BigLabel, context: *anyopaque) !void {
     if (self.update_fn) |update_fn| {
         return @call(
             .auto,

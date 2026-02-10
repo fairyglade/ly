@@ -172,19 +172,29 @@ pub fn presentBuffer() void {
     _ = termbox.tb_present();
 }
 
-pub fn setCell(
-    x: usize,
-    y: usize,
-    ch: u32,
-    fg: u32,
-    bg: u32,
-) void {
+pub fn getCell(x: usize, y: usize) ?Cell {
+    var maybe_cell: ?*termbox.tb_cell = undefined;
+    _ = termbox.tb_get_cell(
+        @intCast(x),
+        @intCast(y),
+        1,
+        &maybe_cell,
+    );
+
+    if (maybe_cell) |cell| {
+        return Cell.init(cell.ch, cell.fg, cell.bg);
+    }
+
+    return null;
+}
+
+pub fn setCell(x: usize, y: usize, cell: Cell) void {
     _ = termbox.tb_set_cell(
         @intCast(x),
         @intCast(y),
-        ch,
-        fg,
-        bg,
+        cell.ch,
+        cell.fg,
+        cell.bg,
     );
 }
 
@@ -199,40 +209,6 @@ pub fn reclaim(self: TerminalBuffer) !void {
 
         try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, termios);
     }
-}
-
-pub fn cascade(self: TerminalBuffer) bool {
-    var changed = false;
-    var y = self.height - 2;
-
-    while (y > 0) : (y -= 1) {
-        for (0..self.width) |x| {
-            var cell: ?*termbox.tb_cell = undefined;
-            var cell_under: ?*termbox.tb_cell = undefined;
-
-            _ = termbox.tb_get_cell(@intCast(x), @intCast(y - 1), 1, &cell);
-            _ = termbox.tb_get_cell(@intCast(x), @intCast(y), 1, &cell_under);
-
-            // This shouldn't happen under normal circumstances, but because
-            // this is a *secret* animation, there's no need to care that much
-            if (cell == null or cell_under == null) continue;
-
-            const char: u8 = @truncate(cell.?.ch);
-            if (std.ascii.isWhitespace(char)) continue;
-
-            const char_under: u8 = @truncate(cell_under.?.ch);
-            if (!std.ascii.isWhitespace(char_under)) continue;
-
-            changed = true;
-
-            if ((self.random.int(u16) % 10) > 7) continue;
-
-            _ = termbox.tb_set_cell(@intCast(x), @intCast(y), cell.?.ch, cell.?.fg, cell.?.bg);
-            _ = termbox.tb_set_cell(@intCast(x), @intCast(y - 1), ' ', cell_under.?.fg, cell_under.?.bg);
-        }
-    }
-
-    return changed;
 }
 
 pub fn registerKeybind(self: *TerminalBuffer, keybind: []const u8, callback: KeybindCallbackFn) !void {

@@ -26,11 +26,20 @@ fg_color: u32,
 entropy_interval: usize,
 frame_delay: usize,
 initial_density: f32,
+timeout: *bool,
 dead_cell: Cell,
 width: usize,
 height: usize,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_color: u32, entropy_interval: usize, frame_delay: usize, initial_density: f32) !GameOfLife {
+pub fn init(
+    allocator: Allocator,
+    terminal_buffer: *TerminalBuffer,
+    fg_color: u32,
+    entropy_interval: usize,
+    frame_delay: usize,
+    initial_density: f32,
+    timeout: *bool,
+) !GameOfLife {
     const width = terminal_buffer.width;
     const height = terminal_buffer.height;
     const grid_size = width * height;
@@ -49,6 +58,7 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg_color: u3
         .entropy_interval = entropy_interval,
         .frame_delay = frame_delay,
         .initial_density = initial_density,
+        .timeout = timeout,
         .dead_cell = .{ .ch = DEAD_CHAR, .fg = @intCast(TerminalBuffer.Color.DEFAULT), .bg = terminal_buffer.bg },
         .width = width,
         .height = height,
@@ -94,6 +104,8 @@ fn realloc(self: *GameOfLife) !void {
 }
 
 fn draw(self: *GameOfLife) void {
+    if (self.timeout.*) return;
+
     // Update game state at controlled frame rate
     self.frame_counter += 1;
     if (self.frame_counter >= self.frame_delay) {

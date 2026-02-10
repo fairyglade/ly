@@ -56,14 +56,6 @@ pub fn widget(self: *InfoLine) Widget {
     );
 }
 
-pub fn draw(self: *InfoLine) void {
-    self.label.draw();
-}
-
-pub fn handle(self: *InfoLine, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
-    self.label.handle(maybe_key, insert_mode);
-}
-
 pub fn addMessage(self: *InfoLine, text: []const u8, bg: u32, fg: u32) !void {
     if (text.len == 0) return;
 
@@ -89,6 +81,14 @@ pub fn clearRendered(self: InfoLine, allocator: Allocator) !void {
         TerminalBuffer.Color.DEFAULT,
         TerminalBuffer.Color.DEFAULT,
     );
+}
+
+fn draw(self: *InfoLine) void {
+    self.label.draw();
+}
+
+fn handle(self: *InfoLine, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
+    self.label.handle(maybe_key, insert_mode);
 }
 
 fn drawItem(label: *MessageLabel, message: Message, x: usize, y: usize, width: usize) void {

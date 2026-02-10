@@ -17,14 +17,22 @@ fn length(vec: Vec2) f32 {
 }
 
 terminal_buffer: *TerminalBuffer,
+timeout: *bool,
 frames: u64,
 pattern_cos_mod: f32,
 pattern_sin_mod: f32,
 palette: [palette_len]Cell,
 
-pub fn init(terminal_buffer: *TerminalBuffer, col1: u32, col2: u32, col3: u32) ColorMix {
+pub fn init(
+    terminal_buffer: *TerminalBuffer,
+    col1: u32,
+    col2: u32,
+    col3: u32,
+    timeout: *bool,
+) ColorMix {
     return .{
         .terminal_buffer = terminal_buffer,
+        .timeout = timeout,
         .frames = 0,
         .pattern_cos_mod = terminal_buffer.random.float(f32) * math.pi * 2.0,
         .pattern_sin_mod = terminal_buffer.random.float(f32) * math.pi * 2.0,
@@ -57,6 +65,8 @@ pub fn widget(self: *ColorMix) Widget {
 }
 
 fn draw(self: *ColorMix) void {
+    if (self.timeout.*) return;
+
     self.frames +%= 1;
     const time: f32 = @as(f32, @floatFromInt(self.frames)) * time_scale;
 

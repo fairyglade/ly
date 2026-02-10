@@ -34,9 +34,18 @@ fg: u32,
 head_col: u32,
 min_codepoint: u16,
 max_codepoint: u16,
+timeout: *bool,
 default_cell: Cell,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg: u32, head_col: u32, min_codepoint: u16, max_codepoint: u16) !Matrix {
+pub fn init(
+    allocator: Allocator,
+    terminal_buffer: *TerminalBuffer,
+    fg: u32,
+    head_col: u32,
+    min_codepoint: u16,
+    max_codepoint: u16,
+    timeout: *bool,
+) !Matrix {
     const dots = try allocator.alloc(Dot, terminal_buffer.width * (terminal_buffer.height + 1));
     const lines = try allocator.alloc(Line, terminal_buffer.width);
 
@@ -53,6 +62,7 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, fg: u32, hea
         .head_col = head_col,
         .min_codepoint = min_codepoint,
         .max_codepoint = max_codepoint - min_codepoint,
+        .timeout = timeout,
         .default_cell = .{ .ch = ' ', .fg = fg, .bg = terminal_buffer.bg },
     };
 }
@@ -84,6 +94,8 @@ fn realloc(self: *Matrix) !void {
 }
 
 fn draw(self: *Matrix) void {
+    if (self.timeout.*) return;
+
     const buf_height = self.terminal_buffer.height;
     const buf_width = self.terminal_buffer.width;
     self.count += 1;

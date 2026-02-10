@@ -307,6 +307,7 @@ frames: u64,
 frame_size: UVec2,
 start_pos: IVec2,
 full_color: bool,
+timeout: *bool,
 frame_time: u32,
 time_previous: i64,
 is_color_format_16: bool,
@@ -357,7 +358,17 @@ fn calc_frame_size(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat) UVec
     return .{ frame_width, frame_height };
 }
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_file: *LogFile, file_path: []const u8, offset_alignment: DurOffsetAlignment, x_offset: i32, y_offset: i32, full_color: bool) !DurFile {
+pub fn init(
+    allocator: Allocator,
+    terminal_buffer: *TerminalBuffer,
+    log_file: *LogFile,
+    file_path: []const u8,
+    offset_alignment: DurOffsetAlignment,
+    x_offset: i32,
+    y_offset: i32,
+    full_color: bool,
+    timeout: *bool,
+) !DurFile {
     var dur_movie: DurFormat = .init(allocator);
 
     dur_movie.create_from_file(allocator, file_path) catch |err| switch (err) {
@@ -395,6 +406,7 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, log_file: *L
         .frame_size = frame_size,
         .start_pos = start_pos,
         .full_color = full_color,
+        .timeout = timeout,
         .dur_movie = dur_movie,
         .frame_time = frame_time,
         .is_color_format_16 = eql(u8, dur_movie.colorFormat.?, "16"),
@@ -425,6 +437,8 @@ fn realloc(self: *DurFile) !void {
 }
 
 fn draw(self: *DurFile) void {
+    if (self.timeout.*) return;
+
     const current_frame = self.dur_movie.frames.items[self.frames];
 
     const buf_width: u32 = @intCast(self.terminal_buffer.width);

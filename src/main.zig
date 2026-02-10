@@ -15,6 +15,7 @@ const LogFile = ly_core.LogFile;
 const SharedError = ly_core.SharedError;
 const IniParser = ly_core.IniParser;
 
+const Cascade = @import("animations/Cascade.zig");
 const ColorMix = @import("animations/ColorMix.zig");
 const Doom = @import("animations/Doom.zig");
 const DurFile = @import("animations/DurFile.zig");
@@ -74,7 +75,6 @@ const UiState = struct {
     buffer: TerminalBuffer,
     labels_max_length: usize,
     animation_timed_out: bool,
-    animation: ?Widget,
     shutdown_label: Label,
     restart_label: Label,
     sleep_label: Label,
@@ -517,6 +517,7 @@ pub fn main() !void {
         state.buffer.border_fg,
         state.buffer.fg,
         state.buffer.bg,
+        &updateBox,
     );
 
     state.info_line = InfoLine.init(
@@ -867,10 +868,9 @@ pub fn main() !void {
     }
 
     // Initialize the animation, if any
+    var animation: ?Widget = null;
     switch (state.config.animation) {
-        .none => {
-            state.animation = null;
-        },
+        .none => {},
         .doom => {
             var doom = try Doom.init(
                 state.allocator,
@@ -880,8 +880,9 @@ pub fn main() !void {
                 state.config.doom_bottom_color,
                 state.config.doom_fire_height,
                 state.config.doom_fire_spread,
+                &state.animation_timed_out,
             );
-            state.animation = doom.widget();
+            animation = doom.widget();
         },
         .matrix => {
             var matrix = try Matrix.init(
@@ -891,8 +892,9 @@ pub fn main() !void {
                 state.config.cmatrix_head_col,
                 state.config.cmatrix_min_codepoint,
                 state.config.cmatrix_max_codepoint,
+                &state.animation_timed_out,
             );
-            state.animation = matrix.widget();
+            animation = matrix.widget();
         },
         .colormix => {
             var color_mix = ColorMix.init(
@@ -900,8 +902,9 @@ pub fn main() !void {
                 state.config.colormix_col1,
                 state.config.colormix_col2,
                 state.config.colormix_col3,
+                &state.animation_timed_out,
             );
-            state.animation = color_mix.widget();
+            animation = color_mix.widget();
         },
         .gameoflife => {
             var game_of_life = try GameOfLife.init(
@@ -911,8 +914,9 @@ pub fn main() !void {
                 state.config.gameoflife_entropy_interval,
                 state.config.gameoflife_frame_delay,
                 state.config.gameoflife_initial_density,
+                &state.animation_timed_out,
             );
-            state.animation = game_of_life.widget();
+            animation = game_of_life.widget();
         },
         .dur_file => {
             var dur = try DurFile.init(
@@ -924,11 +928,18 @@ pub fn main() !void {
                 state.config.dur_x_offset,
                 state.config.dur_y_offset,
                 state.config.full_color,
+                &state.animation_timed_out,
             );
-            state.animation = dur.widget();
+            animation = dur.widget();
         },
     }
-    defer if (state.animation) |*a| a.deinit();
+    defer if (animation) |*a| a.deinit();
+
+    var cascade = Cascade.init(
+        &state.buffer,
+        &state.auth_fails,
+        state.config.auth_fails,
+    );
 
     state.auth_fails = 0;
     state.run = true;
@@ -966,9 +977,14 @@ pub fn main() !void {
         }
     }
 
+    // TODO: Layer system where we can put widgets in specific layers (to
+    // allow certain widgets to be below or above others, like animations)
     var widgets: std.ArrayList(Widget) = .empty;
     defer widgets.deinit(state.allocator);
 
+    if (animation) |a| {
+        try widgets.append(state.allocator, a);
+    }
     if (!state.config.hide_key_hints) {
         try widgets.append(state.allocator, state.shutdown_label.widget());
         try widgets.append(state.allocator, state.restart_label.widget());
@@ -1006,9 +1022,12 @@ pub fn main() !void {
     if (!state.config.hide_version_string) {
         try widgets.append(state.allocator, state.version_label.widget());
     }
+    if (state.config.auth_fails > 0) {
+        try widgets.append(state.allocator, cascade.widget());
+    }
 
     // Position components and place cursor accordingly
-    try updateComponents(&state, widgets);
+    for (widgets.items) |*widget| try widget.update(&state);
     positionComponents(&state);
 
     switch (state.active_input) {
@@ -1085,9 +1104,11 @@ pub fn main() !void {
         );
     }
 
+    if (state.is_autologin) _ = try authenticate(&state);
+
     while (state.run) {
         if (state.update) {
-            try updateComponents(&state, widgets);
+            for (widgets.items) |*widget| try widget.update(&state);
 
             switch (state.active_input) {
                 .info_line => state.info_line.label.handle(null, state.insert_mode),
@@ -1099,7 +1120,11 @@ pub fn main() !void {
                 },
             }
 
-            if (!try drawUi(&state, widgets)) continue;
+            try TerminalBuffer.clearScreen(false);
+
+            for (widgets.items) |*widget| widget.draw();
+
+            TerminalBuffer.presentBuffer();
         }
 
         var timeout: i32 = -1;
@@ -1113,7 +1138,7 @@ pub fn main() !void {
 
             if (state.config.animation_timeout_sec > 0 and time.seconds - animation_time_start.seconds > state.config.animation_timeout_sec) {
                 state.animation_timed_out = true;
-                if (state.animation) |*a| a.deinit();
+                if (animation) |*a| a.deinit();
             }
         } else if (state.config.bigclock != .none and state.config.clock == null) {
             const time = try interop.getTimeOfDay();
@@ -1155,25 +1180,11 @@ pub fn main() !void {
             }
         }
 
-        // Skip event polling if autologin is set, use simulated Enter key press instead
-        if (state.is_autologin) {
-            event = .{
-                .type = termbox.TB_EVENT_KEY,
-                .key = termbox.TB_KEY_ENTER,
-                .ch = 0,
-                .w = 0,
-                .h = 0,
-                .x = 0,
-                .y = 0,
-                .mod = 0,
-            };
-        } else {
-            const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
+        const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
 
-            state.update = timeout != -1;
+        state.update = timeout != -1;
 
-            if (event_error < 0) continue;
-        }
+        if (event_error < 0) continue;
 
         // Input of some kind was detected, so reset the inactivity timer
         inactivity_time_start = try interop.getTimeOfDay();
@@ -1184,7 +1195,7 @@ pub fn main() !void {
 
             try state.log_file.info("tui", "screen resolution updated to {d}x{d}", .{ state.buffer.width, state.buffer.height });
 
-            if (state.animation) |*a| a.realloc() catch |err| {
+            if (animation) |*a| a.realloc() catch |err| {
                 try state.info_line.addMessage(
                     state.lang.err_alloc,
                     state.config.error_bg,
@@ -1196,6 +1207,21 @@ pub fn main() !void {
                     .{@errorName(err)},
                 );
             };
+
+            for (widgets.items) |*widget| {
+                widget.realloc() catch |err| {
+                    try state.info_line.addMessage(
+                        state.lang.err_alloc,
+                        state.config.error_bg,
+                        state.config.error_fg,
+                    );
+                    try state.log_file.err(
+                        "tui",
+                        "failed to reallocate widget: {s}",
+                        .{@errorName(err)},
+                    );
+                };
+            }
 
             positionComponents(&state);
 
@@ -1617,43 +1643,6 @@ fn increaseBrightnessCmd(ptr: *anyopaque) !bool {
     return false;
 }
 
-fn updateComponents(state: *UiState, widgets: std.ArrayList(Widget)) !void {
-    for (widgets.items) |*widget| {
-        try widget.update(state);
-    }
-}
-
-fn drawUi(state: *UiState, widgets: std.ArrayList(Widget)) !bool {
-    // If the user entered a wrong password 10 times in a row, play a cascade animation, else update normally
-    if (state.config.auth_fails > 0 and state.auth_fails >= state.config.auth_fails) {
-        std.Thread.sleep(std.time.ns_per_ms * 10);
-        state.update = state.buffer.cascade();
-
-        if (!state.update) {
-            std.Thread.sleep(std.time.ns_per_s * 7);
-            state.auth_fails = 0;
-        }
-
-        TerminalBuffer.presentBuffer();
-        return false;
-    }
-
-    try TerminalBuffer.clearScreen(false);
-
-    if (!state.animation_timed_out) if (state.animation) |*a| a.draw();
-
-    for (widgets.items) |*widget| {
-        widget.draw();
-    }
-
-    if (state.config.vi_mode) {
-        state.box.bottom_title = if (state.insert_mode) state.lang.insert else state.lang.normal;
-    }
-
-    TerminalBuffer.presentBuffer();
-    return true;
-}
-
 fn updateNumlock(self: *Label, ptr: *anyopaque) !void {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
@@ -1763,6 +1752,14 @@ fn updateBigClock(self: *BigLabel, ptr: *anyopaque) !void {
 
     const clock_str = interop.timeAsString(&state.bigclock_buf, format);
     self.setText(clock_str);
+}
+
+fn updateBox(self: *CenteredBox, ptr: *anyopaque) !void {
+    const state: *UiState = @ptrCast(@alignCast(ptr));
+
+    if (state.config.vi_mode) {
+        self.bottom_title = if (state.insert_mode) state.lang.insert else state.lang.normal;
+    }
 }
 
 fn updateSessionSpecifier(self: *Label, ptr: *anyopaque) !void {

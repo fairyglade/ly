@@ -19,6 +19,7 @@ bottom_title: ?[]const u8,
 border_fg: u32,
 title_fg: u32,
 bg: u32,
+update_fn: ?*const fn (*CenteredBox, *anyopaque) anyerror!void,
 left_pos: Position,
 right_pos: Position,
 children_pos: Position,
@@ -36,6 +37,7 @@ pub fn init(
     border_fg: u32,
     title_fg: u32,
     bg: u32,
+    update_fn: ?*const fn (*CenteredBox, *anyopaque) anyerror!void,
 ) CenteredBox {
     return .{
         .buffer = buffer,
@@ -50,6 +52,7 @@ pub fn init(
         .border_fg = border_fg,
         .title_fg = title_fg,
         .bg = bg,
+        .update_fn = update_fn,
         .left_pos = TerminalBuffer.START_POSITION,
         .right_pos = TerminalBuffer.START_POSITION,
         .children_pos = TerminalBuffer.START_POSITION,
@@ -90,7 +93,7 @@ pub fn childrenPosition(self: CenteredBox) Position {
     return self.children_pos;
 }
 
-pub fn draw(self: *CenteredBox) void {
+fn draw(self: *CenteredBox) void {
     if (self.show_borders) {
         var left_up = Cell.init(
             self.buffer.box_chars.left_up,
@@ -169,6 +172,16 @@ pub fn draw(self: *CenteredBox) void {
             self.width,
             self.title_fg,
             self.bg,
+        );
+    }
+}
+
+fn update(self: *CenteredBox, ctx: *anyopaque) !void {
+    if (self.update_fn) |update_fn| {
+        return @call(
+            .auto,
+            update_fn,
+            .{ self, ctx },
         );
     }
 }

@@ -66,19 +66,19 @@ pub fn widget(self: *Session) Widget {
     );
 }
 
-pub fn draw(self: *Session) void {
-    self.label.draw();
-}
-
-pub fn handle(self: *Session, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
-    self.label.handle(maybe_key, insert_mode);
-}
-
 pub fn addEnvironment(self: *Session, environment: Environment) !void {
     const env = Env{ .environment = environment, .index = self.label.list.items.len };
 
     try self.label.addItem(env);
     addedSession(env, self.user_list);
+}
+
+fn draw(self: *Session) void {
+    self.label.draw();
+}
+
+fn handle(self: *Session, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
+    self.label.handle(maybe_key, insert_mode);
 }
 
 fn addedSession(env: Env, user_list: *UserList) void {

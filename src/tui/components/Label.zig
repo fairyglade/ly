@@ -98,7 +98,7 @@ pub fn childrenPosition(self: Label) Position {
     return self.children_pos;
 }
 
-pub fn draw(self: *Label) void {
+fn draw(self: *Label) void {
     if (self.max_width) |width| {
         TerminalBuffer.drawConfinedText(
             self.text,
@@ -120,7 +120,7 @@ pub fn draw(self: *Label) void {
     );
 }
 
-pub fn update(self: *Label, ctx: *anyopaque) !void {
+fn update(self: *Label, ctx: *anyopaque) !void {
     if (self.update_fn) |update_fn| {
         return @call(
             .auto,

@@ -13,12 +13,22 @@ pub const SPREAD_MAX = 4;
 
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
+timeout: *bool,
 buffer: []u8,
 height: u8,
 spread: u8,
 fire: [STEPS + 1]Cell,
 
-pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u32, middle_color: u32, bottom_color: u32, fire_height: u8, fire_spread: u8) !Doom {
+pub fn init(
+    allocator: Allocator,
+    terminal_buffer: *TerminalBuffer,
+    top_color: u32,
+    middle_color: u32,
+    bottom_color: u32,
+    fire_height: u8,
+    fire_spread: u8,
+    timeout: *bool,
+) !Doom {
     const buffer = try allocator.alloc(u8, terminal_buffer.width * terminal_buffer.height);
     initBuffer(buffer, terminal_buffer.width);
 
@@ -42,6 +52,7 @@ pub fn init(allocator: Allocator, terminal_buffer: *TerminalBuffer, top_color: u
     return .{
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
+        .timeout = timeout,
         .buffer = buffer,
         .height = @min(HEIGHT_MAX, fire_height),
         .spread = @min(SPREAD_MAX, fire_spread),
@@ -71,6 +82,8 @@ fn realloc(self: *Doom) !void {
 }
 
 fn draw(self: *Doom) void {
+    if (self.timeout.*) return;
+
     for (0..self.terminal_buffer.width) |x| {
         // We start from 1 so that we always have the topmost line when spreading fire
         for (1..self.terminal_buffer.height) |y| {

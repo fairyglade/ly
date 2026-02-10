@@ -87,6 +87,13 @@ pub fn childrenPosition(self: Text) Position {
     return self.children_pos;
 }
 
+pub fn clear(self: *Text) void {
+    self.text.clearRetainingCapacity();
+    self.end = 0;
+    self.cursor = 0;
+    self.visible_start = 0;
+}
+
 pub fn handle(self: *Text, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
     if (maybe_key) |key| {
         if (key.left or (!insert_mode and (key.h or key.backspace))) {
@@ -117,7 +124,7 @@ pub fn handle(self: *Text, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
     );
 }
 
-pub fn draw(self: *Text) void {
+fn draw(self: *Text) void {
     if (self.masked) {
         if (self.maybe_mask) |mask| {
             if (self.width < 1) return;
@@ -156,13 +163,6 @@ pub fn draw(self: *Text) void {
         self.fg,
         self.bg,
     );
-}
-
-pub fn clear(self: *Text) void {
-    self.text.clearRetainingCapacity();
-    self.end = 0;
-    self.cursor = 0;
-    self.visible_start = 0;
 }
 
 fn goLeft(self: *Text) void {

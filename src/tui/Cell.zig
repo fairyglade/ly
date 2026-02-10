@@ -17,5 +17,5 @@ pub fn init(ch: u32, fg: u32, bg: u32) Cell {
 pub fn put(self: Cell, x: usize, y: usize) void {
     if (self.ch == 0) return;
 
-    TerminalBuffer.setCell(x, y, self.ch, self.fg, self.bg);
+    TerminalBuffer.setCell(x, y, self);
 }
