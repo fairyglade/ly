@@ -312,7 +312,7 @@ pub fn main() !void {
 
     if (state.config.start_cmd) |start_cmd| {
         var start = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", start_cmd }, state.allocator);
-        start.stdout_behavior = .Ignore;
+        start.stdout_behavior = .Inherit;
         start.stderr_behavior = .Ignore;
 
         handle_start_cmd: {

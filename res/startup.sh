@@ -7,32 +7,34 @@
 # Colors are in red/green/blue hex (the current colors are a brighter palette than default)
 #
 #if [ "$TERM" = "linux" ]; then
-#	declare -a colors=(
-#		[0]="232323"  # black
-#		[1]="D75F5F"  # dark red
-#		[2]="87AF5F"  # dark green
-#		[3]="D7AF87"  # dark yellow
-#		[4]="8787AF"  # dark blue
-#		[5]="BD53A5"  # dark magenta
-#		[6]="5FAFAF"  # dark cyan
-#		[7]="E5E5E5"  # light gray
-#		[8]="2B2B2B"  # dark gray
-#		[9]="E33636"  # red
-#		[10]="98E34D" # green
-#		[11]="FFD75F" # yellow
-#		[12]="7373C9" # blue
-#		[13]="D633B2" # magenta
-#		[14]="44C9C9" # cyan
-#		[15]="FFFFFF" # white
-#	)
+#	BLACK="232323"
+#	DARK_RED="D75F5F"
+#	DARK_GREEN="87AF5F"
+#	DARK_YELLOW="D7AF87"
+#	DARK_BLUE="8787AF"
+#	DARK_MAGENTA="BD53A5"
+#	DARK_CYAN="5FAFAF"
+#	LIGHT_GRAY="E5E5E5"
+#	DARK_GRAY="2B2B2B"
+#	RED="E33636"
+#	GREEN="98E34D"
+#	YELLOW="FFD75F"
+#	BLUE="7373C9"
+#	MAGENTA="D633B2"
+#	CYAN="44C9C9"
+#	WHITE="FFFFFF"
+#	
+#	COLORS="${BLACK} ${DARK_RED} ${DARK_GREEN} ${DARK_YELLOW} ${DARK_BLUE} ${DARK_MAGENTA} ${DARK_CYAN} ${LIGHT_GRAY} ${DARK_GRAY} ${RED} ${GREEN} ${YELLOW} ${BLUE} ${MAGENTA} ${CYAN} ${WHITE}"
 #	
 #	control_palette_str="\e]P"
 #	
-#	for i in ${!colors[@]}
+#	i=0
+#	while [ $i -lt 16 ]
 #	do
-#		echo -en "${control_palette_str}$( printf "%x" ${i} )${colors[i]}"
+#		echo -en "${control_palette_str}$( printf "%x" ${i} )$(echo $COLORS | cut -d ' ' -f`expr $i + 1`)"
+#
+#		i=`expr $i + 1`
 #	done
 #
 #	clear # for fixing background artifacting after changing color
 #fi
-
