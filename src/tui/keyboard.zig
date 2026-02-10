@@ -111,10 +111,15 @@ pub const Key = packed struct {
     z: bool,
 
     pub fn getEnabledPrintableAscii(self: Key) ?u8 {
-        if (self.ctrl or self.shift or self.alt) return null;
+        if (self.ctrl or self.alt) return null;
 
         inline for (std.meta.fields(Key)) |field| {
             if (field.name.len == 1 and std.ascii.isPrint(field.name[0]) and @field(self, field.name)) {
+                if (self.shift) {
+                    if (!std.ascii.isAlphanumeric(field.name[0])) return null;
+                    return std.ascii.toUpper(field.name[0]);
+                }
+
                 return field.name[0];
             }
         }
@@ -341,50 +346,26 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
                 key.@" " = true;
             },
             33 => {
-                key.shift = true;
-                key.@"1" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"!" = true;
             },
             34 => {
-                key.shift = true;
-                key.@"2" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"\"" = true;
             },
             35 => {
-                key.shift = true;
-                key.@"3" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"#" = true;
             },
             36 => {
-                key.shift = true;
-                key.@"4" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"$" = true;
             },
             37 => {
-                key.shift = true;
-                key.@"5" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"%" = true;
             },
             38 => {
-                key.shift = true;
-                key.@"6" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"&" = true;
             },
@@ -392,34 +373,18 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
                 key.@"'" = true;
             },
             40 => {
-                key.shift = true;
-                key.@"9" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"(" = true;
             },
             41 => {
-                key.shift = true;
-                key.@"0" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@")" = true;
             },
             42 => {
-                key.shift = true;
-                key.@"8" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"*" = true;
             },
             43 => {
-                key.shift = true;
-                key.@"7" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"+" = true;
             },
@@ -609,10 +574,6 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
                 key.@"]" = true;
             },
             94 => {
-                key.shift = true;
-                key.@"6" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"^" = true;
             },
