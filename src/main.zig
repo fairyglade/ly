@@ -76,7 +76,6 @@ const UiState = struct {
     active_tty: u8,
     buffer: TerminalBuffer,
     labels_max_length: usize,
-    animation_timed_out: bool,
     shutdown_label: Label,
     restart_label: Label,
     sleep_label: Label,
@@ -151,9 +150,6 @@ pub fn main() !void {
     defer _ = gpa.deinit();
 
     state.allocator = gpa.allocator();
-
-    // Allows stopping an animation after some time
-    const animation_time_start = try interop.getTimeOfDay();
 
     // Load arguments
     const params = comptime clap.parseParamsComptime(
@@ -884,7 +880,8 @@ pub fn main() !void {
                 state.config.doom_bottom_color,
                 state.config.doom_fire_height,
                 state.config.doom_fire_spread,
-                &state.animation_timed_out,
+                &state.animate,
+                state.config.animation_timeout_sec,
             );
             animation = doom.widget();
         },
@@ -896,17 +893,19 @@ pub fn main() !void {
                 state.config.cmatrix_head_col,
                 state.config.cmatrix_min_codepoint,
                 state.config.cmatrix_max_codepoint,
-                &state.animation_timed_out,
+                &state.animate,
+                state.config.animation_timeout_sec,
             );
             animation = matrix.widget();
         },
         .colormix => {
-            var color_mix = ColorMix.init(
+            var color_mix = try ColorMix.init(
                 &state.buffer,
                 state.config.colormix_col1,
                 state.config.colormix_col2,
                 state.config.colormix_col3,
-                &state.animation_timed_out,
+                &state.animate,
+                state.config.animation_timeout_sec,
             );
             animation = color_mix.widget();
         },
@@ -918,7 +917,8 @@ pub fn main() !void {
                 state.config.gameoflife_entropy_interval,
                 state.config.gameoflife_frame_delay,
                 state.config.gameoflife_initial_density,
-                &state.animation_timed_out,
+                &state.animate,
+                state.config.animation_timeout_sec,
             );
             animation = game_of_life.widget();
         },
@@ -932,7 +932,8 @@ pub fn main() !void {
                 state.config.dur_x_offset,
                 state.config.dur_y_offset,
                 state.config.full_color,
-                &state.animation_timed_out,
+                &state.animate,
+                state.config.animation_timeout_sec,
             );
             animation = dur.widget();
         },
@@ -949,7 +950,6 @@ pub fn main() !void {
     state.auth_fails = 0;
     state.run = true;
     state.update = true;
-    state.animation_timed_out = false;
     state.animate = state.config.animation != .none;
     state.insert_mode = !state.config.vi_mode or state.config.vi_default_mode == .insert;
     state.edge_margin = Position.init(
@@ -1148,15 +1148,8 @@ pub fn main() !void {
         var timeout: i32 = -1;
 
         // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for the event indefinitely instead
-        if (state.animate and !state.animation_timed_out) {
+        if (state.animate) {
             timeout = state.config.animation_frame_delay;
-
-            // Check how long we've been running so we can turn off the animation
-            const time = try interop.getTimeOfDay();
-
-            if (state.config.animation_timeout_sec > 0 and time.seconds - animation_time_start.seconds > state.config.animation_timeout_sec) {
-                state.animation_timed_out = true;
-            }
         } else if (state.config.bigclock != .none and state.config.clock == null) {
             const time = try interop.getTimeOfDay();
 

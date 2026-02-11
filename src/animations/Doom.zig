@@ -1,6 +1,10 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const ly_core = @import("ly-core");
+const interop = ly_core.interop;
+const TimeOfDay = interop.TimeOfDay;
+
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const Widget = @import("../tui/Widget.zig");
@@ -11,9 +15,11 @@ pub const STEPS = 12;
 pub const HEIGHT_MAX = 9;
 pub const SPREAD_MAX = 4;
 
+start_time: TimeOfDay,
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
-timeout: *bool,
+animate: *bool,
+timeout_sec: u12,
 buffer: []u8,
 height: u8,
 spread: u8,
@@ -27,7 +33,8 @@ pub fn init(
     bottom_color: u32,
     fire_height: u8,
     fire_spread: u8,
-    timeout: *bool,
+    animate: *bool,
+    timeout_sec: u12,
 ) !Doom {
     const buffer = try allocator.alloc(u8, terminal_buffer.width * terminal_buffer.height);
     initBuffer(buffer, terminal_buffer.width);
@@ -50,9 +57,11 @@ pub fn init(
         };
 
     return .{
+        .start_time = try interop.getTimeOfDay(),
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
-        .timeout = timeout,
+        .animate = animate,
+        .timeout_sec = timeout_sec,
         .buffer = buffer,
         .height = @min(HEIGHT_MAX, fire_height),
         .spread = @min(SPREAD_MAX, fire_spread),
@@ -67,7 +76,7 @@ pub fn widget(self: *Doom) Widget {
         deinit,
         realloc,
         draw,
-        null,
+        update,
         null,
     );
 }
@@ -83,7 +92,7 @@ fn realloc(self: *Doom) !void {
 }
 
 fn draw(self: *Doom) void {
-    if (self.timeout.*) return;
+    if (!self.animate.*) return;
 
     for (0..self.terminal_buffer.width) |x| {
         // We start from 1 so that we always have the topmost line when spreading fire
@@ -129,4 +138,12 @@ fn initBuffer(buffer: []u8, width: usize) void {
     // last color
     @memset(slice_start, 0);
     @memset(slice_end, STEPS);
+}
+
+fn update(self: *Doom, _: *anyopaque) !void {
+    const time = try interop.getTimeOfDay();
+
+    if (self.timeout_sec > 0 and time.seconds - self.start_time.seconds > self.timeout_sec) {
+        self.animate.* = false;
+    }
 }

@@ -5,6 +5,8 @@ const eql = std.mem.eql;
 const flate = std.compress.flate;
 
 const ly_core = @import("ly-core");
+const interop = ly_core.interop;
+const TimeOfDay = interop.TimeOfDay;
 const LogFile = ly_core.LogFile;
 
 const enums = @import("../enums.zig");
@@ -300,6 +302,7 @@ const VEC_Y = 1;
 
 const DurFile = @This();
 
+start_time: TimeOfDay,
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
 dur_movie: DurFormat,
@@ -307,7 +310,8 @@ frames: u64,
 frame_size: UVec2,
 start_pos: IVec2,
 full_color: bool,
-timeout: *bool,
+animate: *bool,
+timeout_sec: u12,
 frame_time: u32,
 time_previous: i64,
 is_color_format_16: bool,
@@ -367,7 +371,8 @@ pub fn init(
     x_offset: i32,
     y_offset: i32,
     full_color: bool,
-    timeout: *bool,
+    animate: *bool,
+    timeout_sec: u12,
 ) !DurFile {
     var dur_movie: DurFormat = .init(allocator);
 
@@ -399,6 +404,7 @@ pub fn init(
     const frame_time: u32 = @intFromFloat(1000 / dur_movie.framerate.?);
 
     return .{
+        .start_time = try interop.getTimeOfDay(),
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
         .frames = 0,
@@ -406,7 +412,8 @@ pub fn init(
         .frame_size = frame_size,
         .start_pos = start_pos,
         .full_color = full_color,
-        .timeout = timeout,
+        .animate = animate,
+        .timeout_sec = timeout_sec,
         .dur_movie = dur_movie,
         .frame_time = frame_time,
         .is_color_format_16 = eql(u8, dur_movie.colorFormat.?, "16"),
@@ -422,7 +429,7 @@ pub fn widget(self: *DurFile) Widget {
         deinit,
         realloc,
         draw,
-        null,
+        update,
         null,
     );
 }
@@ -438,7 +445,7 @@ fn realloc(self: *DurFile) !void {
 }
 
 fn draw(self: *DurFile) void {
-    if (self.timeout.*) return;
+    if (!self.animate.*) return;
 
     const current_frame = self.dur_movie.frames.items[self.frames];
 
@@ -491,5 +498,13 @@ fn draw(self: *DurFile) void {
 
         const frame_count = self.dur_movie.frames.items.len;
         self.frames = (self.frames + 1) % frame_count;
+    }
+}
+
+fn update(self: *DurFile, _: *anyopaque) !void {
+    const time = try interop.getTimeOfDay();
+
+    if (self.timeout_sec > 0 and time.seconds - self.start_time.seconds > self.timeout_sec) {
+        self.animate.* = false;
     }
 }

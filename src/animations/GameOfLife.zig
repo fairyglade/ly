@@ -1,6 +1,10 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const ly_core = @import("ly-core");
+const interop = ly_core.interop;
+const TimeOfDay = interop.TimeOfDay;
+
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const Widget = @import("../tui/Widget.zig");
@@ -16,6 +20,7 @@ const NEIGHBOR_DIRS = [_][2]i8{
     .{ 1, 0 },   .{ 1, 1 },
 };
 
+start_time: TimeOfDay,
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
 current_grid: []bool,
@@ -26,7 +31,8 @@ fg_color: u32,
 entropy_interval: usize,
 frame_delay: usize,
 initial_density: f32,
-timeout: *bool,
+animate: *bool,
+timeout_sec: u12,
 dead_cell: Cell,
 width: usize,
 height: usize,
@@ -38,7 +44,8 @@ pub fn init(
     entropy_interval: usize,
     frame_delay: usize,
     initial_density: f32,
-    timeout: *bool,
+    animate: *bool,
+    timeout_sec: u12,
 ) !GameOfLife {
     const width = terminal_buffer.width;
     const height = terminal_buffer.height;
@@ -48,6 +55,7 @@ pub fn init(
     const next_grid = try allocator.alloc(bool, grid_size);
 
     var game = GameOfLife{
+        .start_time = try interop.getTimeOfDay(),
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
         .current_grid = current_grid,
@@ -58,7 +66,8 @@ pub fn init(
         .entropy_interval = entropy_interval,
         .frame_delay = frame_delay,
         .initial_density = initial_density,
-        .timeout = timeout,
+        .animate = animate,
+        .timeout_sec = timeout_sec,
         .dead_cell = .{ .ch = DEAD_CHAR, .fg = @intCast(TerminalBuffer.Color.DEFAULT), .bg = terminal_buffer.bg },
         .width = width,
         .height = height,
@@ -77,7 +86,7 @@ pub fn widget(self: *GameOfLife) Widget {
         deinit,
         realloc,
         draw,
-        null,
+        update,
         null,
     );
 }
@@ -105,7 +114,7 @@ fn realloc(self: *GameOfLife) !void {
 }
 
 fn draw(self: *GameOfLife) void {
-    if (self.timeout.*) return;
+    if (!self.animate.*) return;
 
     // Update game state at controlled frame rate
     self.frame_counter += 1;
@@ -129,6 +138,14 @@ fn draw(self: *GameOfLife) void {
             const cell = if (self.current_grid[row_offset + x]) alive_cell else self.dead_cell;
             cell.put(x, y);
         }
+    }
+}
+
+fn update(self: *GameOfLife, _: *anyopaque) !void {
+    const time = try interop.getTimeOfDay();
+
+    if (self.timeout_sec > 0 and time.seconds - self.start_time.seconds > self.timeout_sec) {
+        self.animate.* = false;
     }
 }
 

@@ -2,6 +2,10 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Random = std.Random;
 
+const ly_core = @import("ly-core");
+const interop = ly_core.interop;
+const TimeOfDay = interop.TimeOfDay;
+
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const Widget = @import("../tui/Widget.zig");
@@ -24,6 +28,7 @@ pub const Line = struct {
     update: usize,
 };
 
+start_time: TimeOfDay,
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
 dots: []Dot,
@@ -34,7 +39,8 @@ fg: u32,
 head_col: u32,
 min_codepoint: u16,
 max_codepoint: u16,
-timeout: *bool,
+animate: *bool,
+timeout_sec: u12,
 default_cell: Cell,
 
 pub fn init(
@@ -44,7 +50,8 @@ pub fn init(
     head_col: u32,
     min_codepoint: u16,
     max_codepoint: u16,
-    timeout: *bool,
+    animate: *bool,
+    timeout_sec: u12,
 ) !Matrix {
     const dots = try allocator.alloc(Dot, terminal_buffer.width * (terminal_buffer.height + 1));
     const lines = try allocator.alloc(Line, terminal_buffer.width);
@@ -52,6 +59,7 @@ pub fn init(
     initBuffers(dots, lines, terminal_buffer.width, terminal_buffer.height, terminal_buffer.random);
 
     return .{
+        .start_time = try interop.getTimeOfDay(),
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
         .dots = dots,
@@ -62,7 +70,8 @@ pub fn init(
         .head_col = head_col,
         .min_codepoint = min_codepoint,
         .max_codepoint = max_codepoint - min_codepoint,
-        .timeout = timeout,
+        .animate = animate,
+        .timeout_sec = timeout_sec,
         .default_cell = .{ .ch = ' ', .fg = fg, .bg = terminal_buffer.bg },
     };
 }
@@ -74,7 +83,7 @@ pub fn widget(self: *Matrix) Widget {
         deinit,
         realloc,
         draw,
-        null,
+        update,
         null,
     );
 }
@@ -95,7 +104,7 @@ fn realloc(self: *Matrix) !void {
 }
 
 fn draw(self: *Matrix) void {
-    if (self.timeout.*) return;
+    if (!self.animate.*) return;
 
     const buf_height = self.terminal_buffer.height;
     const buf_width = self.terminal_buffer.width;
@@ -185,6 +194,14 @@ fn draw(self: *Matrix) void {
             // Fill background in between columns
             self.default_cell.put(x + 1, y - 1);
         }
+    }
+}
+
+fn update(self: *Matrix, _: *anyopaque) !void {
+    const time = try interop.getTimeOfDay();
+
+    if (self.timeout_sec > 0 and time.seconds - self.start_time.seconds > self.timeout_sec) {
+        self.animate.* = false;
     }
 }
 

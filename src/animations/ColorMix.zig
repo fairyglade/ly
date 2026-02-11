@@ -1,6 +1,10 @@
 const std = @import("std");
 const math = std.math;
 
+const ly_core = @import("ly-core");
+const interop = ly_core.interop;
+const TimeOfDay = interop.TimeOfDay;
+
 const Cell = @import("../tui/Cell.zig");
 const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
 const Widget = @import("../tui/Widget.zig");
@@ -16,8 +20,10 @@ fn length(vec: Vec2) f32 {
     return math.sqrt(vec[0] * vec[0] + vec[1] * vec[1]);
 }
 
+start_time: TimeOfDay,
 terminal_buffer: *TerminalBuffer,
-timeout: *bool,
+animate: *bool,
+timeout_sec: u12,
 frames: u64,
 pattern_cos_mod: f32,
 pattern_sin_mod: f32,
@@ -28,11 +34,14 @@ pub fn init(
     col1: u32,
     col2: u32,
     col3: u32,
-    timeout: *bool,
-) ColorMix {
+    animate: *bool,
+    timeout_sec: u12,
+) !ColorMix {
     return .{
+        .start_time = try interop.getTimeOfDay(),
         .terminal_buffer = terminal_buffer,
-        .timeout = timeout,
+        .animate = animate,
+        .timeout_sec = timeout_sec,
         .frames = 0,
         .pattern_cos_mod = terminal_buffer.random.float(f32) * math.pi * 2.0,
         .pattern_sin_mod = terminal_buffer.random.float(f32) * math.pi * 2.0,
@@ -60,13 +69,13 @@ pub fn widget(self: *ColorMix) Widget {
         null,
         null,
         draw,
-        null,
+        update,
         null,
     );
 }
 
 fn draw(self: *ColorMix) void {
-    if (self.timeout.*) return;
+    if (!self.animate.*) return;
 
     self.frames +%= 1;
     const time: f32 = @as(f32, @floatFromInt(self.frames)) * time_scale;
@@ -97,5 +106,13 @@ fn draw(self: *ColorMix) void {
             const cell = self.palette[@as(usize, @intFromFloat(math.floor(length(uv) * 5.0))) % palette_len];
             cell.put(x, y);
         }
+    }
+}
+
+fn update(self: *ColorMix, _: *anyopaque) !void {
+    const time = try interop.getTimeOfDay();
+
+    if (self.timeout_sec > 0 and time.seconds - self.start_time.seconds > self.timeout_sec) {
+        self.animate.* = false;
     }
 }
