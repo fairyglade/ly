@@ -66,6 +66,8 @@ fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
 
 const UiState = struct {
     allocator: Allocator,
+    active_widget_index: usize,
+    handlable_widgets: std.ArrayList(*Widget),
     auth_fails: u64,
     run: bool,
     update: bool,
@@ -97,7 +99,7 @@ const UiState = struct {
     saved_users: SavedUsers,
     login: UserList,
     password: Text,
-    active_input: enums.Input,
+    password_widget: Widget,
     insert_mode: bool,
     edge_margin: Position,
     config: Config,
@@ -780,6 +782,8 @@ pub fn main() !void {
     );
     defer state.password.deinit();
 
+    state.password_widget = state.password.widget();
+
     state.version_label = Label.init(
         ly_version_str,
         null,
@@ -941,12 +945,12 @@ pub fn main() !void {
         state.config.auth_fails,
     );
 
+    state.active_widget_index = 0;
     state.auth_fails = 0;
     state.run = true;
     state.update = true;
     state.animation_timed_out = false;
     state.animate = state.config.animation != .none;
-    state.active_input = state.config.default_input;
     state.insert_mode = !state.config.vi_mode or state.config.vi_default_mode == .insert;
     state.edge_margin = Position.init(
         state.config.edge_margin,
@@ -955,6 +959,8 @@ pub fn main() !void {
 
     // Load last saved username and desktop selection, if any
     // Skip if autologin is active to prevent overriding autologin session
+    var default_input = state.config.default_input;
+
     if (state.config.save and !state.is_autologin) {
         if (state.saved_users.last_username_index) |index| load_last_user: {
             // If the saved index isn't valid, bail out
@@ -971,7 +977,7 @@ pub fn main() !void {
                 }
             }
 
-            state.active_input = .password;
+            default_input = .password;
 
             state.session.label.current = @min(user.session_index, state.session.label.list.items.len - 1);
         }
@@ -979,6 +985,10 @@ pub fn main() !void {
 
     // TODO: Layer system where we can put widgets in specific layers (to
     // allow certain widgets to be below or above others, like animations)
+    const info_line_widget = state.info_line.widget();
+    const session_widget = state.session.widget();
+    const login_widget = state.login.widget();
+
     var widgets: std.ArrayList(Widget) = .empty;
     defer widgets.deinit(state.allocator);
 
@@ -1012,40 +1022,18 @@ pub fn main() !void {
         try widgets.append(state.allocator, state.capslock_label.widget());
     }
     try widgets.append(state.allocator, state.box.widget());
-    try widgets.append(state.allocator, state.info_line.widget());
+    try widgets.append(state.allocator, info_line_widget);
     try widgets.append(state.allocator, state.session_specifier_label.widget());
-    try widgets.append(state.allocator, state.session.widget());
+    try widgets.append(state.allocator, session_widget);
     try widgets.append(state.allocator, state.login_label.widget());
-    try widgets.append(state.allocator, state.login.widget());
+    try widgets.append(state.allocator, login_widget);
     try widgets.append(state.allocator, state.password_label.widget());
-    try widgets.append(state.allocator, state.password.widget());
+    try widgets.append(state.allocator, state.password_widget);
     if (!state.config.hide_version_string) {
         try widgets.append(state.allocator, state.version_label.widget());
     }
     if (state.config.auth_fails > 0) {
         try widgets.append(state.allocator, cascade.widget());
-    }
-
-    // Position components and place cursor accordingly
-    for (widgets.items) |*widget| try widget.update(&state);
-    positionComponents(&state);
-
-    switch (state.active_input) {
-        .info_line => state.info_line.label.handle(null, state.insert_mode),
-        .session => state.session.label.handle(null, state.insert_mode),
-        .login => state.login.label.handle(null, state.insert_mode),
-        .password => state.password.handle(null, state.insert_mode) catch |err| {
-            try state.info_line.addMessage(
-                state.lang.err_alloc,
-                state.config.error_bg,
-                state.config.error_fg,
-            );
-            try state.log_file.err(
-                "tui",
-                "failed to handle password input: {s}",
-                .{@errorName(err)},
-            );
-        },
     }
 
     try state.buffer.registerKeybind("Esc", &disableInsertMode);
@@ -1057,11 +1045,11 @@ pub fn main() !void {
 
     try state.buffer.registerKeybind("Ctrl+K", &moveCursorUp);
     try state.buffer.registerKeybind("Up", &moveCursorUp);
-    try state.buffer.registerKeybind("J", &viMoseCursorUp);
+    try state.buffer.registerKeybind("K", &viMoveCursorUp);
 
     try state.buffer.registerKeybind("Ctrl+J", &moveCursorDown);
     try state.buffer.registerKeybind("Down", &moveCursorDown);
-    try state.buffer.registerKeybind("K", &viMoveCursorDown);
+    try state.buffer.registerKeybind("J", &viMoseCursorDown);
 
     try state.buffer.registerKeybind("Tab", &wrapCursor);
     try state.buffer.registerKeybind("Shift+Tab", &wrapCursorReverse);
@@ -1104,21 +1092,51 @@ pub fn main() !void {
         );
     }
 
+    // Position components and place cursor accordingly
     if (state.is_autologin) _ = try authenticate(&state);
+
+    const active_widget = switch (default_input) {
+        .info_line => info_line_widget,
+        .session => session_widget,
+        .login => login_widget,
+        .password => state.password_widget,
+    };
+
+    // Run the event loop
+    state.handlable_widgets = .empty;
+    defer state.handlable_widgets.deinit(state.allocator);
+
+    var i: usize = 0;
+    for (widgets.items) |*widget| {
+        if (widget.vtable.handle_fn != null) {
+            try state.handlable_widgets.append(state.allocator, widget);
+
+            if (widget.id == active_widget.id) state.active_widget_index = i;
+            i += 1;
+        }
+    }
+
+    for (widgets.items) |*widget| try widget.update(&state);
+    positionComponents(&state);
 
     while (state.run) {
         if (state.update) {
             for (widgets.items) |*widget| try widget.update(&state);
 
-            switch (state.active_input) {
-                .info_line => state.info_line.label.handle(null, state.insert_mode),
-                .session => state.session.label.handle(null, state.insert_mode),
-                .login => state.login.label.handle(null, state.insert_mode),
-                .password => state.password.handle(null, state.insert_mode) catch |err| {
-                    try state.info_line.addMessage(state.lang.err_alloc, state.config.error_bg, state.config.error_fg);
-                    try state.log_file.err("tui", "failed to handle password input: {s}", .{@errorName(err)});
-                },
-            }
+            // Reset cursor
+            const current_widget = getActiveWidget(&state);
+            current_widget.handle(null, state.insert_mode) catch |err| {
+                try state.info_line.addMessage(
+                    state.lang.err_alloc,
+                    state.config.error_bg,
+                    state.config.error_fg,
+                );
+                try state.log_file.err(
+                    "tui",
+                    "failed to set cursor in active widget: {s}",
+                    .{@errorName(err)},
+                );
+            };
 
             try TerminalBuffer.clearScreen(false);
 
@@ -1237,23 +1255,34 @@ pub fn main() !void {
         if (maybe_keys) |*keys| {
             defer keys.deinit(state.allocator);
 
+            const current_widget = getActiveWidget(&state);
             for (keys.items) |key| {
-                switch (state.active_input) {
-                    .info_line => state.info_line.label.handle(key, state.insert_mode),
-                    .session => state.session.label.handle(key, state.insert_mode),
-                    .login => state.login.label.handle(key, state.insert_mode),
-                    .password => state.password.handle(key, state.insert_mode) catch {
-                        try state.info_line.addMessage(
-                            state.lang.err_alloc,
-                            state.config.error_bg,
-                            state.config.error_fg,
-                        );
-                    },
-                }
+                current_widget.handle(key, state.insert_mode) catch |err| {
+                    try state.info_line.addMessage(
+                        state.lang.err_alloc,
+                        state.config.error_bg,
+                        state.config.error_fg,
+                    );
+                    try state.log_file.err(
+                        "tui",
+                        "failed to handle active widget: {s}",
+                        .{@errorName(err)},
+                    );
+                };
             }
 
             state.update = true;
         }
+    }
+}
+
+fn getActiveWidget(state: *UiState) *Widget {
+    return state.handlable_widgets.items[state.active_widget_index];
+}
+
+fn setActiveWidget(state: *UiState, widget: *Widget) void {
+    for (state.handlable_widgets.items, 0..) |widg, i| {
+        if (widg.id == widget.id) state.active_widget_index = i;
     }
 }
 
@@ -1279,7 +1308,7 @@ fn enableInsertMode(ptr: *anyopaque) !bool {
 fn clearPassword(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
-    if (state.active_input == .password) {
+    if (getActiveWidget(state) == &state.password_widget) {
         state.password.clear();
         state.update = true;
     }
@@ -1288,34 +1317,38 @@ fn clearPassword(ptr: *anyopaque) !bool {
 
 fn moveCursorUp(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
+    if (state.active_widget_index == 0) return false;
 
-    state.active_input.move(true, false);
+    state.active_widget_index -= 1;
     state.update = true;
     return false;
 }
 
-fn viMoseCursorUp(ptr: *anyopaque) !bool {
+fn viMoveCursorUp(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
     if (state.insert_mode) return true;
+    if (state.active_widget_index == 0) return false;
 
-    state.active_input.move(false, false);
+    state.active_widget_index -= 1;
     state.update = true;
     return false;
 }
 
 fn moveCursorDown(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
+    if (state.active_widget_index == state.handlable_widgets.items.len - 1) return false;
 
-    state.active_input.move(false, false);
+    state.active_widget_index += 1;
     state.update = true;
     return false;
 }
 
-fn viMoveCursorDown(ptr: *anyopaque) !bool {
+fn viMoseCursorDown(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
     if (state.insert_mode) return true;
+    if (state.active_widget_index == state.handlable_widgets.items.len - 1) return false;
 
-    state.active_input.move(true, false);
+    state.active_widget_index += 1;
     state.update = true;
     return false;
 }
@@ -1323,7 +1356,7 @@ fn viMoveCursorDown(ptr: *anyopaque) !bool {
 fn wrapCursor(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
-    state.active_input.move(false, true);
+    state.active_widget_index = (state.active_widget_index + 1) % state.handlable_widgets.items.len;
     state.update = true;
     return false;
 }
@@ -1331,7 +1364,7 @@ fn wrapCursor(ptr: *anyopaque) !bool {
 fn wrapCursorReverse(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
-    state.active_input.move(true, true);
+    state.active_widget_index = (state.active_widget_index - 1) % state.handlable_widgets.items.len;
     state.update = true;
     return false;
 }
@@ -1500,7 +1533,7 @@ fn authenticate(ptr: *anyopaque) !bool {
     const auth_err = shared_err.readError();
     if (auth_err) |err| {
         state.auth_fails += 1;
-        state.active_input = .password;
+        setActiveWidget(state, &state.password_widget);
 
         try state.info_line.addMessage(
             getAuthErrorMsg(err, state.lang),

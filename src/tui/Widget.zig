@@ -4,13 +4,14 @@ const keyboard = @import("keyboard.zig");
 const TerminalBuffer = @import("TerminalBuffer.zig");
 
 const VTable = struct {
-    deinit_fn: *const fn (ptr: *anyopaque) void,
-    realloc_fn: *const fn (ptr: *anyopaque) anyerror!void,
+    deinit_fn: ?*const fn (ptr: *anyopaque) void,
+    realloc_fn: ?*const fn (ptr: *anyopaque) anyerror!void,
     draw_fn: *const fn (ptr: *anyopaque) void,
-    update_fn: *const fn (ptr: *anyopaque, ctx: *anyopaque) anyerror!void,
-    handle_fn: *const fn (ptr: *anyopaque, maybe_key: ?keyboard.Key, insert_mode: bool) anyerror!void,
+    update_fn: ?*const fn (ptr: *anyopaque, ctx: *anyopaque) anyerror!void,
+    handle_fn: ?*const fn (ptr: *anyopaque, maybe_key: ?keyboard.Key, insert_mode: bool) anyerror!void,
 };
 
+id: u64,
 pointer: *anyopaque,
 vtable: VTable,
 
@@ -18,7 +19,7 @@ pub fn init(
     pointer: anytype,
     comptime deinit_fn: ?fn (ptr: @TypeOf(pointer)) void,
     comptime realloc_fn: ?fn (ptr: @TypeOf(pointer)) anyerror!void,
-    comptime draw_fn: ?fn (ptr: @TypeOf(pointer)) void,
+    comptime draw_fn: fn (ptr: @TypeOf(pointer)) void,
     comptime update_fn: ?fn (ptr: @TypeOf(pointer), ctx: *anyopaque) anyerror!void,
     comptime handle_fn: ?fn (ptr: @TypeOf(pointer), maybe_key: ?keyboard.Key, insert_mode: bool) anyerror!void,
 ) Widget {
@@ -27,73 +28,64 @@ pub fn init(
         pub fn deinitImpl(ptr: *anyopaque) void {
             const impl: Pointer = @ptrCast(@alignCast(ptr));
 
-            if (deinit_fn) |func| {
-                return @call(
-                    .always_inline,
-                    func,
-                    .{impl},
-                );
-            }
+            return @call(
+                .always_inline,
+                deinit_fn.?,
+                .{impl},
+            );
         }
 
         pub fn reallocImpl(ptr: *anyopaque) !void {
             const impl: Pointer = @ptrCast(@alignCast(ptr));
 
-            if (realloc_fn) |func| {
-                return @call(
-                    .always_inline,
-                    func,
-                    .{impl},
-                );
-            }
+            return @call(
+                .always_inline,
+                realloc_fn.?,
+                .{impl},
+            );
         }
 
         pub fn drawImpl(ptr: *anyopaque) void {
             const impl: Pointer = @ptrCast(@alignCast(ptr));
 
-            if (draw_fn) |func| {
-                return @call(
-                    .always_inline,
-                    func,
-                    .{impl},
-                );
-            }
+            return @call(
+                .always_inline,
+                draw_fn,
+                .{impl},
+            );
         }
 
         pub fn updateImpl(ptr: *anyopaque, ctx: *anyopaque) !void {
             const impl: Pointer = @ptrCast(@alignCast(ptr));
 
-            if (update_fn) |func| {
-                return @call(
-                    .always_inline,
-                    func,
-                    .{ impl, ctx },
-                );
-            }
+            return @call(
+                .always_inline,
+                update_fn.?,
+                .{ impl, ctx },
+            );
         }
 
         pub fn handleImpl(ptr: *anyopaque, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
             const impl: Pointer = @ptrCast(@alignCast(ptr));
 
-            if (handle_fn) |func| {
-                return @call(
-                    .always_inline,
-                    func,
-                    .{ impl, maybe_key, insert_mode },
-                );
-            }
+            return @call(
+                .always_inline,
+                handle_fn.?,
+                .{ impl, maybe_key, insert_mode },
+            );
         }
 
         const vtable = VTable{
-            .deinit_fn = deinitImpl,
-            .realloc_fn = reallocImpl,
+            .deinit_fn = if (deinit_fn != null) deinitImpl else null,
+            .realloc_fn = if (realloc_fn != null) reallocImpl else null,
             .draw_fn = drawImpl,
-            .update_fn = updateImpl,
-            .handle_fn = handleImpl,
+            .update_fn = if (update_fn != null) updateImpl else null,
+            .handle_fn = if (handle_fn != null) handleImpl else null,
         };
     };
 
     return .{
+        .id = @intFromPtr(Impl.vtable.draw_fn),
         .pointer = pointer,
         .vtable = Impl.vtable,
     };
@@ -102,27 +94,31 @@ pub fn init(
 pub fn deinit(self: *Widget) void {
     const impl: @TypeOf(self.pointer) = @ptrCast(@alignCast(self.pointer));
 
-    return @call(
-        .auto,
-        self.vtable.deinit_fn,
-        .{impl},
-    );
+    if (self.vtable.deinit_fn) |deinit_fn| {
+        return @call(
+            .auto,
+            deinit_fn,
+            .{impl},
+        );
+    }
 }
 
 pub fn realloc(self: *Widget) !void {
     const impl: @TypeOf(self.pointer) = @ptrCast(@alignCast(self.pointer));
 
-    return @call(
-        .auto,
-        self.vtable.realloc_fn,
-        .{impl},
-    );
+    if (self.vtable.realloc_fn) |realloc_fn| {
+        return @call(
+            .auto,
+            realloc_fn,
+            .{impl},
+        );
+    }
 }
 
 pub fn draw(self: *Widget) void {
     const impl: @TypeOf(self.pointer) = @ptrCast(@alignCast(self.pointer));
 
-    return @call(
+    @call(
         .auto,
         self.vtable.draw_fn,
         .{impl},
@@ -132,19 +128,23 @@ pub fn draw(self: *Widget) void {
 pub fn update(self: *Widget, ctx: *anyopaque) !void {
     const impl: @TypeOf(self.pointer) = @ptrCast(@alignCast(self.pointer));
 
-    return @call(
-        .auto,
-        self.vtable.update_fn,
-        .{ impl, ctx },
-    );
+    if (self.vtable.update_fn) |update_fn| {
+        return @call(
+            .auto,
+            update_fn,
+            .{ impl, ctx },
+        );
+    }
 }
 
 pub fn handle(self: *Widget, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
     const impl: @TypeOf(self.pointer) = @ptrCast(@alignCast(self.pointer));
 
-    return @call(
-        .auto,
-        self.vtable.handle_fn,
-        .{ impl, maybe_key, insert_mode },
-    );
+    if (self.vtable.handle_fn) |handle_fn| {
+        return @call(
+            .auto,
+            handle_fn,
+            .{ impl, maybe_key, insert_mode },
+        );
+    }
 }
