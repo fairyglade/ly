@@ -363,6 +363,7 @@ pub fn main() !void {
         state.buffer.fg,
         state.buffer.bg,
         null,
+        null,
     );
     defer state.shutdown_label.deinit();
 
@@ -371,6 +372,7 @@ pub fn main() !void {
         null,
         state.buffer.fg,
         state.buffer.bg,
+        null,
         null,
     );
     defer state.restart_label.deinit();
@@ -381,6 +383,7 @@ pub fn main() !void {
         state.buffer.fg,
         state.buffer.bg,
         null,
+        null,
     );
     defer state.sleep_label.deinit();
 
@@ -389,6 +392,7 @@ pub fn main() !void {
         null,
         state.buffer.fg,
         state.buffer.bg,
+        null,
         null,
     );
     defer state.hibernate_label.deinit();
@@ -399,6 +403,7 @@ pub fn main() !void {
         state.buffer.fg,
         state.buffer.bg,
         null,
+        null,
     );
     defer state.brightness_down_label.deinit();
 
@@ -407,6 +412,7 @@ pub fn main() !void {
         null,
         state.buffer.fg,
         state.buffer.bg,
+        null,
         null,
     );
     defer state.brightness_up_label.deinit();
@@ -458,6 +464,7 @@ pub fn main() !void {
         state.buffer.fg,
         state.buffer.bg,
         &updateNumlock,
+        null,
     );
     defer state.numlock_label.deinit();
 
@@ -467,6 +474,7 @@ pub fn main() !void {
         state.buffer.fg,
         state.buffer.bg,
         &updateCapslock,
+        null,
     );
     defer state.capslock_label.deinit();
 
@@ -476,6 +484,7 @@ pub fn main() !void {
         state.buffer.fg,
         state.buffer.bg,
         &updateBattery,
+        null,
     );
     defer state.battery_label.deinit();
 
@@ -485,6 +494,7 @@ pub fn main() !void {
         state.buffer.fg,
         state.buffer.bg,
         &updateClock,
+        &calculateClockTimeout,
     );
     defer state.clock_label.deinit();
 
@@ -499,6 +509,7 @@ pub fn main() !void {
             .fa => .fa,
         },
         &updateBigClock,
+        &calculateBigClockTimeout,
     );
     defer state.bigclock_label.deinit();
 
@@ -624,6 +635,7 @@ pub fn main() !void {
         state.buffer.fg,
         state.buffer.bg,
         &updateSessionSpecifier,
+        null,
     );
     defer state.session_specifier_label.deinit();
 
@@ -643,6 +655,7 @@ pub fn main() !void {
         null,
         state.buffer.fg,
         state.buffer.bg,
+        null,
         null,
     );
     defer state.login_label.deinit();
@@ -764,6 +777,7 @@ pub fn main() !void {
         state.buffer.fg,
         state.buffer.bg,
         null,
+        null,
     );
     defer state.password_label.deinit();
 
@@ -785,6 +799,7 @@ pub fn main() !void {
         null,
         state.buffer.fg,
         state.buffer.bg,
+        null,
         null,
     );
     defer state.version_label.deinit();
@@ -882,6 +897,7 @@ pub fn main() !void {
                 state.config.doom_fire_spread,
                 &state.animate,
                 state.config.animation_timeout_sec,
+                state.config.animation_frame_delay,
             );
             animation = doom.widget();
         },
@@ -895,6 +911,7 @@ pub fn main() !void {
                 state.config.cmatrix_max_codepoint,
                 &state.animate,
                 state.config.animation_timeout_sec,
+                state.config.animation_frame_delay,
             );
             animation = matrix.widget();
         },
@@ -906,6 +923,7 @@ pub fn main() !void {
                 state.config.colormix_col3,
                 &state.animate,
                 state.config.animation_timeout_sec,
+                state.config.animation_frame_delay,
             );
             animation = color_mix.widget();
         },
@@ -919,6 +937,7 @@ pub fn main() !void {
                 state.config.gameoflife_initial_density,
                 &state.animate,
                 state.config.animation_timeout_sec,
+                state.config.animation_frame_delay,
             );
             animation = game_of_life.widget();
         },
@@ -934,6 +953,7 @@ pub fn main() !void {
                 state.config.full_color,
                 &state.animate,
                 state.config.animation_timeout_sec,
+                state.config.animation_frame_delay,
             );
             animation = dur.widget();
         },
@@ -1145,19 +1165,11 @@ pub fn main() !void {
             TerminalBuffer.presentBuffer();
         }
 
-        var timeout: i32 = -1;
-
-        // Calculate the maximum timeout based on current animations, or the (big) clock. If there's none, we wait for the event indefinitely instead
-        if (state.animate) {
-            timeout = state.config.animation_frame_delay;
-        } else if (state.config.bigclock != .none and state.config.clock == null) {
-            const time = try interop.getTimeOfDay();
-
-            timeout = @intCast((60 - @rem(time.seconds, 60)) * 1000 - @divTrunc(time.microseconds, 1000) + 1);
-        } else if (state.config.clock != null) {
-            const time = try interop.getTimeOfDay();
-
-            timeout = @intCast(1000 - @divTrunc(time.microseconds, 1000) + 1);
+        var maybe_timeout: ?usize = null;
+        for (widgets.items) |*widget| {
+            if (try widget.calculateTimeout(&state)) |widget_timeout| {
+                if (maybe_timeout == null or widget_timeout < maybe_timeout.?) maybe_timeout = widget_timeout;
+            }
         }
 
         if (state.config.inactivity_cmd) |inactivity_cmd| {
@@ -1190,9 +1202,9 @@ pub fn main() !void {
             }
         }
 
-        const event_error = if (timeout == -1) termbox.tb_poll_event(&event) else termbox.tb_peek_event(&event, timeout);
+        const event_error = if (maybe_timeout) |timeout| termbox.tb_peek_event(&event, @intCast(timeout)) else termbox.tb_poll_event(&event);
 
-        state.update = timeout != -1;
+        state.update = maybe_timeout != null;
 
         if (event_error < 0) continue;
 
@@ -1741,6 +1753,12 @@ fn updateClock(self: *Label, ptr: *anyopaque) !void {
     }
 }
 
+fn calculateClockTimeout(_: *Label, _: *anyopaque) !?usize {
+    const time = try interop.getTimeOfDay();
+
+    return @intCast(1000 - @divTrunc(time.microseconds, 1000) + 1);
+}
+
 fn updateBigClock(self: *BigLabel, ptr: *anyopaque) !void {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
@@ -1764,6 +1782,17 @@ fn updateBigClock(self: *BigLabel, ptr: *anyopaque) !void {
 
     const clock_str = interop.timeAsString(&state.bigclock_buf, format);
     self.setText(clock_str);
+}
+
+fn calculateBigClockTimeout(_: *BigLabel, ptr: *anyopaque) !?usize {
+    const state: *UiState = @ptrCast(@alignCast(ptr));
+    const time = try interop.getTimeOfDay();
+
+    if (state.config.bigclock_seconds) {
+        return @intCast(1000 - @divTrunc(time.microseconds, 1000) + 1);
+    }
+
+    return @intCast((60 - @rem(time.seconds, 60)) * 1000 - @divTrunc(time.microseconds, 1000) + 1);
 }
 
 fn updateBox(self: *CenteredBox, ptr: *anyopaque) !void {

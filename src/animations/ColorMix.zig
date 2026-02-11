@@ -24,6 +24,7 @@ start_time: TimeOfDay,
 terminal_buffer: *TerminalBuffer,
 animate: *bool,
 timeout_sec: u12,
+frame_delay: u16,
 frames: u64,
 pattern_cos_mod: f32,
 pattern_sin_mod: f32,
@@ -36,12 +37,14 @@ pub fn init(
     col3: u32,
     animate: *bool,
     timeout_sec: u12,
+    frame_delay: u16,
 ) !ColorMix {
     return .{
         .start_time = try interop.getTimeOfDay(),
         .terminal_buffer = terminal_buffer,
         .animate = animate,
         .timeout_sec = timeout_sec,
+        .frame_delay = frame_delay,
         .frames = 0,
         .pattern_cos_mod = terminal_buffer.random.float(f32) * math.pi * 2.0,
         .pattern_sin_mod = terminal_buffer.random.float(f32) * math.pi * 2.0,
@@ -71,6 +74,7 @@ pub fn widget(self: *ColorMix) Widget {
         draw,
         update,
         null,
+        calculateTimeout,
     );
 }
 
@@ -115,4 +119,8 @@ fn update(self: *ColorMix, _: *anyopaque) !void {
     if (self.timeout_sec > 0 and time.seconds - self.start_time.seconds > self.timeout_sec) {
         self.animate.* = false;
     }
+}
+
+fn calculateTimeout(self: *ColorMix, _: *anyopaque) !?usize {
+    return self.frame_delay;
 }

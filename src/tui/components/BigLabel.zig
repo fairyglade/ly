@@ -52,6 +52,7 @@ fg: u32,
 bg: u32,
 locale: BigLabelLocale,
 update_fn: ?*const fn (*BigLabel, *anyopaque) anyerror!void,
+calculate_timeout_fn: ?*const fn (*BigLabel, *anyopaque) anyerror!?usize,
 component_pos: Position,
 children_pos: Position,
 
@@ -63,6 +64,7 @@ pub fn init(
     bg: u32,
     locale: BigLabelLocale,
     update_fn: ?*const fn (*BigLabel, *anyopaque) anyerror!void,
+    calculate_timeout_fn: ?*const fn (*BigLabel, *anyopaque) anyerror!?usize,
 ) BigLabel {
     return .{
         .allocator = null,
@@ -73,6 +75,7 @@ pub fn init(
         .bg = bg,
         .locale = locale,
         .update_fn = update_fn,
+        .calculate_timeout_fn = calculate_timeout_fn,
         .component_pos = TerminalBuffer.START_POSITION,
         .children_pos = TerminalBuffer.START_POSITION,
     };
@@ -91,6 +94,7 @@ pub fn widget(self: *BigLabel) Widget {
         draw,
         update,
         null,
+        calculateTimeout,
     );
 }
 
@@ -168,6 +172,18 @@ fn update(self: *BigLabel, context: *anyopaque) !void {
             .{ self, context },
         );
     }
+}
+
+fn calculateTimeout(self: *BigLabel, ctx: *anyopaque) !?usize {
+    if (self.calculate_timeout_fn) |calculate_timeout_fn| {
+        return @call(
+            .auto,
+            calculate_timeout_fn,
+            .{ self, ctx },
+        );
+    }
+
+    return null;
 }
 
 fn clockCell(char: u8, fg: u32, bg: u32, locale: BigLabelLocale) [CHAR_SIZE]Cell {

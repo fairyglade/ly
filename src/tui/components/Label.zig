@@ -14,6 +14,7 @@ max_width: ?usize,
 fg: u32,
 bg: u32,
 update_fn: ?*const fn (*Label, *anyopaque) anyerror!void,
+calculate_timeout_fn: ?*const fn (*Label, *anyopaque) anyerror!?usize,
 component_pos: Position,
 children_pos: Position,
 
@@ -23,6 +24,7 @@ pub fn init(
     fg: u32,
     bg: u32,
     update_fn: ?*const fn (*Label, *anyopaque) anyerror!void,
+    calculate_timeout_fn: ?*const fn (*Label, *anyopaque) anyerror!?usize,
 ) Label {
     return .{
         .allocator = null,
@@ -31,6 +33,7 @@ pub fn init(
         .fg = fg,
         .bg = bg,
         .update_fn = update_fn,
+        .calculate_timeout_fn = calculate_timeout_fn,
         .component_pos = TerminalBuffer.START_POSITION,
         .children_pos = TerminalBuffer.START_POSITION,
     };
@@ -49,6 +52,7 @@ pub fn widget(self: *Label) Widget {
         draw,
         update,
         null,
+        calculateTimeout,
     );
 }
 
@@ -129,4 +133,16 @@ fn update(self: *Label, ctx: *anyopaque) !void {
             .{ self, ctx },
         );
     }
+}
+
+fn calculateTimeout(self: *Label, ctx: *anyopaque) !?usize {
+    if (self.calculate_timeout_fn) |calculate_timeout_fn| {
+        return @call(
+            .auto,
+            calculate_timeout_fn,
+            .{ self, ctx },
+        );
+    }
+
+    return null;
 }

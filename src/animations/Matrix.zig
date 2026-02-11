@@ -41,6 +41,7 @@ min_codepoint: u16,
 max_codepoint: u16,
 animate: *bool,
 timeout_sec: u12,
+frame_delay: u16,
 default_cell: Cell,
 
 pub fn init(
@@ -52,6 +53,7 @@ pub fn init(
     max_codepoint: u16,
     animate: *bool,
     timeout_sec: u12,
+    frame_delay: u16,
 ) !Matrix {
     const dots = try allocator.alloc(Dot, terminal_buffer.width * (terminal_buffer.height + 1));
     const lines = try allocator.alloc(Line, terminal_buffer.width);
@@ -72,6 +74,7 @@ pub fn init(
         .max_codepoint = max_codepoint - min_codepoint,
         .animate = animate,
         .timeout_sec = timeout_sec,
+        .frame_delay = frame_delay,
         .default_cell = .{ .ch = ' ', .fg = fg, .bg = terminal_buffer.bg },
     };
 }
@@ -85,6 +88,7 @@ pub fn widget(self: *Matrix) Widget {
         draw,
         update,
         null,
+        calculateTimeout,
     );
 }
 
@@ -203,6 +207,10 @@ fn update(self: *Matrix, _: *anyopaque) !void {
     if (self.timeout_sec > 0 and time.seconds - self.start_time.seconds > self.timeout_sec) {
         self.animate.* = false;
     }
+}
+
+fn calculateTimeout(self: *Matrix, _: *anyopaque) !?usize {
+    return self.frame_delay;
 }
 
 fn initBuffers(dots: []Dot, lines: []Line, width: usize, height: usize, random: Random) void {

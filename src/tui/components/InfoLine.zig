@@ -54,6 +54,7 @@ pub fn widget(self: *InfoLine) Widget {
         draw,
         null,
         handle,
+        null,
     );
 }
 

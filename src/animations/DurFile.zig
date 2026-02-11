@@ -312,6 +312,7 @@ start_pos: IVec2,
 full_color: bool,
 animate: *bool,
 timeout_sec: u12,
+frame_delay: u16,
 frame_time: u32,
 time_previous: i64,
 is_color_format_16: bool,
@@ -373,6 +374,7 @@ pub fn init(
     full_color: bool,
     animate: *bool,
     timeout_sec: u12,
+    frame_delay: u16,
 ) !DurFile {
     var dur_movie: DurFormat = .init(allocator);
 
@@ -414,6 +416,7 @@ pub fn init(
         .full_color = full_color,
         .animate = animate,
         .timeout_sec = timeout_sec,
+        .frame_delay = frame_delay,
         .dur_movie = dur_movie,
         .frame_time = frame_time,
         .is_color_format_16 = eql(u8, dur_movie.colorFormat.?, "16"),
@@ -431,6 +434,7 @@ pub fn widget(self: *DurFile) Widget {
         draw,
         update,
         null,
+        calculateTimeout,
     );
 }
 
@@ -507,4 +511,8 @@ fn update(self: *DurFile, _: *anyopaque) !void {
     if (self.timeout_sec > 0 and time.seconds - self.start_time.seconds > self.timeout_sec) {
         self.animate.* = false;
     }
+}
+
+fn calculateTimeout(self: *DurFile, _: *anyopaque) !?usize {
+    return self.frame_delay;
 }

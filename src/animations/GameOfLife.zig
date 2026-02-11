@@ -33,6 +33,7 @@ frame_delay: usize,
 initial_density: f32,
 animate: *bool,
 timeout_sec: u12,
+animation_frame_delay: u16,
 dead_cell: Cell,
 width: usize,
 height: usize,
@@ -46,6 +47,7 @@ pub fn init(
     initial_density: f32,
     animate: *bool,
     timeout_sec: u12,
+    animation_frame_delay: u16,
 ) !GameOfLife {
     const width = terminal_buffer.width;
     const height = terminal_buffer.height;
@@ -68,6 +70,7 @@ pub fn init(
         .initial_density = initial_density,
         .animate = animate,
         .timeout_sec = timeout_sec,
+        .animation_frame_delay = animation_frame_delay,
         .dead_cell = .{ .ch = DEAD_CHAR, .fg = @intCast(TerminalBuffer.Color.DEFAULT), .bg = terminal_buffer.bg },
         .width = width,
         .height = height,
@@ -88,6 +91,7 @@ pub fn widget(self: *GameOfLife) Widget {
         draw,
         update,
         null,
+        calculateTimeout,
     );
 }
 
@@ -147,6 +151,10 @@ fn update(self: *GameOfLife, _: *anyopaque) !void {
     if (self.timeout_sec > 0 and time.seconds - self.start_time.seconds > self.timeout_sec) {
         self.animate.* = false;
     }
+}
+
+fn calculateTimeout(self: *GameOfLife, _: *anyopaque) !?usize {
+    return self.animation_frame_delay;
 }
 
 fn updateGeneration(self: *GameOfLife) void {

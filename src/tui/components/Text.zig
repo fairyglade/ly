@@ -63,6 +63,7 @@ pub fn widget(self: *Text) Widget {
         draw,
         null,
         handle,
+        null,
     );
 }
 

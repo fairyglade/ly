@@ -20,6 +20,7 @@ allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
 animate: *bool,
 timeout_sec: u12,
+frame_delay: u16,
 buffer: []u8,
 height: u8,
 spread: u8,
@@ -35,6 +36,7 @@ pub fn init(
     fire_spread: u8,
     animate: *bool,
     timeout_sec: u12,
+    frame_delay: u16,
 ) !Doom {
     const buffer = try allocator.alloc(u8, terminal_buffer.width * terminal_buffer.height);
     initBuffer(buffer, terminal_buffer.width);
@@ -62,6 +64,7 @@ pub fn init(
         .terminal_buffer = terminal_buffer,
         .animate = animate,
         .timeout_sec = timeout_sec,
+        .frame_delay = frame_delay,
         .buffer = buffer,
         .height = @min(HEIGHT_MAX, fire_height),
         .spread = @min(SPREAD_MAX, fire_spread),
@@ -78,6 +81,7 @@ pub fn widget(self: *Doom) Widget {
         draw,
         update,
         null,
+        calculateTimeout,
     );
 }
 
@@ -146,4 +150,8 @@ fn update(self: *Doom, _: *anyopaque) !void {
     if (self.timeout_sec > 0 and time.seconds - self.start_time.seconds > self.timeout_sec) {
         self.animate.* = false;
     }
+}
+
+fn calculateTimeout(self: *Doom, _: *anyopaque) !?usize {
+    return self.frame_delay;
 }
