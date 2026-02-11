@@ -1156,13 +1156,12 @@ pub fn main() !void {
 
             if (state.config.animation_timeout_sec > 0 and time.seconds - animation_time_start.seconds > state.config.animation_timeout_sec) {
                 state.animation_timed_out = true;
-                if (animation) |*a| a.deinit();
             }
         } else if (state.config.bigclock != .none and state.config.clock == null) {
             const time = try interop.getTimeOfDay();
 
             timeout = @intCast((60 - @rem(time.seconds, 60)) * 1000 - @divTrunc(time.microseconds, 1000) + 1);
-        } else if (state.config.clock != null or (state.config.auth_fails > 0 and state.auth_fails >= state.config.auth_fails)) {
+        } else if (state.config.clock != null) {
             const time = try interop.getTimeOfDay();
 
             timeout = @intCast(1000 - @divTrunc(time.microseconds, 1000) + 1);
