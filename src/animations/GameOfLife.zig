@@ -72,6 +72,7 @@ pub fn init(
 
 pub fn widget(self: *GameOfLife) Widget {
     return Widget.init(
+        "GameOfLife",
         self,
         deinit,
         realloc,

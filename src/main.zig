@@ -1133,8 +1133,8 @@ pub fn main() !void {
                 );
                 try state.log_file.err(
                     "tui",
-                    "failed to set cursor in active widget: {s}",
-                    .{@errorName(err)},
+                    "failed to set cursor in active widget '{s}': {s}",
+                    .{ current_widget.display_name, @errorName(err) },
                 );
             };
 
@@ -1213,19 +1213,6 @@ pub fn main() !void {
 
             try state.log_file.info("tui", "screen resolution updated to {d}x{d}", .{ state.buffer.width, state.buffer.height });
 
-            if (animation) |*a| a.realloc() catch |err| {
-                try state.info_line.addMessage(
-                    state.lang.err_alloc,
-                    state.config.error_bg,
-                    state.config.error_fg,
-                );
-                try state.log_file.err(
-                    "tui",
-                    "failed to reallocate animation buffers: {s}",
-                    .{@errorName(err)},
-                );
-            };
-
             for (widgets.items) |*widget| {
                 widget.realloc() catch |err| {
                     try state.info_line.addMessage(
@@ -1235,8 +1222,8 @@ pub fn main() !void {
                     );
                     try state.log_file.err(
                         "tui",
-                        "failed to reallocate widget: {s}",
-                        .{@errorName(err)},
+                        "failed to reallocate widget '{s}': {s}",
+                        .{ widget.display_name, @errorName(err) },
                     );
                 };
             }
@@ -1265,8 +1252,8 @@ pub fn main() !void {
                     );
                     try state.log_file.err(
                         "tui",
-                        "failed to handle active widget: {s}",
-                        .{@errorName(err)},
+                        "failed to handle active widget '{s}': {s}",
+                        .{ current_widget.display_name, @errorName(err) },
                     );
                 };
             }

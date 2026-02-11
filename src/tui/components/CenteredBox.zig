@@ -61,6 +61,7 @@ pub fn init(
 
 pub fn widget(self: *CenteredBox) Widget {
     return Widget.init(
+        "CenteredBox",
         self,
         null,
         null,

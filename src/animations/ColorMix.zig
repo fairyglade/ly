@@ -55,6 +55,7 @@ pub fn init(
 
 pub fn widget(self: *ColorMix) Widget {
     return Widget.init(
+        "ColorMix",
         self,
         null,
         null,

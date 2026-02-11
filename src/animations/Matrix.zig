@@ -69,6 +69,7 @@ pub fn init(
 
 pub fn widget(self: *Matrix) Widget {
     return Widget.init(
+        "Matrix",
         self,
         deinit,
         realloc,

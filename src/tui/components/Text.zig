@@ -56,6 +56,7 @@ pub fn deinit(self: *Text) void {
 
 pub fn widget(self: *Text) Widget {
     return Widget.init(
+        "Text",
         self,
         deinit,
         null,

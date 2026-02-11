@@ -47,6 +47,7 @@ pub fn deinit(self: *InfoLine) void {
 
 pub fn widget(self: *InfoLine) Widget {
     return Widget.init(
+        "InfoLine",
         self,
         deinit,
         null,

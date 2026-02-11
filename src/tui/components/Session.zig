@@ -57,6 +57,7 @@ pub fn deinit(self: *Session) void {
 
 pub fn widget(self: *Session) Widget {
     return Widget.init(
+        "Session",
         self,
         deinit,
         null,
