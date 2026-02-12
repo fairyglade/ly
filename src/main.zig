@@ -1054,6 +1054,7 @@ pub fn main() !void {
 
     try state.buffer.registerKeybind("Ctrl+C", &quit, &state);
 
+    // TODO: Make this generic for any Text widget present in the UI
     try state.buffer.registerKeybind("Ctrl+U", &clearPassword, &state);
 
     try state.buffer.registerKeybind("K", &viMoveCursorUp, &state);
@@ -1093,7 +1094,6 @@ pub fn main() !void {
         );
     }
 
-    // Position components and place cursor accordingly
     if (state.is_autologin) _ = try authenticate(&state);
 
     const active_widget = switch (default_input) {
@@ -1103,7 +1103,7 @@ pub fn main() !void {
         .password => state.password_widget,
     };
 
-    var shared_error = try SharedError.init();
+    var shared_error = try SharedError.init(&uiErrorHandler, &state);
     defer shared_error.deinit();
 
     try state.buffer.runEventLoop(
@@ -1117,6 +1117,35 @@ pub fn main() !void {
         handleInactivity,
         &state,
     );
+}
+
+fn uiErrorHandler(err: anyerror, ctx: *anyopaque) anyerror!void {
+    var state: *UiState = @ptrCast(@alignCast(ctx));
+
+    switch (err) {
+        error.SetCursorFailed => {
+            try state.info_line.addMessage(
+                state.lang.err_alloc,
+                state.config.error_bg,
+                state.config.error_fg,
+            );
+        },
+        error.WidgetReallocationFailed => {
+            try state.info_line.addMessage(
+                state.lang.err_alloc,
+                state.config.error_bg,
+                state.config.error_fg,
+            );
+        },
+        error.CurrentWidgetHandlingFailed => {
+            try state.info_line.addMessage(
+                state.lang.err_alloc,
+                state.config.error_bg,
+                state.config.error_fg,
+            );
+        },
+        else => unreachable,
+    }
 }
 
 fn disableInsertMode(ptr: *anyopaque) !bool {
@@ -1256,7 +1285,7 @@ fn authenticate(ptr: *anyopaque) !bool {
         }
     }
 
-    var shared_err = try SharedError.init();
+    var shared_err = try SharedError.init(null, null);
     defer shared_err.deinit();
 
     {

@@ -105,7 +105,7 @@ pub fn authenticate(allocator: std.mem.Allocator, log_file: *LogFile, options: A
     try log_file.info("auth/passwd", "setting user shell", .{});
     if (user_entry.shell == null) interop.setUserShell(&user_entry);
 
-    var shared_err = try SharedError.init();
+    var shared_err = try SharedError.init(null, null);
     defer shared_err.deinit();
 
     log_file.deinit();
