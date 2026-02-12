@@ -996,57 +996,67 @@ pub fn main() !void {
         }
     }
 
-    // TODO: Layer system where we can put widgets in specific layers (to
-    // allow certain widgets to be below or above others, like animations)
     const info_line_widget = state.info_line.widget();
     const session_widget = state.session.widget();
     const login_widget = state.login.widget();
 
-    var widgets: std.ArrayList(Widget) = .empty;
+    var widgets: std.ArrayList([]Widget) = .empty;
     defer widgets.deinit(state.allocator);
 
+    // Layer 1
     if (animation) |a| {
-        try widgets.append(state.allocator, a);
+        var layer1 = [_]Widget{a};
+        try widgets.append(state.allocator, &layer1);
     }
+
+    // Layer 2
+    var layer2: std.ArrayList(Widget) = .empty;
+    defer layer2.deinit(state.allocator);
+
     if (!state.config.hide_key_hints) {
-        try widgets.append(state.allocator, state.shutdown_label.widget());
-        try widgets.append(state.allocator, state.restart_label.widget());
+        try layer2.append(state.allocator, state.shutdown_label.widget());
+        try layer2.append(state.allocator, state.restart_label.widget());
         if (state.config.sleep_cmd != null) {
-            try widgets.append(state.allocator, state.sleep_label.widget());
+            try layer2.append(state.allocator, state.sleep_label.widget());
         }
         if (state.config.brightness_down_key != null) {
-            try widgets.append(state.allocator, state.brightness_down_label.widget());
+            try layer2.append(state.allocator, state.brightness_down_label.widget());
         }
         if (state.config.brightness_up_key != null) {
-            try widgets.append(state.allocator, state.brightness_up_label.widget());
+            try layer2.append(state.allocator, state.brightness_up_label.widget());
         }
     }
     if (state.config.battery_id != null) {
-        try widgets.append(state.allocator, state.battery_label.widget());
+        try layer2.append(state.allocator, state.battery_label.widget());
     }
     if (state.config.clock != null) {
-        try widgets.append(state.allocator, state.clock_label.widget());
+        try layer2.append(state.allocator, state.clock_label.widget());
     }
     if (state.config.bigclock != .none) {
-        try widgets.append(state.allocator, state.bigclock_label.widget());
+        try layer2.append(state.allocator, state.bigclock_label.widget());
     }
     if (!state.config.hide_keyboard_locks) {
-        try widgets.append(state.allocator, state.numlock_label.widget());
-        try widgets.append(state.allocator, state.capslock_label.widget());
+        try layer2.append(state.allocator, state.numlock_label.widget());
+        try layer2.append(state.allocator, state.capslock_label.widget());
     }
-    try widgets.append(state.allocator, state.box.widget());
-    try widgets.append(state.allocator, info_line_widget);
-    try widgets.append(state.allocator, state.session_specifier_label.widget());
-    try widgets.append(state.allocator, session_widget);
-    try widgets.append(state.allocator, state.login_label.widget());
-    try widgets.append(state.allocator, login_widget);
-    try widgets.append(state.allocator, state.password_label.widget());
-    try widgets.append(state.allocator, state.password_widget);
+    try layer2.append(state.allocator, state.box.widget());
+    try layer2.append(state.allocator, info_line_widget);
+    try layer2.append(state.allocator, state.session_specifier_label.widget());
+    try layer2.append(state.allocator, session_widget);
+    try layer2.append(state.allocator, state.login_label.widget());
+    try layer2.append(state.allocator, login_widget);
+    try layer2.append(state.allocator, state.password_label.widget());
+    try layer2.append(state.allocator, state.password_widget);
     if (!state.config.hide_version_string) {
-        try widgets.append(state.allocator, state.version_label.widget());
+        try layer2.append(state.allocator, state.version_label.widget());
     }
+
+    try widgets.append(state.allocator, layer2.items);
+
+    // Layer 3
     if (state.config.auth_fails > 0) {
-        try widgets.append(state.allocator, cascade.widget());
+        var layer3 = [_]Widget{cascade.widget()};
+        try widgets.append(state.allocator, &layer3);
     }
 
     try state.buffer.registerKeybind("Esc", &disableInsertMode, &state);

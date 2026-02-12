@@ -169,7 +169,7 @@ pub fn runEventLoop(
     self: *TerminalBuffer,
     allocator: Allocator,
     shared_error: SharedError,
-    widgets: []Widget,
+    layers: [][]Widget,
     active_widget: Widget,
     inactivity_delay: u16,
     insert_mode: *bool,
@@ -189,16 +189,22 @@ pub fn runEventLoop(
     defer self.handlable_widgets.deinit(allocator);
 
     var i: usize = 0;
-    for (widgets) |*widget| {
-        if (widget.vtable.handle_fn != null) {
-            try self.handlable_widgets.append(allocator, widget);
+    for (layers) |layer| {
+        for (layer) |*widget| {
+            if (widget.vtable.handle_fn != null) {
+                try self.handlable_widgets.append(allocator, widget);
 
-            if (widget.id == active_widget.id) self.active_widget_index = i;
-            i += 1;
+                if (widget.id == active_widget.id) self.active_widget_index = i;
+                i += 1;
+            }
         }
     }
 
-    for (widgets) |*widget| try widget.update(context);
+    for (layers) |layer| {
+        for (layer) |*widget| {
+            try widget.update(context);
+        }
+    }
     try @call(.auto, position_widgets_fn, .{context});
 
     var event: termbox.tb_event = undefined;
@@ -207,7 +213,11 @@ pub fn runEventLoop(
 
     while (self.run) {
         if (self.update) {
-            for (widgets) |*widget| try widget.update(context);
+            for (layers) |layer| {
+                for (layer) |*widget| {
+                    try widget.update(context);
+                }
+            }
 
             // Reset cursor
             const current_widget = self.getActiveWidget();
@@ -222,15 +232,21 @@ pub fn runEventLoop(
 
             try TerminalBuffer.clearScreen(false);
 
-            for (widgets) |*widget| widget.draw();
+            for (layers) |layer| {
+                for (layer) |*widget| {
+                    widget.draw();
+                }
+            }
 
             TerminalBuffer.presentBuffer();
         }
 
         var maybe_timeout: ?usize = null;
-        for (widgets) |*widget| {
-            if (try widget.calculateTimeout(context)) |widget_timeout| {
-                if (maybe_timeout == null or widget_timeout < maybe_timeout.?) maybe_timeout = widget_timeout;
+        for (layers) |layer| {
+            for (layer) |*widget| {
+                if (try widget.calculateTimeout(context)) |widget_timeout| {
+                    if (maybe_timeout == null or widget_timeout < maybe_timeout.?) maybe_timeout = widget_timeout;
+                }
             }
         }
 
@@ -262,15 +278,17 @@ pub fn runEventLoop(
                 .{ self.width, self.height },
             );
 
-            for (widgets) |*widget| {
-                widget.realloc() catch |err| {
-                    shared_error.writeError(error.WidgetReallocationFailed);
-                    try self.log_file.err(
-                        "tui",
-                        "failed to reallocate widget '{s}': {s}",
-                        .{ widget.display_name, @errorName(err) },
-                    );
-                };
+            for (layers) |layer| {
+                for (layer) |*widget| {
+                    widget.realloc() catch |err| {
+                        shared_error.writeError(error.WidgetReallocationFailed);
+                        try self.log_file.err(
+                            "tui",
+                            "failed to reallocate widget '{s}': {s}",
+                            .{ widget.display_name, @errorName(err) },
+                        );
+                    };
+                }
             }
 
             try @call(.auto, position_widgets_fn, .{context});
