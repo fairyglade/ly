@@ -5,16 +5,21 @@ const Random = std.Random;
 const ly_core = @import("ly-core");
 const interop = ly_core.interop;
 const LogFile = ly_core.LogFile;
+const SharedError = ly_core.SharedError;
 pub const termbox = @import("termbox2");
 
 const Cell = @import("Cell.zig");
 const keyboard = @import("keyboard.zig");
 const Position = @import("Position.zig");
+const Widget = @import("Widget.zig");
 
 const TerminalBuffer = @This();
 
 const KeybindCallbackFn = *const fn (*anyopaque) anyerror!bool;
-const KeybindMap = std.AutoHashMap(keyboard.Key, KeybindCallbackFn);
+const KeybindMap = std.AutoHashMap(keyboard.Key, struct {
+    callback: KeybindCallbackFn,
+    context: *anyopaque,
+});
 
 pub const InitOptions = struct {
     fg: u32,
@@ -85,8 +90,17 @@ blank_cell: Cell,
 full_color: bool,
 termios: ?std.posix.termios,
 keybinds: KeybindMap,
+handlable_widgets: std.ArrayList(*Widget),
+run: bool,
+update: bool,
+active_widget_index: usize,
 
-pub fn init(allocator: Allocator, options: InitOptions, log_file: *LogFile, random: Random) !TerminalBuffer {
+pub fn init(
+    allocator: Allocator,
+    options: InitOptions,
+    log_file: *LogFile,
+    random: Random,
+) !TerminalBuffer {
     // Initialize termbox
     _ = termbox.tb_init();
 
@@ -139,12 +153,169 @@ pub fn init(allocator: Allocator, options: InitOptions, log_file: *LogFile, rand
         // Needed to reclaim the TTY after giving up its control
         .termios = try std.posix.tcgetattr(std.posix.STDIN_FILENO),
         .keybinds = KeybindMap.init(allocator),
+        .handlable_widgets = .empty,
+        .run = true,
+        .update = true,
+        .active_widget_index = 0,
     };
 }
 
 pub fn deinit(self: *TerminalBuffer) void {
     self.keybinds.deinit();
     TerminalBuffer.shutdown();
+}
+
+pub fn runEventLoop(
+    self: *TerminalBuffer,
+    allocator: Allocator,
+    shared_error: SharedError,
+    widgets: []Widget,
+    active_widget: Widget,
+    inactivity_delay: u16,
+    insert_mode: *bool,
+    position_widgets_fn: *const fn (*anyopaque) anyerror!void,
+    inactivity_event_fn: ?*const fn (*anyopaque) anyerror!void,
+    context: *anyopaque,
+) !void {
+    try self.registerKeybind("Ctrl+K", &moveCursorUp, self);
+    try self.registerKeybind("Up", &moveCursorUp, self);
+
+    try self.registerKeybind("Ctrl+J", &moveCursorDown, self);
+    try self.registerKeybind("Down", &moveCursorDown, self);
+
+    try self.registerKeybind("Tab", &wrapCursor, self);
+    try self.registerKeybind("Shift+Tab", &wrapCursorReverse, self);
+
+    defer self.handlable_widgets.deinit(allocator);
+
+    var i: usize = 0;
+    for (widgets) |*widget| {
+        if (widget.vtable.handle_fn != null) {
+            try self.handlable_widgets.append(allocator, widget);
+
+            if (widget.id == active_widget.id) self.active_widget_index = i;
+            i += 1;
+        }
+    }
+
+    for (widgets) |*widget| try widget.update(context);
+    try @call(.auto, position_widgets_fn, .{context});
+
+    var event: termbox.tb_event = undefined;
+    var inactivity_cmd_ran = false;
+    var inactivity_time_start = try interop.getTimeOfDay();
+
+    while (self.run) {
+        if (self.update) {
+            for (widgets) |*widget| try widget.update(context);
+
+            // Reset cursor
+            const current_widget = self.getActiveWidget();
+            current_widget.handle(null, insert_mode.*) catch |err| {
+                shared_error.writeError(error.SetCursorFailed);
+                try self.log_file.err(
+                    "tui",
+                    "failed to set cursor in active widget '{s}': {s}",
+                    .{ current_widget.display_name, @errorName(err) },
+                );
+            };
+
+            try TerminalBuffer.clearScreen(false);
+
+            for (widgets) |*widget| widget.draw();
+
+            TerminalBuffer.presentBuffer();
+        }
+
+        var maybe_timeout: ?usize = null;
+        for (widgets) |*widget| {
+            if (try widget.calculateTimeout(context)) |widget_timeout| {
+                if (maybe_timeout == null or widget_timeout < maybe_timeout.?) maybe_timeout = widget_timeout;
+            }
+        }
+
+        if (inactivity_event_fn) |inactivity_fn| {
+            const time = try interop.getTimeOfDay();
+
+            if (!inactivity_cmd_ran and time.seconds - inactivity_time_start.seconds > inactivity_delay) {
+                try @call(.auto, inactivity_fn, .{context});
+                inactivity_cmd_ran = true;
+            }
+        }
+
+        const event_error = if (maybe_timeout) |timeout| termbox.tb_peek_event(&event, @intCast(timeout)) else termbox.tb_poll_event(&event);
+
+        self.update = maybe_timeout != null;
+
+        if (event_error < 0) continue;
+
+        // Input of some kind was detected, so reset the inactivity timer
+        inactivity_time_start = try interop.getTimeOfDay();
+
+        if (event.type == termbox.TB_EVENT_RESIZE) {
+            self.width = TerminalBuffer.getWidth();
+            self.height = TerminalBuffer.getHeight();
+
+            try self.log_file.info(
+                "tui",
+                "screen resolution updated to {d}x{d}",
+                .{ self.width, self.height },
+            );
+
+            for (widgets) |*widget| {
+                widget.realloc() catch |err| {
+                    shared_error.writeError(error.WidgetReallocationFailed);
+                    try self.log_file.err(
+                        "tui",
+                        "failed to reallocate widget '{s}': {s}",
+                        .{ widget.display_name, @errorName(err) },
+                    );
+                };
+            }
+
+            try @call(.auto, position_widgets_fn, .{context});
+
+            self.update = true;
+            continue;
+        }
+
+        var maybe_keys = try self.handleKeybind(allocator, event);
+        if (maybe_keys) |*keys| {
+            defer keys.deinit(allocator);
+
+            const current_widget = self.getActiveWidget();
+            for (keys.items) |key| {
+                current_widget.handle(key, insert_mode.*) catch |err| {
+                    shared_error.writeError(error.CurrentWidgetHandlingFailed);
+                    try self.log_file.err(
+                        "tui",
+                        "failed to handle active widget '{s}': {s}",
+                        .{ current_widget.display_name, @errorName(err) },
+                    );
+                };
+            }
+
+            self.update = true;
+        }
+    }
+}
+
+pub fn stopEventLoop(self: *TerminalBuffer) void {
+    self.run = false;
+}
+
+pub fn drawNextFrame(self: *TerminalBuffer, value: bool) void {
+    self.update = value;
+}
+
+pub fn getActiveWidget(self: *TerminalBuffer) *Widget {
+    return self.handlable_widgets.items[self.active_widget_index];
+}
+
+pub fn setActiveWidget(self: *TerminalBuffer, widget: Widget) void {
+    for (self.handlable_widgets.items, 0..) |widg, i| {
+        if (widg.id == widget.id) self.active_widget_index = i;
+    }
 }
 
 pub fn getWidth() usize {
@@ -211,31 +382,18 @@ pub fn reclaim(self: TerminalBuffer) !void {
     }
 }
 
-pub fn registerKeybind(self: *TerminalBuffer, keybind: []const u8, callback: KeybindCallbackFn) !void {
-    var key = std.mem.zeroes(keyboard.Key);
-    var iterator = std.mem.splitScalar(u8, keybind, '+');
+pub fn registerKeybind(
+    self: *TerminalBuffer,
+    keybind: []const u8,
+    callback: KeybindCallbackFn,
+    context: *anyopaque,
+) !void {
+    const key = try self.parseKeybind(keybind);
 
-    while (iterator.next()) |item| {
-        var found = false;
-
-        inline for (std.meta.fields(keyboard.Key)) |field| {
-            if (std.ascii.eqlIgnoreCase(field.name, item)) {
-                @field(key, field.name) = true;
-                found = true;
-                break;
-            }
-        }
-
-        if (!found) {
-            try self.log_file.err(
-                "tui",
-                "failed to parse key {s} of keybind {s}",
-                .{ item, keybind },
-            );
-        }
-    }
-
-    self.keybinds.put(key, callback) catch |err| {
+    self.keybinds.put(key, .{
+        .callback = callback,
+        .context = context,
+    }) catch |err| {
         try self.log_file.err(
             "tui",
             "failed to register keybind {s}: {s}",
@@ -244,27 +402,18 @@ pub fn registerKeybind(self: *TerminalBuffer, keybind: []const u8, callback: Key
     };
 }
 
-pub fn handleKeybind(
-    self: *TerminalBuffer,
-    allocator: Allocator,
-    tb_event: termbox.tb_event,
-    context: *anyopaque,
-) !?std.ArrayList(keyboard.Key) {
-    var keys = try keyboard.getKeyList(allocator, tb_event);
+pub fn simulateKeybind(self: *TerminalBuffer, keybind: []const u8) !bool {
+    const key = try self.parseKeybind(keybind);
 
-    for (keys.items) |key| {
-        if (self.keybinds.get(key)) |callback| {
-            const passthrough_event = try @call(.auto, callback, .{context});
-            if (!passthrough_event) {
-                keys.deinit(allocator);
-                return null;
-            }
-
-            return keys;
-        }
+    if (self.keybinds.get(key)) |binding| {
+        return try @call(
+            .auto,
+            binding.callback,
+            .{binding.context},
+        );
     }
 
-    return keys;
+    return true;
 }
 
 pub fn drawText(
@@ -334,4 +483,92 @@ fn clearBackBuffer() !void {
     const capability = termbox.global.caps[termbox.TB_CAP_CLEAR_SCREEN];
     const capability_slice = std.mem.span(capability);
     _ = try std.posix.write(termbox.global.ttyfd, capability_slice);
+}
+
+fn parseKeybind(self: *TerminalBuffer, keybind: []const u8) !keyboard.Key {
+    var key = std.mem.zeroes(keyboard.Key);
+    var iterator = std.mem.splitScalar(u8, keybind, '+');
+
+    while (iterator.next()) |item| {
+        var found = false;
+
+        inline for (std.meta.fields(keyboard.Key)) |field| {
+            if (std.ascii.eqlIgnoreCase(field.name, item)) {
+                @field(key, field.name) = true;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            try self.log_file.err(
+                "tui",
+                "failed to parse key {s} of keybind {s}",
+                .{ item, keybind },
+            );
+        }
+    }
+
+    return key;
+}
+
+fn handleKeybind(
+    self: *TerminalBuffer,
+    allocator: Allocator,
+    tb_event: termbox.tb_event,
+) !?std.ArrayList(keyboard.Key) {
+    var keys = try keyboard.getKeyList(allocator, tb_event);
+
+    for (keys.items) |key| {
+        if (self.keybinds.get(key)) |binding| {
+            const passthrough_event = try @call(
+                .auto,
+                binding.callback,
+                .{binding.context},
+            );
+
+            if (!passthrough_event) {
+                keys.deinit(allocator);
+                return null;
+            }
+
+            return keys;
+        }
+    }
+
+    return keys;
+}
+
+fn moveCursorUp(ptr: *anyopaque) !bool {
+    var state: *TerminalBuffer = @ptrCast(@alignCast(ptr));
+    if (state.active_widget_index == 0) return false;
+
+    state.active_widget_index -= 1;
+    state.update = true;
+    return false;
+}
+
+fn moveCursorDown(ptr: *anyopaque) !bool {
+    var state: *TerminalBuffer = @ptrCast(@alignCast(ptr));
+    if (state.active_widget_index == state.handlable_widgets.items.len - 1) return false;
+
+    state.active_widget_index += 1;
+    state.update = true;
+    return false;
+}
+
+fn wrapCursor(ptr: *anyopaque) !bool {
+    var state: *TerminalBuffer = @ptrCast(@alignCast(ptr));
+
+    state.active_widget_index = (state.active_widget_index + 1) % state.handlable_widgets.items.len;
+    state.update = true;
+    return false;
+}
+
+fn wrapCursorReverse(ptr: *anyopaque) !bool {
+    var state: *TerminalBuffer = @ptrCast(@alignCast(ptr));
+
+    state.active_widget_index = if (state.active_widget_index == 0) state.handlable_widgets.items.len - 1 else state.active_widget_index - 1;
+    state.update = true;
+    return false;
 }

@@ -66,11 +66,7 @@ fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
 
 const UiState = struct {
     allocator: Allocator,
-    active_widget_index: usize,
-    handlable_widgets: std.ArrayList(*Widget),
     auth_fails: u64,
-    run: bool,
-    update: bool,
     is_autologin: bool,
     use_kmscon_vt: bool,
     active_tty: u8,
@@ -966,10 +962,7 @@ pub fn main() !void {
         state.config.auth_fails,
     );
 
-    state.active_widget_index = 0;
     state.auth_fails = 0;
-    state.run = true;
-    state.update = true;
     state.animate = state.config.animation != .none;
     state.insert_mode = !state.config.vi_mode or state.config.vi_default_mode == .insert;
     state.edge_margin = Position.init(
@@ -1056,36 +1049,24 @@ pub fn main() !void {
         try widgets.append(state.allocator, cascade.widget());
     }
 
-    try state.buffer.registerKeybind("Esc", &disableInsertMode);
-    try state.buffer.registerKeybind("I", &enableInsertMode);
+    try state.buffer.registerKeybind("Esc", &disableInsertMode, &state);
+    try state.buffer.registerKeybind("I", &enableInsertMode, &state);
 
-    try state.buffer.registerKeybind("Ctrl+C", &quit);
+    try state.buffer.registerKeybind("Ctrl+C", &quit, &state);
 
-    try state.buffer.registerKeybind("Ctrl+U", &clearPassword);
+    try state.buffer.registerKeybind("Ctrl+U", &clearPassword, &state);
 
-    try state.buffer.registerKeybind("Ctrl+K", &moveCursorUp);
-    try state.buffer.registerKeybind("Up", &moveCursorUp);
-    try state.buffer.registerKeybind("K", &viMoveCursorUp);
+    try state.buffer.registerKeybind("K", &viMoveCursorUp, &state);
+    try state.buffer.registerKeybind("J", &viMoveCursorDown, &state);
 
-    try state.buffer.registerKeybind("Ctrl+J", &moveCursorDown);
-    try state.buffer.registerKeybind("Down", &moveCursorDown);
-    try state.buffer.registerKeybind("J", &viMoseCursorDown);
+    try state.buffer.registerKeybind("Enter", &authenticate, &state);
 
-    try state.buffer.registerKeybind("Tab", &wrapCursor);
-    try state.buffer.registerKeybind("Shift+Tab", &wrapCursorReverse);
-
-    try state.buffer.registerKeybind("Enter", &authenticate);
-
-    try state.buffer.registerKeybind(state.config.shutdown_key, &shutdownCmd);
-    try state.buffer.registerKeybind(state.config.restart_key, &restartCmd);
-    if (state.config.sleep_cmd != null) try state.buffer.registerKeybind(state.config.sleep_key, &sleepCmd);
-    if (state.config.hibernate_cmd != null) try state.buffer.registerKeybind(state.config.hibernate_key, &hibernateCmd);
-    if (state.config.brightness_down_key) |key| try state.buffer.registerKeybind(key, &decreaseBrightnessCmd);
-    if (state.config.brightness_up_key) |key| try state.buffer.registerKeybind(key, &increaseBrightnessCmd);
-
-    var event: termbox.tb_event = undefined;
-    var inactivity_time_start = try interop.getTimeOfDay();
-    var inactivity_cmd_ran = false;
+    try state.buffer.registerKeybind(state.config.shutdown_key, &shutdownCmd, &state);
+    try state.buffer.registerKeybind(state.config.restart_key, &restartCmd, &state);
+    if (state.config.sleep_cmd != null) try state.buffer.registerKeybind(state.config.sleep_key, &sleepCmd, &state);
+    if (state.config.hibernate_cmd != null) try state.buffer.registerKeybind(state.config.hibernate_key, &hibernateCmd, &state);
+    if (state.config.brightness_down_key) |key| try state.buffer.registerKeybind(key, &decreaseBrightnessCmd, &state);
+    if (state.config.brightness_up_key) |key| try state.buffer.registerKeybind(key, &increaseBrightnessCmd, &state);
 
     if (state.config.initial_info_text) |text| {
         try state.info_line.addMessage(text, state.config.bg, state.config.fg);
@@ -1122,159 +1103,20 @@ pub fn main() !void {
         .password => state.password_widget,
     };
 
-    // Run the event loop
-    state.handlable_widgets = .empty;
-    defer state.handlable_widgets.deinit(state.allocator);
+    var shared_error = try SharedError.init();
+    defer shared_error.deinit();
 
-    var i: usize = 0;
-    for (widgets.items) |*widget| {
-        if (widget.vtable.handle_fn != null) {
-            try state.handlable_widgets.append(state.allocator, widget);
-
-            if (widget.id == active_widget.id) state.active_widget_index = i;
-            i += 1;
-        }
-    }
-
-    for (widgets.items) |*widget| try widget.update(&state);
-    positionComponents(&state);
-
-    while (state.run) {
-        if (state.update) {
-            for (widgets.items) |*widget| try widget.update(&state);
-
-            // Reset cursor
-            const current_widget = getActiveWidget(&state);
-            current_widget.handle(null, state.insert_mode) catch |err| {
-                try state.info_line.addMessage(
-                    state.lang.err_alloc,
-                    state.config.error_bg,
-                    state.config.error_fg,
-                );
-                try state.log_file.err(
-                    "tui",
-                    "failed to set cursor in active widget '{s}': {s}",
-                    .{ current_widget.display_name, @errorName(err) },
-                );
-            };
-
-            try TerminalBuffer.clearScreen(false);
-
-            for (widgets.items) |*widget| widget.draw();
-
-            TerminalBuffer.presentBuffer();
-        }
-
-        var maybe_timeout: ?usize = null;
-        for (widgets.items) |*widget| {
-            if (try widget.calculateTimeout(&state)) |widget_timeout| {
-                if (maybe_timeout == null or widget_timeout < maybe_timeout.?) maybe_timeout = widget_timeout;
-            }
-        }
-
-        if (state.config.inactivity_cmd) |inactivity_cmd| {
-            const time = try interop.getTimeOfDay();
-
-            if (!inactivity_cmd_ran and time.seconds - inactivity_time_start.seconds > state.config.inactivity_delay) {
-                var inactivity = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", inactivity_cmd }, state.allocator);
-                inactivity.stdout_behavior = .Ignore;
-                inactivity.stderr_behavior = .Ignore;
-
-                handle_inactivity_cmd: {
-                    const process_result = inactivity.spawnAndWait() catch {
-                        break :handle_inactivity_cmd;
-                    };
-                    if (process_result.Exited != 0) {
-                        try state.info_line.addMessage(
-                            state.lang.err_inactivity,
-                            state.config.error_bg,
-                            state.config.error_fg,
-                        );
-                        try state.log_file.err(
-                            "sys",
-                            "failed to execute inactivity command: exit code {d}",
-                            .{process_result.Exited},
-                        );
-                    }
-                }
-
-                inactivity_cmd_ran = true;
-            }
-        }
-
-        const event_error = if (maybe_timeout) |timeout| termbox.tb_peek_event(&event, @intCast(timeout)) else termbox.tb_poll_event(&event);
-
-        state.update = maybe_timeout != null;
-
-        if (event_error < 0) continue;
-
-        // Input of some kind was detected, so reset the inactivity timer
-        inactivity_time_start = try interop.getTimeOfDay();
-
-        if (event.type == termbox.TB_EVENT_RESIZE) {
-            state.buffer.width = TerminalBuffer.getWidth();
-            state.buffer.height = TerminalBuffer.getHeight();
-
-            try state.log_file.info("tui", "screen resolution updated to {d}x{d}", .{ state.buffer.width, state.buffer.height });
-
-            for (widgets.items) |*widget| {
-                widget.realloc() catch |err| {
-                    try state.info_line.addMessage(
-                        state.lang.err_alloc,
-                        state.config.error_bg,
-                        state.config.error_fg,
-                    );
-                    try state.log_file.err(
-                        "tui",
-                        "failed to reallocate widget '{s}': {s}",
-                        .{ widget.display_name, @errorName(err) },
-                    );
-                };
-            }
-
-            positionComponents(&state);
-
-            state.update = true;
-            continue;
-        }
-
-        var maybe_keys = try state.buffer.handleKeybind(
-            state.allocator,
-            event,
-            &state,
-        );
-        if (maybe_keys) |*keys| {
-            defer keys.deinit(state.allocator);
-
-            const current_widget = getActiveWidget(&state);
-            for (keys.items) |key| {
-                current_widget.handle(key, state.insert_mode) catch |err| {
-                    try state.info_line.addMessage(
-                        state.lang.err_alloc,
-                        state.config.error_bg,
-                        state.config.error_fg,
-                    );
-                    try state.log_file.err(
-                        "tui",
-                        "failed to handle active widget '{s}': {s}",
-                        .{ current_widget.display_name, @errorName(err) },
-                    );
-                };
-            }
-
-            state.update = true;
-        }
-    }
-}
-
-fn getActiveWidget(state: *UiState) *Widget {
-    return state.handlable_widgets.items[state.active_widget_index];
-}
-
-fn setActiveWidget(state: *UiState, widget: *Widget) void {
-    for (state.handlable_widgets.items, 0..) |widg, i| {
-        if (widg.id == widget.id) state.active_widget_index = i;
-    }
+    try state.buffer.runEventLoop(
+        state.allocator,
+        shared_error,
+        widgets.items,
+        active_widget,
+        state.config.inactivity_delay,
+        &state.insert_mode, // FIXME: Hack
+        positionWidgets,
+        handleInactivity,
+        &state,
+    );
 }
 
 fn disableInsertMode(ptr: *anyopaque) !bool {
@@ -1282,7 +1124,7 @@ fn disableInsertMode(ptr: *anyopaque) !bool {
 
     if (state.config.vi_mode and state.insert_mode) {
         state.insert_mode = false;
-        state.update = true;
+        state.buffer.drawNextFrame(true);
     }
     return false;
 }
@@ -1292,78 +1134,38 @@ fn enableInsertMode(ptr: *anyopaque) !bool {
     if (state.insert_mode) return true;
 
     state.insert_mode = true;
-    state.update = true;
-    return false;
-}
-
-fn clearPassword(ptr: *anyopaque) !bool {
-    var state: *UiState = @ptrCast(@alignCast(ptr));
-
-    if (getActiveWidget(state) == &state.password_widget) {
-        state.password.clear();
-        state.update = true;
-    }
-    return false;
-}
-
-fn moveCursorUp(ptr: *anyopaque) !bool {
-    var state: *UiState = @ptrCast(@alignCast(ptr));
-    if (state.active_widget_index == 0) return false;
-
-    state.active_widget_index -= 1;
-    state.update = true;
+    state.buffer.drawNextFrame(true);
     return false;
 }
 
 fn viMoveCursorUp(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
     if (state.insert_mode) return true;
-    if (state.active_widget_index == 0) return false;
 
-    state.active_widget_index -= 1;
-    state.update = true;
-    return false;
+    return try state.buffer.simulateKeybind("Up");
 }
 
-fn moveCursorDown(ptr: *anyopaque) !bool {
-    var state: *UiState = @ptrCast(@alignCast(ptr));
-    if (state.active_widget_index == state.handlable_widgets.items.len - 1) return false;
-
-    state.active_widget_index += 1;
-    state.update = true;
-    return false;
-}
-
-fn viMoseCursorDown(ptr: *anyopaque) !bool {
+fn viMoveCursorDown(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
     if (state.insert_mode) return true;
-    if (state.active_widget_index == state.handlable_widgets.items.len - 1) return false;
 
-    state.active_widget_index += 1;
-    state.update = true;
-    return false;
+    return try state.buffer.simulateKeybind("Down");
 }
 
-fn wrapCursor(ptr: *anyopaque) !bool {
+fn clearPassword(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
-    state.active_widget_index = (state.active_widget_index + 1) % state.handlable_widgets.items.len;
-    state.update = true;
-    return false;
-}
-
-fn wrapCursorReverse(ptr: *anyopaque) !bool {
-    var state: *UiState = @ptrCast(@alignCast(ptr));
-
-    state.active_widget_index = (state.active_widget_index - 1) % state.handlable_widgets.items.len;
-    state.update = true;
+    if (state.buffer.getActiveWidget().id == state.password_widget.id) {
+        state.password.clear();
+        state.buffer.drawNextFrame(true);
+    }
     return false;
 }
 
 fn quit(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
-    state.run = false;
+    state.buffer.stopEventLoop();
     return false;
 }
 
@@ -1524,7 +1326,7 @@ fn authenticate(ptr: *anyopaque) !bool {
     const auth_err = shared_err.readError();
     if (auth_err) |err| {
         state.auth_fails += 1;
-        setActiveWidget(state, &state.password_widget);
+        state.buffer.setActiveWidget(state.password_widget);
 
         try state.info_line.addMessage(
             getAuthErrorMsg(err, state.lang),
@@ -1556,7 +1358,7 @@ fn authenticate(ptr: *anyopaque) !bool {
 
     if (state.config.auth_fails == 0 or state.auth_fails < state.config.auth_fails) {
         try TerminalBuffer.clearScreen(true);
-        state.update = true;
+        state.buffer.drawNextFrame(true);
     }
 
     // Restore the cursor
@@ -1569,7 +1371,7 @@ fn shutdownCmd(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
     shutdown = true;
-    state.run = false;
+    state.buffer.stopEventLoop();
     return false;
 }
 
@@ -1577,7 +1379,7 @@ fn restartCmd(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
     restart = true;
-    state.run = false;
+    state.buffer.stopEventLoop();
     return false;
 }
 
@@ -1810,7 +1612,9 @@ fn updateSessionSpecifier(self: *Label, ptr: *anyopaque) !void {
     self.setText(env.environment.specifier);
 }
 
-fn positionComponents(state: *UiState) void {
+fn positionWidgets(ptr: *anyopaque) !void {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
     if (!state.config.hide_key_hints) {
         state.shutdown_label.positionX(state.edge_margin
             .add(TerminalBuffer.START_POSITION));
@@ -1893,6 +1697,34 @@ fn positionComponents(state: *UiState) void {
     state.version_label.positionXY(state.edge_margin
         .add(TerminalBuffer.START_POSITION)
         .invertY(state.buffer.height - 1));
+}
+
+fn handleInactivity(ptr: *anyopaque) !void {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    if (state.config.inactivity_cmd) |inactivity_cmd| {
+        var inactivity = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", inactivity_cmd }, state.allocator);
+        inactivity.stdout_behavior = .Ignore;
+        inactivity.stderr_behavior = .Ignore;
+
+        handle_inactivity_cmd: {
+            const process_result = inactivity.spawnAndWait() catch {
+                break :handle_inactivity_cmd;
+            };
+            if (process_result.Exited != 0) {
+                try state.info_line.addMessage(
+                    state.lang.err_inactivity,
+                    state.config.error_bg,
+                    state.config.error_fg,
+                );
+                try state.log_file.err(
+                    "sys",
+                    "failed to execute inactivity command: exit code {d}",
+                    .{process_result.Exited},
+                );
+            }
+        }
+    }
 }
 
 fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplayServer, exec: ?[]const u8) !void {
