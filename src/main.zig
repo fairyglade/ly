@@ -40,7 +40,6 @@ const Session = @import("tui/components/Session.zig");
 const Text = @import("tui/components/Text.zig");
 const UserList = @import("tui/components/UserList.zig");
 const TerminalBuffer = @import("tui/TerminalBuffer.zig");
-const termbox = TerminalBuffer.termbox;
 const Widget = @import("tui/Widget.zig");
 
 const ly_version_str = "Ly version " ++ build_options.version;
