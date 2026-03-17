@@ -1686,22 +1686,34 @@ fn positionWidgets(ptr: *anyopaque) !void {
     if (!state.config.hide_key_hints) {
         state.shutdown_label.positionX(state.edge_margin
             .add(TerminalBuffer.START_POSITION));
-        state.restart_label.positionX(state.shutdown_label
+        var last_label = state.shutdown_label;
+        state.restart_label.positionX(last_label
             .childrenPosition()
             .addX(1));
-        state.sleep_label.positionX(state.restart_label
+        last_label = state.restart_label;
+        state.sleep_label.positionX(last_label
             .childrenPosition()
             .addX(1));
-        state.hibernate_label.positionX(state.sleep_label
+        if (state.config.sleep_cmd != null) {
+            last_label = state.sleep_label;
+        }
+        state.hibernate_label.positionX(last_label
             .childrenPosition()
             .addX(1));
-        state.toggle_password_label.positionX(state.hibernate_label
+        if (state.config.hibernate_cmd != null) {
+            last_label = state.hibernate_label;
+        }
+        state.toggle_password_label.positionX(last_label
             .childrenPosition()
             .addX(1));
-        state.brightness_down_label.positionX(state.toggle_password_label
+        last_label = state.toggle_password_label;
+        state.brightness_down_label.positionX(last_label
             .childrenPosition()
             .addX(1));
-        state.brightness_up_label.positionXY(state.brightness_down_label
+        if (state.config.brightness_down_key != null) {
+            last_label = state.brightness_down_label;
+        }
+        state.brightness_up_label.positionXY(last_label
             .childrenPosition()
             .addX(1));
     }
