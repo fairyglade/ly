@@ -1084,6 +1084,7 @@ pub fn main() !void {
     try state.buffer.registerKeybind("Ctrl+C", &quit, &state);
 
     // TODO: Make this generic for any Text widget present in the UI
+    // TODO: Per-widget keybinds, will fix insert_mode hack too
     try state.buffer.registerKeybind("Ctrl+U", &clearPassword, &state);
 
     try state.buffer.registerKeybind("K", &viMoveCursorUp, &state);
