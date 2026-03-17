@@ -96,6 +96,10 @@ pub fn clear(self: *Text) void {
     self.visible_start = 0;
 }
 
+pub fn toggleMask(self: *Text) void {
+    self.masked = !self.masked;
+}
+
 pub fn handle(self: *Text, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
     if (maybe_key) |key| {
         if (key.left or (!insert_mode and (key.h or key.backspace))) {

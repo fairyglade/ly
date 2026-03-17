@@ -76,6 +76,7 @@ const UiState = struct {
     restart_label: Label,
     sleep_label: Label,
     hibernate_label: Label,
+    toggle_password_label: Label,
     brightness_down_label: Label,
     brightness_up_label: Label,
     numlock_label: Label,
@@ -393,6 +394,16 @@ pub fn main() !void {
     );
     defer state.hibernate_label.deinit();
 
+    state.toggle_password_label = Label.init(
+        "",
+        null,
+        state.buffer.fg,
+        state.buffer.bg,
+        null,
+        null,
+    );
+    defer state.toggle_password_label.deinit();
+
     state.brightness_down_label = Label.init(
         "",
         null,
@@ -423,6 +434,11 @@ pub fn main() !void {
             state.allocator,
             "{s} {s}",
             .{ state.config.restart_key, state.lang.restart },
+        );
+        try state.toggle_password_label.setTextAlloc(
+            state.allocator,
+            "{s} {s}",
+            .{ state.config.show_password_key, state.lang.toggle_password },
         );
         if (state.config.sleep_cmd != null) {
             try state.sleep_label.setTextAlloc(
@@ -1019,6 +1035,10 @@ pub fn main() !void {
         if (state.config.sleep_cmd != null) {
             try layer2.append(state.allocator, state.sleep_label.widget());
         }
+        if (state.config.hibernate_cmd != null) {
+            try layer2.append(state.allocator, state.hibernate_label.widget());
+        }
+        try layer2.append(state.allocator, state.toggle_password_label.widget());
         if (state.config.brightness_down_key != null) {
             try layer2.append(state.allocator, state.brightness_down_label.widget());
         }
@@ -1074,6 +1094,7 @@ pub fn main() !void {
 
     try state.buffer.registerKeybind(state.config.shutdown_key, &shutdownCmd, &state);
     try state.buffer.registerKeybind(state.config.restart_key, &restartCmd, &state);
+    try state.buffer.registerKeybind(state.config.show_password_key, &togglePasswordMask, &state);
     if (state.config.sleep_cmd != null) try state.buffer.registerKeybind(state.config.sleep_key, &sleepCmd, &state);
     if (state.config.hibernate_cmd != null) try state.buffer.registerKeybind(state.config.hibernate_key, &hibernateCmd, &state);
     if (state.config.brightness_down_key) |key| try state.buffer.registerKeybind(key, &decreaseBrightnessCmd, &state);
@@ -1198,6 +1219,14 @@ fn clearPassword(ptr: *anyopaque) !bool {
         state.password.clear();
         state.buffer.drawNextFrame(true);
     }
+    return false;
+}
+
+fn togglePasswordMask(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    state.password.toggleMask();
+    state.buffer.drawNextFrame(true);
     return false;
 }
 
@@ -1666,7 +1695,10 @@ fn positionWidgets(ptr: *anyopaque) !void {
         state.hibernate_label.positionX(state.sleep_label
             .childrenPosition()
             .addX(1));
-        state.brightness_down_label.positionX(state.hibernate_label
+        state.toggle_password_label.positionX(state.hibernate_label
+            .childrenPosition()
+            .addX(1));
+        state.brightness_down_label.positionX(state.toggle_password_label
             .childrenPosition()
             .addX(1));
         state.brightness_up_label.positionXY(state.brightness_down_label
