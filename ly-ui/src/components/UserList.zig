@@ -1,7 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const SavedUsers = @import("../../config/SavedUsers.zig");
+const ly_core = @import("ly-core");
+const SavedUsers = ly_core.SavedUsers;
+
 const keyboard = @import("../keyboard.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const Widget = @import("../Widget.zig");

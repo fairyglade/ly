@@ -1,7 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const Environment = @import("../../Environment.zig");
+const ly_core = @import("ly-core");
+const Environment = ly_core.Environment;
+
 const keyboard = @import("../keyboard.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const Widget = @import("../Widget.zig");
@@ -9,6 +11,7 @@ const generic = @import("generic.zig");
 const UserList = @import("UserList.zig");
 
 const Env = struct {
+    // TODO: Remove dependency on Environment
     environment: Environment,
     index: usize,
 };

@@ -9,14 +9,6 @@ pub const Animation = enum {
     dur_file,
 };
 
-pub const DisplayServer = enum {
-    wayland,
-    shell,
-    xinitrc,
-    x11,
-    custom,
-};
-
 pub const Input = enum {
     info_line,
     session,

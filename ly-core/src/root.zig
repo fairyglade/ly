@@ -1,10 +1,14 @@
 const std = @import("std");
-const ini = @import("zigini");
+
+pub const ini = @import("zigini");
 
 pub const interop = @import("interop.zig");
 pub const UidRange = @import("UidRange.zig");
 pub const LogFile = @import("LogFile.zig");
 pub const SharedError = @import("SharedError.zig");
+pub const SavedUsers = @import("SavedUsers.zig");
+pub const Environment = @import("Environment.zig");
+pub const DisplayServer = @import("enums.zig").DisplayServer;
 
 pub fn IniParser(comptime Struct: type) type {
     return struct {

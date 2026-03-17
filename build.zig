@@ -72,35 +72,17 @@ pub fn build(b: *std.Build) !void {
         .use_llvm = true,
     });
 
-    const ly_core = b.dependency("ly_core", .{ .target = target, .optimize = optimize });
-    exe.root_module.addImport("ly-core", ly_core.module("ly-core"));
-
-    const zigini = b.dependency("zigini", .{ .target = target, .optimize = optimize });
-    exe.root_module.addImport("zigini", zigini.module("zigini"));
+    const ly_ui = b.dependency("ly_ui", .{ .target = target, .optimize = optimize });
+    exe.root_module.addImport("ly-ui", ly_ui.module("ly-ui"));
 
     exe.root_module.addOptions("build_options", build_options);
 
     const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("clap", clap.module("clap"));
 
-    const termbox_dep = b.dependency("termbox2", .{
-        .target = target,
-        .optimize = optimize,
-    });
-
     exe.linkSystemLibrary("pam");
     if (enable_x11_support) exe.linkSystemLibrary("xcb");
     exe.linkLibC();
-
-    const translate_c = b.addTranslateC(.{
-        .root_source_file = termbox_dep.path("termbox2.h"),
-        .target = target,
-        .optimize = optimize,
-    });
-    translate_c.defineCMacroRaw("TB_IMPL");
-    translate_c.defineCMacro("TB_OPT_ATTR_W", "32"); // Enable 24-bit color support + styling (32-bit)
-    const termbox2 = translate_c.addModule("termbox2");
-    exe.root_module.addImport("termbox2", termbox2);
 
     b.installArtifact(exe);
 

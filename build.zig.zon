@@ -4,20 +4,12 @@
     .fingerprint = 0xa148ffcc5dc2cb59,
     .minimum_zig_version = "0.15.0",
     .dependencies = .{
-        .ly_core = .{
-            .path = "ly-core",
+        .ly_ui = .{
+            .path = "ly-ui",
         },
         .clap = .{
             .url = "git+https://github.com/Hejsil/zig-clap#5289e0753cd274d65344bef1c114284c633536ea",
             .hash = "clap-0.11.0-oBajB-HnAQDPCKYzwF7rO3qDFwRcD39Q0DALlTSz5H7e",
-        },
-        .zigini = .{
-            .url = "git+https://github.com/AnErrupTion/zigini?ref=zig-0.15.0#9281f47702b57779e831d7618e158abb8eb4d4a2",
-            .hash = "zigini-0.3.3-36M0FRJJAADZVq5HPm-hYKMpFFTr0OgjbEYcK2ijKZ5n",
-        },
-        .termbox2 = .{
-            .url = "git+https://github.com/AnErrupTion/termbox2?ref=master#496730697c662893eec43192f48ff616c2539da6",
-            .hash = "N-V-__8AAOEWBQDt5tNdIzIFY6n8DdZsCP-6MyLoNS20wgpA",
         },
     },
     .paths = .{""},

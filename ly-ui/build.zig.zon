@@ -1,0 +1,20 @@
+.{
+    .name = .ly_ui,
+    .version = "1.0.0",
+    .fingerprint = 0x8d11bf85a74ec803,
+    .minimum_zig_version = "0.15.0",
+    .dependencies = .{
+        .ly_core = .{
+            .path = "../ly-core",
+        },
+        .termbox2 = .{
+            .url = "git+https://github.com/AnErrupTion/termbox2?ref=master#496730697c662893eec43192f48ff616c2539da6",
+            .hash = "N-V-__8AAOEWBQDt5tNdIzIFY6n8DdZsCP-6MyLoNS20wgpA",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

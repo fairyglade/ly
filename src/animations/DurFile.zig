@@ -4,18 +4,20 @@ const Json = std.json;
 const eql = std.mem.eql;
 const flate = std.compress.flate;
 
-const ly_core = @import("ly-core");
+const ly_ui = @import("ly-ui");
+const Cell = ly_ui.Cell;
+const TerminalBuffer = ly_ui.TerminalBuffer;
+const Color = TerminalBuffer.Color;
+const Styling = TerminalBuffer.Styling;
+const Widget = ly_ui.Widget;
+
+const ly_core = ly_ui.ly_core;
 const interop = ly_core.interop;
 const TimeOfDay = interop.TimeOfDay;
 const LogFile = ly_core.LogFile;
 
 const enums = @import("../enums.zig");
 const DurOffsetAlignment = enums.DurOffsetAlignment;
-const Cell = @import("../tui/Cell.zig");
-const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
-const Color = TerminalBuffer.Color;
-const Styling = TerminalBuffer.Styling;
-const Widget = @import("../tui/Widget.zig");
 
 fn read_decompress_file(allocator: Allocator, file_path: []const u8) ![]u8 {
     const file_buffer = std.fs.cwd().openFile(file_path, .{}) catch {

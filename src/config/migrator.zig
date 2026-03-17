@@ -5,16 +5,17 @@
 const std = @import("std");
 var temporary_allocator = std.heap.page_allocator;
 
-const ini = @import("zigini");
-const ly_core = @import("ly-core");
-const IniParser = ly_core.IniParser;
-
-const TerminalBuffer = @import("../tui/TerminalBuffer.zig");
+const ly_ui = @import("ly-ui");
+const TerminalBuffer = ly_ui.TerminalBuffer;
 const Color = TerminalBuffer.Color;
 const Styling = TerminalBuffer.Styling;
+const ly_core = ly_ui.ly_core;
+const IniParser = ly_core.IniParser;
+const SavedUsers = ly_core.SavedUsers;
+const ini = ly_core.ini;
+
 const Config = @import("Config.zig");
 const OldSave = @import("OldSave.zig");
-const SavedUsers = @import("SavedUsers.zig");
 
 const color_properties = [_][]const u8{
     "bg",
