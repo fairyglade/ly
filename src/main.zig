@@ -540,7 +540,7 @@ pub fn main() !void {
         &updateBox,
     );
 
-    state.info_line = InfoLine.init(
+    state.info_line = try InfoLine.init(
         state.allocator,
         &state.buffer,
         state.box.width - 2 * state.box.horizontal_margin,
@@ -548,6 +548,9 @@ pub fn main() !void {
         state.buffer.bg,
     );
     defer state.info_line.deinit();
+
+    try state.buffer.registerKeybind(&state.info_line.label.keybinds, "H", &viGoLeft, &state);
+    try state.buffer.registerKeybind(&state.info_line.label.keybinds, "L", &viGoRight, &state);
 
     if (maybe_res == null) {
         var longest = diag.name.longest();
@@ -650,7 +653,7 @@ pub fn main() !void {
     );
     defer state.session_specifier_label.deinit();
 
-    state.session = Session.init(
+    state.session = try Session.init(
         state.allocator,
         &state.buffer,
         &state.login,
@@ -660,6 +663,9 @@ pub fn main() !void {
         state.buffer.bg,
     );
     defer state.session.deinit();
+
+    try state.buffer.registerKeybind(&state.session.label.keybinds, "H", &viGoLeft, &state);
+    try state.buffer.registerKeybind(&state.session.label.keybinds, "L", &viGoRight, &state);
 
     state.login_label = Label.init(
         state.lang.login,
@@ -683,6 +689,9 @@ pub fn main() !void {
         state.buffer.bg,
     );
     defer state.login.deinit();
+
+    try state.buffer.registerKeybind(&state.login.label.keybinds, "H", &viGoLeft, &state);
+    try state.buffer.registerKeybind(&state.login.label.keybinds, "L", &viGoRight, &state);
 
     addOtherEnvironment(&state.session, state.lang, .shell, null) catch |err| {
         try state.info_line.addMessage(
@@ -792,9 +801,12 @@ pub fn main() !void {
     );
     defer state.password_label.deinit();
 
+    state.insert_mode = !state.config.vi_mode or state.config.vi_default_mode == .insert;
+
     state.password = try Text.init(
         state.allocator,
         &state.buffer,
+        state.insert_mode,
         true,
         state.config.asterisk,
         state.box.width - 2 * state.box.horizontal_margin - state.labels_max_length - 1,
@@ -802,6 +814,9 @@ pub fn main() !void {
         state.buffer.bg,
     );
     defer state.password.deinit();
+
+    try state.buffer.registerKeybind(&state.password.keybinds, "H", &viGoLeft, &state);
+    try state.buffer.registerKeybind(&state.password.keybinds, "L", &viGoRight, &state);
 
     state.password_widget = state.password.widget();
 
@@ -979,7 +994,6 @@ pub fn main() !void {
 
     state.auth_fails = 0;
     state.animate = state.config.animation != .none;
-    state.insert_mode = !state.config.vi_mode or state.config.vi_default_mode == .insert;
     state.edge_margin = Position.init(
         state.config.edge_margin,
         state.config.edge_margin,
@@ -1139,7 +1153,6 @@ pub fn main() !void {
         widgets.items,
         active_widget,
         state.config.inactivity_delay,
-        &state.insert_mode, // FIXME: Hack
         positionWidgets,
         handleInactivity,
         &state,
@@ -1180,6 +1193,7 @@ fn disableInsertMode(ptr: *anyopaque) !bool {
 
     if (state.config.vi_mode and state.insert_mode) {
         state.insert_mode = false;
+        state.password.should_insert = false;
         state.buffer.drawNextFrame(true);
     }
     return false;
@@ -1190,8 +1204,23 @@ fn enableInsertMode(ptr: *anyopaque) !bool {
     if (state.insert_mode) return true;
 
     state.insert_mode = true;
+    state.password.should_insert = true;
     state.buffer.drawNextFrame(true);
     return false;
+}
+
+fn viGoLeft(ptr: *anyopaque) !bool {
+    var self: *UiState = @ptrCast(@alignCast(ptr));
+    if (self.insert_mode) return true;
+
+    return try self.buffer.simulateKeybind("Left");
+}
+
+fn viGoRight(ptr: *anyopaque) !bool {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+    if (state.insert_mode) return true;
+
+    return try state.buffer.simulateKeybind("Right");
 }
 
 fn viMoveCursorUp(ptr: *anyopaque) !bool {

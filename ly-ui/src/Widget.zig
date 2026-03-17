@@ -8,7 +8,7 @@ const VTable = struct {
     realloc_fn: ?*const fn (ptr: *anyopaque) anyerror!void,
     draw_fn: *const fn (ptr: *anyopaque) void,
     update_fn: ?*const fn (ptr: *anyopaque, ctx: *anyopaque) anyerror!void,
-    handle_fn: ?*const fn (ptr: *anyopaque, maybe_key: ?keyboard.Key, insert_mode: bool) anyerror!void,
+    handle_fn: ?*const fn (ptr: *anyopaque, maybe_key: ?keyboard.Key) anyerror!void,
     calculate_timeout_fn: ?*const fn (ptr: *anyopaque, ctx: *anyopaque) anyerror!?usize,
 };
 
@@ -26,7 +26,7 @@ pub fn init(
     comptime realloc_fn: ?fn (ptr: @TypeOf(pointer)) anyerror!void,
     comptime draw_fn: fn (ptr: @TypeOf(pointer)) void,
     comptime update_fn: ?fn (ptr: @TypeOf(pointer), ctx: *anyopaque) anyerror!void,
-    comptime handle_fn: ?fn (ptr: @TypeOf(pointer), maybe_key: ?keyboard.Key, insert_mode: bool) anyerror!void,
+    comptime handle_fn: ?fn (ptr: @TypeOf(pointer), maybe_key: ?keyboard.Key) anyerror!void,
     comptime calculate_timeout_fn: ?fn (ptr: @TypeOf(pointer), ctx: *anyopaque) anyerror!?usize,
 ) Widget {
     const Pointer = @TypeOf(pointer);
@@ -71,13 +71,13 @@ pub fn init(
             );
         }
 
-        pub fn handleImpl(ptr: *anyopaque, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
+        pub fn handleImpl(ptr: *anyopaque, maybe_key: ?keyboard.Key) !void {
             const impl: Pointer = @ptrCast(@alignCast(ptr));
 
             return @call(
                 .always_inline,
                 handle_fn.?,
-                .{ impl, maybe_key, insert_mode },
+                .{ impl, maybe_key },
             );
         }
 
@@ -156,14 +156,14 @@ pub fn update(self: *Widget, ctx: *anyopaque) !void {
     }
 }
 
-pub fn handle(self: *Widget, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
+pub fn handle(self: *Widget, maybe_key: ?keyboard.Key) !void {
     const impl: @TypeOf(self.pointer) = @ptrCast(@alignCast(self.pointer));
 
     if (self.vtable.handle_fn) |handle_fn| {
         return @call(
             .auto,
             handle_fn,
-            .{ impl, maybe_key, insert_mode },
+            .{ impl, maybe_key },
         );
     }
 }

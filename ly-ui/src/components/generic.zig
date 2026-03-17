@@ -28,6 +28,7 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
         draw_item_fn: DrawItemFn,
         change_item_fn: ?ChangeItemFn,
         change_item_arg: ?ChangeItemType,
+        keybinds: TerminalBuffer.KeybindMap,
 
         pub fn init(
             allocator: Allocator,
@@ -39,8 +40,9 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
             text_in_center: bool,
             fg: u32,
             bg: u32,
-        ) Self {
-            return .{
+        ) !*Self {
+            var self = try allocator.create(Self);
+            self.* = .{
                 .allocator = allocator,
                 .buffer = buffer,
                 .list = .empty,
@@ -55,11 +57,21 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
                 .draw_item_fn = draw_item_fn,
                 .change_item_fn = change_item_fn,
                 .change_item_arg = change_item_arg,
+                .keybinds = .init(allocator),
             };
+
+            try buffer.registerKeybind(&self.keybinds, "Left", &goLeft, self);
+            try buffer.registerKeybind(&self.keybinds, "Ctrl+H", &goLeft, self);
+            try buffer.registerKeybind(&self.keybinds, "Right", &goRight, self);
+            try buffer.registerKeybind(&self.keybinds, "Ctrl+L", &goRight, self);
+
+            return self;
         }
 
         pub fn deinit(self: *Self) void {
             self.list.deinit(self.allocator);
+            self.keybinds.deinit();
+            self.allocator.destroy(self);
         }
 
         pub fn positionX(self: *Self, original_pos: Position) void {
@@ -92,15 +104,7 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
             self.current = self.list.items.len - 1;
         }
 
-        pub fn handle(self: *Self, maybe_key: ?keyboard.Key, insert_mode: bool) void {
-            if (maybe_key) |key| {
-                if (key.left or (key.ctrl and key.h) or (!insert_mode and key.h)) {
-                    self.goLeft();
-                } else if (key.right or (key.ctrl and key.l) or (!insert_mode and key.l)) {
-                    self.goRight();
-                }
-            }
-
+        pub fn handle(self: *Self, _: ?keyboard.Key) void {
             TerminalBuffer.setCursor(
                 self.component_pos.x + self.cursor + 2,
                 self.component_pos.y,
@@ -132,7 +136,9 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
             );
         }
 
-        fn goLeft(self: *Self) void {
+        fn goLeft(ptr: *anyopaque) !bool {
+            var self: *Self = @ptrCast(@alignCast(ptr));
+
             self.current = if (self.current == 0) self.list.items.len - 1 else self.current - 1;
 
             if (self.change_item_fn) |change_item_fn| {
@@ -142,9 +148,13 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
                     .{ self.list.items[self.current], self.change_item_arg },
                 );
             }
+
+            return false;
         }
 
-        fn goRight(self: *Self) void {
+        fn goRight(ptr: *anyopaque) !bool {
+            var self: *Self = @ptrCast(@alignCast(ptr));
+
             self.current = if (self.current == self.list.items.len - 1) 0 else self.current + 1;
 
             if (self.change_item_fn) |change_item_fn| {
@@ -154,6 +164,8 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
                     .{ self.list.items[self.current], self.change_item_arg },
                 );
             }
+
+            return false;
         }
     };
 }

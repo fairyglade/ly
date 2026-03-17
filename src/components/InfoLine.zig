@@ -18,7 +18,7 @@ const Message = struct {
     fg: u32,
 };
 
-label: MessageLabel,
+label: *MessageLabel,
 
 pub fn init(
     allocator: Allocator,
@@ -26,9 +26,9 @@ pub fn init(
     width: usize,
     arrow_fg: u32,
     arrow_bg: u32,
-) InfoLine {
+) !InfoLine {
     return .{
-        .label = MessageLabel.init(
+        .label = try MessageLabel.init(
             allocator,
             buffer,
             drawItem,
@@ -49,7 +49,7 @@ pub fn deinit(self: *InfoLine) void {
 pub fn widget(self: *InfoLine) Widget {
     return Widget.init(
         "InfoLine",
-        null,
+        self.label.keybinds,
         self,
         deinit,
         null,
@@ -91,8 +91,8 @@ fn draw(self: *InfoLine) void {
     self.label.draw();
 }
 
-fn handle(self: *InfoLine, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
-    self.label.handle(maybe_key, insert_mode);
+fn handle(self: *InfoLine, maybe_key: ?keyboard.Key) !void {
+    self.label.handle(maybe_key);
 }
 
 fn drawItem(label: *MessageLabel, message: Message, x: usize, y: usize, width: usize) void {

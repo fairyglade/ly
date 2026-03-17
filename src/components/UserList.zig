@@ -21,7 +21,7 @@ const UserLabel = CyclableLabel(User, *Session);
 
 const UserList = @This();
 
-label: UserLabel,
+label: *UserLabel,
 
 pub fn init(
     allocator: Allocator,
@@ -35,7 +35,7 @@ pub fn init(
     bg: u32,
 ) !UserList {
     var user_list = UserList{
-        .label = UserLabel.init(
+        .label = try UserLabel.init(
             allocator,
             buffer,
             drawItem,
@@ -92,7 +92,7 @@ pub fn deinit(self: *UserList) void {
 pub fn widget(self: *UserList) Widget {
     return Widget.init(
         "UserList",
-        null,
+        self.label.keybinds,
         self,
         deinit,
         null,
@@ -111,8 +111,8 @@ fn draw(self: *UserList) void {
     self.label.draw();
 }
 
-fn handle(self: *UserList, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
-    self.label.handle(maybe_key, insert_mode);
+fn handle(self: *UserList, maybe_key: ?keyboard.Key) !void {
+    self.label.handle(maybe_key);
 }
 
 fn usernameChanged(user: User, maybe_session: ?*Session) void {

@@ -172,7 +172,6 @@ pub fn runEventLoop(
     layers: [][]Widget,
     active_widget: Widget,
     inactivity_delay: u16,
-    insert_mode: *bool,
     position_widgets_fn: *const fn (*anyopaque) anyerror!void,
     inactivity_event_fn: ?*const fn (*anyopaque) anyerror!void,
     context: *anyopaque,
@@ -221,7 +220,7 @@ pub fn runEventLoop(
 
             // Reset cursor
             const current_widget = self.getActiveWidget();
-            current_widget.handle(null, insert_mode.*) catch |err| {
+            current_widget.handle(null) catch |err| {
                 shared_error.writeError(error.SetCursorFailed);
                 try self.log_file.err(
                     "tui",
@@ -303,7 +302,7 @@ pub fn runEventLoop(
 
             const current_widget = self.getActiveWidget();
             for (keys.items) |key| {
-                current_widget.handle(key, insert_mode.*) catch |err| {
+                current_widget.handle(key) catch |err| {
                     shared_error.writeError(error.CurrentWidgetHandlingFailed);
                     try self.log_file.err(
                         "tui",
@@ -439,6 +438,17 @@ pub fn simulateKeybind(self: *TerminalBuffer, keybind: []const u8) !bool {
             binding.callback,
             .{binding.context},
         );
+    }
+
+    const current_widget = self.getActiveWidget();
+    if (current_widget.keybinds) |keybinds| {
+        if (keybinds.get(key)) |binding| {
+            return try @call(
+                .auto,
+                binding.callback,
+                .{binding.context},
+            );
+        }
     }
 
     return true;

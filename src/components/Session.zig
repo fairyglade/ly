@@ -18,7 +18,7 @@ const EnvironmentLabel = CyclableLabel(Env, *UserList);
 
 const Session = @This();
 
-label: EnvironmentLabel,
+label: *EnvironmentLabel,
 user_list: *UserList,
 
 pub fn init(
@@ -29,9 +29,9 @@ pub fn init(
     text_in_center: bool,
     fg: u32,
     bg: u32,
-) Session {
+) !Session {
     return .{
-        .label = EnvironmentLabel.init(
+        .label = try EnvironmentLabel.init(
             allocator,
             buffer,
             drawItem,
@@ -58,7 +58,7 @@ pub fn deinit(self: *Session) void {
 pub fn widget(self: *Session) Widget {
     return Widget.init(
         "Session",
-        null,
+        self.label.keybinds,
         self,
         deinit,
         null,
@@ -80,8 +80,8 @@ fn draw(self: *Session) void {
     self.label.draw();
 }
 
-fn handle(self: *Session, maybe_key: ?keyboard.Key, insert_mode: bool) !void {
-    self.label.handle(maybe_key, insert_mode);
+fn handle(self: *Session, maybe_key: ?keyboard.Key) !void {
+    self.label.handle(maybe_key);
 }
 
 fn addedSession(env: Env, user_list: *UserList) void {

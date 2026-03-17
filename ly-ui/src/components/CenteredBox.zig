@@ -67,7 +67,7 @@ pub fn widget(self: *CenteredBox) Widget {
         null,
         null,
         draw,
-        null,
+        update,
         null,
         null,
     );
