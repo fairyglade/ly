@@ -23,6 +23,7 @@ masked: bool,
 maybe_mask: ?u32,
 fg: u32,
 bg: u32,
+keybinds: TerminalBuffer.KeybindMap,
 
 pub fn init(
     allocator: Allocator,
@@ -32,8 +33,9 @@ pub fn init(
     width: usize,
     fg: u32,
     bg: u32,
-) Text {
-    return .{
+) !*Text {
+    var self = try allocator.create(Text);
+    self.* = Text{
         .allocator = allocator,
         .buffer = buffer,
         .text = .empty,
@@ -47,16 +49,24 @@ pub fn init(
         .maybe_mask = maybe_mask,
         .fg = fg,
         .bg = bg,
+        .keybinds = .init(allocator),
     };
+
+    try buffer.registerKeybind(&self.keybinds, "Ctrl+U", &clearTextEntry, self);
+
+    return self;
 }
 
 pub fn deinit(self: *Text) void {
     self.text.deinit(self.allocator);
+    self.keybinds.deinit();
+    self.allocator.destroy(self);
 }
 
 pub fn widget(self: *Text) Widget {
     return Widget.init(
         "Text",
+        self.keybinds,
         self,
         deinit,
         null,
@@ -207,4 +217,12 @@ fn write(self: *Text, char: u8) !void {
 
     self.end += 1;
     self.goRight();
+}
+
+fn clearTextEntry(ptr: *anyopaque) !bool {
+    var self: *Text = @ptrCast(@alignCast(ptr));
+
+    self.clear();
+    self.buffer.drawNextFrame(true);
+    return false;
 }

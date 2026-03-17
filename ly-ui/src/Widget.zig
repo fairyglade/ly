@@ -14,11 +14,13 @@ const VTable = struct {
 
 id: u64,
 display_name: []const u8,
+keybinds: ?TerminalBuffer.KeybindMap,
 pointer: *anyopaque,
 vtable: VTable,
 
 pub fn init(
     display_name: []const u8,
+    keybinds: ?TerminalBuffer.KeybindMap,
     pointer: anytype,
     comptime deinit_fn: ?fn (ptr: @TypeOf(pointer)) void,
     comptime realloc_fn: ?fn (ptr: @TypeOf(pointer)) anyerror!void,
@@ -102,6 +104,7 @@ pub fn init(
     return .{
         .id = @intFromPtr(Impl.vtable.draw_fn),
         .display_name = display_name,
+        .keybinds = keybinds,
         .pointer = pointer,
         .vtable = Impl.vtable,
     };

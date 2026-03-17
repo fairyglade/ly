@@ -430,6 +430,7 @@ pub fn init(
 pub fn widget(self: *DurFile) Widget {
     return Widget.init(
         "DurFile",
+        null,
         self,
         deinit,
         realloc,

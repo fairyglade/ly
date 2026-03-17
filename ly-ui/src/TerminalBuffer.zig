@@ -15,8 +15,8 @@ const Widget = @import("Widget.zig");
 
 const TerminalBuffer = @This();
 
-const KeybindCallbackFn = *const fn (*anyopaque) anyerror!bool;
-const KeybindMap = std.AutoHashMap(keyboard.Key, struct {
+pub const KeybindCallbackFn = *const fn (*anyopaque) anyerror!bool;
+pub const KeybindMap = std.AutoHashMap(keyboard.Key, struct {
     callback: KeybindCallbackFn,
     context: *anyopaque,
 });
@@ -177,14 +177,14 @@ pub fn runEventLoop(
     inactivity_event_fn: ?*const fn (*anyopaque) anyerror!void,
     context: *anyopaque,
 ) !void {
-    try self.registerKeybind("Ctrl+K", &moveCursorUp, self);
-    try self.registerKeybind("Up", &moveCursorUp, self);
+    try self.registerGlobalKeybind("Ctrl+K", &moveCursorUp, self);
+    try self.registerGlobalKeybind("Up", &moveCursorUp, self);
 
-    try self.registerKeybind("Ctrl+J", &moveCursorDown, self);
-    try self.registerKeybind("Down", &moveCursorDown, self);
+    try self.registerGlobalKeybind("Ctrl+J", &moveCursorDown, self);
+    try self.registerGlobalKeybind("Down", &moveCursorDown, self);
 
-    try self.registerKeybind("Tab", &wrapCursor, self);
-    try self.registerKeybind("Shift+Tab", &wrapCursorReverse, self);
+    try self.registerGlobalKeybind("Tab", &wrapCursor, self);
+    try self.registerGlobalKeybind("Shift+Tab", &wrapCursorReverse, self);
 
     defer self.handlable_widgets.deinit(allocator);
 
@@ -402,13 +402,14 @@ pub fn reclaim(self: TerminalBuffer) !void {
 
 pub fn registerKeybind(
     self: *TerminalBuffer,
+    keybinds: *KeybindMap,
     keybind: []const u8,
     callback: KeybindCallbackFn,
     context: *anyopaque,
 ) !void {
     const key = try self.parseKeybind(keybind);
 
-    self.keybinds.put(key, .{
+    keybinds.put(key, .{
         .callback = callback,
         .context = context,
     }) catch |err| {
@@ -418,6 +419,15 @@ pub fn registerKeybind(
             .{ keybind, @errorName(err) },
         );
     };
+}
+
+pub fn registerGlobalKeybind(
+    self: *TerminalBuffer,
+    keybind: []const u8,
+    callback: KeybindCallbackFn,
+    context: *anyopaque,
+) !void {
+    try self.registerKeybind(&self.keybinds, keybind, callback, context);
 }
 
 pub fn simulateKeybind(self: *TerminalBuffer, keybind: []const u8) !bool {
@@ -551,6 +561,24 @@ fn handleKeybind(
             }
 
             return keys;
+        }
+
+        const current_widget = self.getActiveWidget();
+        if (current_widget.keybinds) |keybinds| {
+            if (keybinds.get(key)) |binding| {
+                const passthrough_event = try @call(
+                    .auto,
+                    binding.callback,
+                    .{binding.context},
+                );
+
+                if (!passthrough_event) {
+                    keys.deinit(allocator);
+                    return null;
+                }
+
+                return keys;
+            }
         }
     }
 

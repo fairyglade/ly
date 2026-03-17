@@ -92,6 +92,7 @@ pub fn deinit(self: *UserList) void {
 pub fn widget(self: *UserList) Widget {
     return Widget.init(
         "UserList",
+        null,
         self,
         deinit,
         null,

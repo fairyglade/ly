@@ -93,7 +93,7 @@ const UiState = struct {
     session: Session,
     saved_users: SavedUsers,
     login: UserList,
-    password: Text,
+    password: *Text,
     password_widget: Widget,
     insert_mode: bool,
     edge_margin: Position,
@@ -792,7 +792,7 @@ pub fn main() !void {
     );
     defer state.password_label.deinit();
 
-    state.password = Text.init(
+    state.password = try Text.init(
         state.allocator,
         &state.buffer,
         true,
@@ -1078,27 +1078,23 @@ pub fn main() !void {
         try widgets.append(state.allocator, &layer3);
     }
 
-    try state.buffer.registerKeybind("Esc", &disableInsertMode, &state);
-    try state.buffer.registerKeybind("I", &enableInsertMode, &state);
+    try state.buffer.registerGlobalKeybind("Esc", &disableInsertMode, &state);
+    try state.buffer.registerGlobalKeybind("I", &enableInsertMode, &state);
 
-    try state.buffer.registerKeybind("Ctrl+C", &quit, &state);
+    try state.buffer.registerGlobalKeybind("Ctrl+C", &quit, &state);
 
-    // TODO: Make this generic for any Text widget present in the UI
-    // TODO: Per-widget keybinds, will fix insert_mode hack too
-    try state.buffer.registerKeybind("Ctrl+U", &clearPassword, &state);
+    try state.buffer.registerGlobalKeybind("K", &viMoveCursorUp, &state);
+    try state.buffer.registerGlobalKeybind("J", &viMoveCursorDown, &state);
 
-    try state.buffer.registerKeybind("K", &viMoveCursorUp, &state);
-    try state.buffer.registerKeybind("J", &viMoveCursorDown, &state);
+    try state.buffer.registerGlobalKeybind("Enter", &authenticate, &state);
 
-    try state.buffer.registerKeybind("Enter", &authenticate, &state);
-
-    try state.buffer.registerKeybind(state.config.shutdown_key, &shutdownCmd, &state);
-    try state.buffer.registerKeybind(state.config.restart_key, &restartCmd, &state);
-    try state.buffer.registerKeybind(state.config.show_password_key, &togglePasswordMask, &state);
-    if (state.config.sleep_cmd != null) try state.buffer.registerKeybind(state.config.sleep_key, &sleepCmd, &state);
-    if (state.config.hibernate_cmd != null) try state.buffer.registerKeybind(state.config.hibernate_key, &hibernateCmd, &state);
-    if (state.config.brightness_down_key) |key| try state.buffer.registerKeybind(key, &decreaseBrightnessCmd, &state);
-    if (state.config.brightness_up_key) |key| try state.buffer.registerKeybind(key, &increaseBrightnessCmd, &state);
+    try state.buffer.registerGlobalKeybind(state.config.shutdown_key, &shutdownCmd, &state);
+    try state.buffer.registerGlobalKeybind(state.config.restart_key, &restartCmd, &state);
+    try state.buffer.registerGlobalKeybind(state.config.show_password_key, &togglePasswordMask, &state);
+    if (state.config.sleep_cmd != null) try state.buffer.registerGlobalKeybind(state.config.sleep_key, &sleepCmd, &state);
+    if (state.config.hibernate_cmd != null) try state.buffer.registerGlobalKeybind(state.config.hibernate_key, &hibernateCmd, &state);
+    if (state.config.brightness_down_key) |key| try state.buffer.registerGlobalKeybind(key, &decreaseBrightnessCmd, &state);
+    if (state.config.brightness_up_key) |key| try state.buffer.registerGlobalKeybind(key, &increaseBrightnessCmd, &state);
 
     if (state.config.initial_info_text) |text| {
         try state.info_line.addMessage(text, state.config.bg, state.config.fg);
@@ -1210,16 +1206,6 @@ fn viMoveCursorDown(ptr: *anyopaque) !bool {
     if (state.insert_mode) return true;
 
     return try state.buffer.simulateKeybind("Down");
-}
-
-fn clearPassword(ptr: *anyopaque) !bool {
-    var state: *UiState = @ptrCast(@alignCast(ptr));
-
-    if (state.buffer.getActiveWidget().id == state.password_widget.id) {
-        state.password.clear();
-        state.buffer.drawNextFrame(true);
-    }
-    return false;
 }
 
 fn togglePasswordMask(ptr: *anyopaque) !bool {

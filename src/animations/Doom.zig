@@ -76,6 +76,7 @@ pub fn init(
 pub fn widget(self: *Doom) Widget {
     return Widget.init(
         "Doom",
+        null,
         self,
         deinit,
         realloc,

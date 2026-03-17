@@ -27,6 +27,7 @@ pub fn init(
 pub fn widget(self: *Cascade) Widget {
     return Widget.init(
         "Cascade",
+        null,
         self,
         null,
         null,

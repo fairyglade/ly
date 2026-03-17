@@ -46,6 +46,7 @@ pub fn deinit(self: *Label) void {
 pub fn widget(self: *Label) Widget {
     return Widget.init(
         "Label",
+        null,
         self,
         deinit,
         null,

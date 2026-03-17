@@ -88,6 +88,7 @@ pub fn deinit(self: *BigLabel) void {
 pub fn widget(self: *BigLabel) Widget {
     return Widget.init(
         "BigLabel",
+        null,
         self,
         deinit,
         null,
