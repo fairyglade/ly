@@ -1,8 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const enums = @import("../../enums.zig");
-const DisplayServer = enums.DisplayServer;
 const Environment = @import("../../Environment.zig");
 const keyboard = @import("../keyboard.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");

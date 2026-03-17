@@ -25,6 +25,7 @@ pub fn init(
     allocator: Allocator,
     buffer: *TerminalBuffer,
     usernames: StringList,
+    // TODO: Remove dependency on SavedUsers
     saved_users: *SavedUsers,
     session: *Session,
     width: usize,
