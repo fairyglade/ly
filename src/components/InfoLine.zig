@@ -1,12 +1,13 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const keyboard = @import("../keyboard.zig");
-const TerminalBuffer = @import("../TerminalBuffer.zig");
-const Widget = @import("../Widget.zig");
-const generic = @import("generic.zig");
+const ly_ui = @import("ly-ui");
+const keyboard = ly_ui.keyboard;
+const TerminalBuffer = ly_ui.TerminalBuffer;
+const Widget = ly_ui.Widget;
+const CyclableLabel = ly_ui.CyclableLabel;
 
-const MessageLabel = generic.CyclableLabel(Message, Message);
+const MessageLabel = CyclableLabel(Message, Message);
 
 const InfoLine = @This();
 

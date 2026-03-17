@@ -1,4 +1,4 @@
-const ini = @import("zigini");
+const ini = @import("ly-ui").ly_core.ini;
 const Ini = ini.Ini;
 
 const enums = @import("enums.zig");

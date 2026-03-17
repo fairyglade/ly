@@ -11,11 +11,11 @@ const Color = TerminalBuffer.Color;
 const Styling = TerminalBuffer.Styling;
 const ly_core = ly_ui.ly_core;
 const IniParser = ly_core.IniParser;
-const SavedUsers = ly_core.SavedUsers;
 const ini = ly_core.ini;
 
 const Config = @import("Config.zig");
 const OldSave = @import("OldSave.zig");
+const SavedUsers = @import("SavedUsers.zig");
 
 const color_properties = [_][]const u8{
     "bg",

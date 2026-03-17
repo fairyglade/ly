@@ -1,21 +1,20 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const ly_core = @import("ly-core");
-const Environment = ly_core.Environment;
+const ly_ui = @import("ly-ui");
+const keyboard = ly_ui.keyboard;
+const TerminalBuffer = ly_ui.TerminalBuffer;
+const Widget = ly_ui.Widget;
+const CyclableLabel = ly_ui.CyclableLabel;
 
-const keyboard = @import("../keyboard.zig");
-const TerminalBuffer = @import("../TerminalBuffer.zig");
-const Widget = @import("../Widget.zig");
-const generic = @import("generic.zig");
 const UserList = @import("UserList.zig");
+const Environment = @import("../Environment.zig");
 
 const Env = struct {
-    // TODO: Remove dependency on Environment
     environment: Environment,
     index: usize,
 };
-const EnvironmentLabel = generic.CyclableLabel(Env, *UserList);
+const EnvironmentLabel = CyclableLabel(Env, *UserList);
 
 const Session = @This();
 

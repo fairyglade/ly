@@ -7,9 +7,10 @@ const ly_core = @import("ly-ui").ly_core;
 const interop = ly_core.interop;
 const SharedError = ly_core.SharedError;
 const LogFile = ly_core.LogFile;
-const Environment = ly_core.Environment;
 const utmp = interop.utmp;
 const Utmp = utmp.utmpx;
+
+const Environment = @import("Environment.zig");
 
 pub const AuthOptions = struct {
     tty: u8,
