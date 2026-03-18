@@ -190,6 +190,8 @@ pub fn runEventLoop(
     var i: usize = 0;
     for (layers) |layer| {
         for (layer) |*widget| {
+            try widget.update(context);
+
             if (widget.vtable.handle_fn != null) {
                 try self.handlable_widgets.append(allocator, widget);
 
@@ -199,11 +201,6 @@ pub fn runEventLoop(
         }
     }
 
-    for (layers) |layer| {
-        for (layer) |*widget| {
-            try widget.update(context);
-        }
-    }
     try @call(.auto, position_widgets_fn, .{context});
 
     var event: termbox.tb_event = undefined;
