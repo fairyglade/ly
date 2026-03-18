@@ -730,6 +730,7 @@ pub fn main() !void {
         try state.log_file.info(
             "comp",
             "x11 support disabled at compile-time",
+            .{},
         );
     }
 
