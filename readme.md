@@ -2,11 +2,12 @@
 
 ![Ly screenshot](.github/screenshot.png "Ly screenshot")
 
-Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD, designed with portability in mind (e.g. it does not require systemd to run).
+Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD, designed with portability in mind and doesn't require systemd to run.
 
 Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.org)!
 
-**Note**: Development happens on [Codeberg](https://codeberg.org/fairyglade/ly) with a mirror on [GitHub](https://github.com/fairyglade/ly).
+> [!NOTE]
+> Development happens on [Codeberg](https://codeberg.org/fairyglade/ly) with a mirror on [GitHub](https://github.com/fairyglade/ly).
 
 ## Dependencies
 
@@ -38,7 +39,8 @@ Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.
 
 ### Fedora
 
-**Warning**: You may encounter issues with SELinux on Fedora. It is recommended to add a rule for Ly as it currently does not ship one.
+> [!WARNING]
+> You may encounter issues with SELinux on Fedora. It is recommended to add a rule for Ly as it currently does not ship one.
 
 ```
 # dnf install kernel-devel pam-devel libxcb-devel zig xorg-x11-xauth xorg-x11-server brightnessctl
@@ -58,7 +60,7 @@ Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.
 
 Every environment that works on other login managers also should work on Ly.
 
-- Unlike most login managers Ly has xinitrc entry and it also supports shell.
+- Unlike most login managers Ly has an xinitrc and shell entry.
 
 - If you installed your favorite environment and you don't see it, that's because Ly doesn't automatically refresh itself. To fix this you should restart Ly service (depends on your init system) or the easy way is to reboot your system.
 
@@ -66,7 +68,7 @@ Every environment that works on other login managers also should work on Ly.
 
 - If there isn't a .desktop file then create a new one at `/etc/ly/custom-sessions` that launches your favorite environment. These .desktop files can be only seen by Ly and if you want them system-wide you also can create at those directories instead.
 
-- If only Xorg sessions doesn't work then check if your distro compiles Ly with Xorg support as it can be compiled with Xorg support disabled.
+- If Xorg sessions don't work then check if your distro compiles Ly with Xorg.
 
 Logs are defined by `/etc/ly/config.ini`:
 
@@ -90,11 +92,13 @@ After building, you can (optionally) test Ly in a terminal emulator, although au
 $ zig build run
 ```
 
-**Important**: While you can also run Ly in a terminal emulator as root, it is **not** recommended either. If you want to properly test Ly, please enable its service (as described below) and reboot your machine.
+> [!IMPORTANT]
+> While you can run Ly in a terminal emulator as root, it is **not** recommended. If you want to test Ly, please enable its service (as described below) and reboot your machine.
 
-The following sections show how to install Ly for a particular init system. Because the procedure is very similar for all of them, the commands will only be detailed for the first section (which is about systemd).
+The next sections will explain how to use Ly with a variety of init systems. Detailed explanation is only given for systemd, but should be applicable for all.
 
-**Note**: All following sections will assume you are using LightDM for convenience sake.
+> [!NOTE]
+> All following sections will assume you are using LightDM for convenience sake.
 
 ### systemd
 
@@ -104,9 +108,10 @@ Now, you can install Ly on your system:
 # zig build installexe -Dinit_system=systemd
 ```
 
-**Note**: The `init_system` parameter is optional and defaults to `systemd`.
+> [!NOTE]
+> The `init_system` parameter is optional and defaults to `systemd`.
 
-Note that you also need to disable your current display manager. For example, if LightDM is the current display manager, you can execute the following command:
+Note that you also need to disable your current display manager. For example, if you are using LightDM, you can execute the following command:
 
 ```
 # systemctl disable lightdm.service
@@ -118,7 +123,8 @@ Then, similarly to the previous command, you need to enable the Ly service:
 # systemctl enable ly@tty2.service
 ```
 
-**Important**: Because Ly runs in a TTY, you **must** disable the TTY service that Ly will run on, otherwise bad things will happen. For example, to disable `getty` spawning on TTY 2, you need to execute the following command:
+> [!IMPORTANT]
+> Because Ly runs in a TTY, you **must** disable the TTY service that Ly will run on, otherwise bad things will happen. For example, to disable `getty` spawning on TTY 2, you need to execute the following command:
 
 ```
 # systemctl disable getty@tty2.service
@@ -141,7 +147,8 @@ On non-systemd systems, you can change the TTY Ly will run on by editing the cor
 # rc-update del agetty.tty2
 ```
 
-**Note**: On Gentoo specifically, you also **must** comment out the appropriate line for the TTY in /etc/inittab.
+> [!NOTE]
+> On Gentoo specifically, you also **must** comment out the appropriate line for the TTY in /etc/inittab.
 
 ### runit
 
