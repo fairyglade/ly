@@ -9,3 +9,4 @@ _Replace this with a reference to an existing issue, or N/A if there is none_
 ## Pre-requisites
 
 - [ ] I have tested & confirmed the changes work locally
+- [ ] I have run `zig fmt` throughout my changes
