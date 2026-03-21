@@ -21,6 +21,7 @@ fn length(vec: Vec2) f32 {
     return math.sqrt(vec[0] * vec[0] + vec[1] * vec[1]);
 }
 
+instance: ?Widget = null,
 start_time: TimeOfDay,
 terminal_buffer: *TerminalBuffer,
 animate: *bool,
@@ -41,6 +42,7 @@ pub fn init(
     frame_delay: u16,
 ) !ColorMix {
     return .{
+        .instance = null,
         .start_time = try interop.getTimeOfDay(),
         .terminal_buffer = terminal_buffer,
         .animate = animate,
@@ -66,8 +68,9 @@ pub fn init(
     };
 }
 
-pub fn widget(self: *ColorMix) Widget {
-    return Widget.init(
+pub fn widget(self: *ColorMix) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "ColorMix",
         null,
         self,
@@ -78,6 +81,7 @@ pub fn widget(self: *ColorMix) Widget {
         null,
         calculateTimeout,
     );
+    return &self.instance.?;
 }
 
 fn draw(self: *ColorMix) void {

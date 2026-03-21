@@ -44,6 +44,7 @@ pub const BigLabelLocale = enum {
     fa,
 };
 
+instance: ?Widget = null,
 allocator: ?Allocator = null,
 buffer: *TerminalBuffer,
 text: []const u8,
@@ -67,6 +68,7 @@ pub fn init(
     calculate_timeout_fn: ?*const fn (*BigLabel, *anyopaque) anyerror!?usize,
 ) BigLabel {
     return .{
+        .instance = null,
         .allocator = null,
         .buffer = buffer,
         .text = text,
@@ -85,8 +87,9 @@ pub fn deinit(self: *BigLabel) void {
     if (self.allocator) |allocator| allocator.free(self.text);
 }
 
-pub fn widget(self: *BigLabel) Widget {
-    return Widget.init(
+pub fn widget(self: *BigLabel) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "BigLabel",
         null,
         self,
@@ -97,6 +100,7 @@ pub fn widget(self: *BigLabel) Widget {
         null,
         calculateTimeout,
     );
+    return &self.instance.?;
 }
 
 pub fn setTextAlloc(

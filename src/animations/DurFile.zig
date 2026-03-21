@@ -304,6 +304,7 @@ const VEC_Y = 1;
 
 const DurFile = @This();
 
+instance: ?Widget = null,
 start_time: TimeOfDay,
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
@@ -408,6 +409,7 @@ pub fn init(
     const frame_time: u32 = @intFromFloat(1000 / dur_movie.framerate.?);
 
     return .{
+        .instance = null,
         .start_time = try interop.getTimeOfDay(),
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
@@ -427,8 +429,9 @@ pub fn init(
     };
 }
 
-pub fn widget(self: *DurFile) Widget {
-    return Widget.init(
+pub fn widget(self: *DurFile) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "DurFile",
         null,
         self,
@@ -439,6 +442,7 @@ pub fn widget(self: *DurFile) Widget {
         null,
         calculateTimeout,
     );
+    return &self.instance.?;
 }
 
 fn deinit(self: *DurFile) void {

@@ -7,6 +7,7 @@ const Widget = @import("../Widget.zig");
 
 const CenteredBox = @This();
 
+instance: ?Widget = null,
 buffer: *TerminalBuffer,
 horizontal_margin: usize,
 vertical_margin: usize,
@@ -40,6 +41,7 @@ pub fn init(
     update_fn: ?*const fn (*CenteredBox, *anyopaque) anyerror!void,
 ) CenteredBox {
     return .{
+        .instance = null,
         .buffer = buffer,
         .horizontal_margin = horizontal_margin,
         .vertical_margin = vertical_margin,
@@ -59,8 +61,9 @@ pub fn init(
     };
 }
 
-pub fn widget(self: *CenteredBox) Widget {
-    return Widget.init(
+pub fn widget(self: *CenteredBox) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "CenteredBox",
         null,
         self,
@@ -71,6 +74,7 @@ pub fn widget(self: *CenteredBox) Widget {
         null,
         null,
     );
+    return &self.instance.?;
 }
 
 pub fn positionXY(self: *CenteredBox, original_pos: Position) void {

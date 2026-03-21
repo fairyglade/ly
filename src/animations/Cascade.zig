@@ -8,6 +8,7 @@ const Widget = ly_ui.Widget;
 
 const Cascade = @This();
 
+instance: ?Widget = null,
 buffer: *TerminalBuffer,
 current_auth_fails: *usize,
 max_auth_fails: usize,
@@ -18,14 +19,16 @@ pub fn init(
     max_auth_fails: usize,
 ) Cascade {
     return .{
+        .instance = null,
         .buffer = buffer,
         .current_auth_fails = current_auth_fails,
         .max_auth_fails = max_auth_fails,
     };
 }
 
-pub fn widget(self: *Cascade) Widget {
-    return Widget.init(
+pub fn widget(self: *Cascade) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "Cascade",
         null,
         self,
@@ -36,6 +39,7 @@ pub fn widget(self: *Cascade) Widget {
         null,
         null,
     );
+    return &self.instance.?;
 }
 
 fn draw(self: *Cascade) void {

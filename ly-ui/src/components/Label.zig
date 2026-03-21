@@ -8,6 +8,7 @@ const Position = @import("../Position.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const Widget = @import("../Widget.zig");
 
+instance: ?Widget,
 allocator: ?Allocator,
 text: []const u8,
 max_width: ?usize,
@@ -27,6 +28,7 @@ pub fn init(
     calculate_timeout_fn: ?*const fn (*Label, *anyopaque) anyerror!?usize,
 ) Label {
     return .{
+        .instance = null,
         .allocator = null,
         .text = text,
         .max_width = max_width,
@@ -43,8 +45,9 @@ pub fn deinit(self: *Label) void {
     if (self.allocator) |allocator| allocator.free(self.text);
 }
 
-pub fn widget(self: *Label) Widget {
-    return Widget.init(
+pub fn widget(self: *Label) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "Label",
         null,
         self,
@@ -55,6 +58,7 @@ pub fn widget(self: *Label) Widget {
         null,
         calculateTimeout,
     );
+    return &self.instance.?;
 }
 
 pub fn setTextAlloc(

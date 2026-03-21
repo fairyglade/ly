@@ -169,8 +169,8 @@ pub fn runEventLoop(
     self: *TerminalBuffer,
     allocator: Allocator,
     shared_error: SharedError,
-    layers: [][]Widget,
-    active_widget: Widget,
+    layers: [][]*Widget,
+    active_widget: *Widget,
     inactivity_delay: u16,
     position_widgets_fn: *const fn (*anyopaque) anyerror!void,
     inactivity_event_fn: ?*const fn (*anyopaque) anyerror!void,
@@ -189,7 +189,7 @@ pub fn runEventLoop(
 
     var i: usize = 0;
     for (layers) |layer| {
-        for (layer) |*widget| {
+        for (layer) |widget| {
             try widget.update(context);
 
             if (widget.vtable.handle_fn != null) {
@@ -210,7 +210,7 @@ pub fn runEventLoop(
     while (self.run) {
         if (self.update) {
             for (layers) |layer| {
-                for (layer) |*widget| {
+                for (layer) |widget| {
                     try widget.update(context);
                 }
             }
@@ -229,7 +229,7 @@ pub fn runEventLoop(
             try TerminalBuffer.clearScreen(false);
 
             for (layers) |layer| {
-                for (layer) |*widget| {
+                for (layer) |widget| {
                     widget.draw();
                 }
             }
@@ -239,7 +239,7 @@ pub fn runEventLoop(
 
         var maybe_timeout: ?usize = null;
         for (layers) |layer| {
-            for (layer) |*widget| {
+            for (layer) |widget| {
                 if (try widget.calculateTimeout(context)) |widget_timeout| {
                     if (maybe_timeout == null or widget_timeout < maybe_timeout.?) maybe_timeout = widget_timeout;
                 }
@@ -275,7 +275,7 @@ pub fn runEventLoop(
             );
 
             for (layers) |layer| {
-                for (layer) |*widget| {
+                for (layer) |widget| {
                     widget.realloc() catch |err| {
                         shared_error.writeError(error.WidgetReallocationFailed);
                         try self.log_file.err(
@@ -326,7 +326,7 @@ pub fn getActiveWidget(self: *TerminalBuffer) *Widget {
     return self.handlable_widgets.items[self.active_widget_index];
 }
 
-pub fn setActiveWidget(self: *TerminalBuffer, widget: Widget) void {
+pub fn setActiveWidget(self: *TerminalBuffer, widget: *Widget) void {
     for (self.handlable_widgets.items, 0..) |widg, i| {
         if (widg.id == widget.id) self.active_widget_index = i;
     }

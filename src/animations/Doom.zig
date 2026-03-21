@@ -16,6 +16,7 @@ pub const STEPS = 12;
 pub const HEIGHT_MAX = 9;
 pub const SPREAD_MAX = 4;
 
+instance: ?Widget = null,
 start_time: TimeOfDay,
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
@@ -60,6 +61,7 @@ pub fn init(
         };
 
     return .{
+        .instance = null,
         .start_time = try interop.getTimeOfDay(),
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
@@ -73,8 +75,9 @@ pub fn init(
     };
 }
 
-pub fn widget(self: *Doom) Widget {
-    return Widget.init(
+pub fn widget(self: *Doom) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "Doom",
         null,
         self,
@@ -85,6 +88,7 @@ pub fn widget(self: *Doom) Widget {
         null,
         calculateTimeout,
     );
+    return &self.instance.?;
 }
 
 fn deinit(self: *Doom) void {

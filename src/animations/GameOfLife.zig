@@ -21,6 +21,7 @@ const NEIGHBOR_DIRS = [_][2]i8{
     .{ 1, 0 },   .{ 1, 1 },
 };
 
+instance: ?Widget = null,
 start_time: TimeOfDay,
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
@@ -58,6 +59,7 @@ pub fn init(
     const next_grid = try allocator.alloc(bool, grid_size);
 
     var game = GameOfLife{
+        .instance = null,
         .start_time = try interop.getTimeOfDay(),
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
@@ -83,8 +85,9 @@ pub fn init(
     return game;
 }
 
-pub fn widget(self: *GameOfLife) Widget {
-    return Widget.init(
+pub fn widget(self: *GameOfLife) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "GameOfLife",
         null,
         self,
@@ -95,6 +98,7 @@ pub fn widget(self: *GameOfLife) Widget {
         null,
         calculateTimeout,
     );
+    return &self.instance.?;
 }
 
 fn deinit(self: *GameOfLife) void {

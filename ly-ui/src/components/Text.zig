@@ -10,6 +10,7 @@ const DynamicString = std.ArrayListUnmanaged(u8);
 
 const Text = @This();
 
+instance: ?Widget,
 allocator: Allocator,
 buffer: *TerminalBuffer,
 text: DynamicString,
@@ -38,6 +39,7 @@ pub fn init(
 ) !*Text {
     var self = try allocator.create(Text);
     self.* = Text{
+        .instance = null,
         .allocator = allocator,
         .buffer = buffer,
         .text = .empty,
@@ -70,8 +72,9 @@ pub fn deinit(self: *Text) void {
     self.allocator.destroy(self);
 }
 
-pub fn widget(self: *Text) Widget {
-    return Widget.init(
+pub fn widget(self: *Text) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "Text",
         self.keybinds,
         self,
@@ -82,6 +85,7 @@ pub fn widget(self: *Text) Widget {
         handle,
         null,
     );
+    return &self.instance.?;
 }
 
 pub fn positionX(self: *Text, original_pos: Position) void {

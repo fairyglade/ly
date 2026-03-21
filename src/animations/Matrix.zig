@@ -29,6 +29,7 @@ pub const Line = struct {
     update: usize,
 };
 
+instance: ?Widget = null,
 start_time: TimeOfDay,
 allocator: Allocator,
 terminal_buffer: *TerminalBuffer,
@@ -62,6 +63,7 @@ pub fn init(
     initBuffers(dots, lines, terminal_buffer.width, terminal_buffer.height, terminal_buffer.random);
 
     return .{
+        .instance = null,
         .start_time = try interop.getTimeOfDay(),
         .allocator = allocator,
         .terminal_buffer = terminal_buffer,
@@ -80,8 +82,9 @@ pub fn init(
     };
 }
 
-pub fn widget(self: *Matrix) Widget {
-    return Widget.init(
+pub fn widget(self: *Matrix) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "Matrix",
         null,
         self,
@@ -92,6 +95,7 @@ pub fn widget(self: *Matrix) Widget {
         null,
         calculateTimeout,
     );
+    return &self.instance.?;
 }
 
 fn deinit(self: *Matrix) void {

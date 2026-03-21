@@ -21,6 +21,7 @@ const UserLabel = CyclableLabel(User, *Session);
 
 const UserList = @This();
 
+instance: ?Widget = null,
 label: *UserLabel,
 
 pub fn init(
@@ -35,6 +36,7 @@ pub fn init(
     bg: u32,
 ) !UserList {
     var user_list = UserList{
+        .instance = null,
         .label = try UserLabel.init(
             allocator,
             buffer,
@@ -89,8 +91,9 @@ pub fn deinit(self: *UserList) void {
     self.label.deinit();
 }
 
-pub fn widget(self: *UserList) Widget {
-    return Widget.init(
+pub fn widget(self: *UserList) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "UserList",
         self.label.keybinds,
         self,
@@ -101,6 +104,7 @@ pub fn widget(self: *UserList) Widget {
         handle,
         null,
     );
+    return &self.instance.?;
 }
 
 pub fn getCurrentUsername(self: UserList) []const u8 {

@@ -18,6 +18,7 @@ const Message = struct {
     fg: u32,
 };
 
+instance: ?Widget = null,
 label: *MessageLabel,
 
 pub fn init(
@@ -28,6 +29,7 @@ pub fn init(
     arrow_bg: u32,
 ) !InfoLine {
     return .{
+        .instance = null,
         .label = try MessageLabel.init(
             allocator,
             buffer,
@@ -46,8 +48,9 @@ pub fn deinit(self: *InfoLine) void {
     self.label.deinit();
 }
 
-pub fn widget(self: *InfoLine) Widget {
-    return Widget.init(
+pub fn widget(self: *InfoLine) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "InfoLine",
         self.label.keybinds,
         self,
@@ -58,6 +61,7 @@ pub fn widget(self: *InfoLine) Widget {
         handle,
         null,
     );
+    return &self.instance.?;
 }
 
 pub fn addMessage(self: *InfoLine, text: []const u8, bg: u32, fg: u32) !void {

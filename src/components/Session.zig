@@ -18,6 +18,7 @@ const EnvironmentLabel = CyclableLabel(Env, *UserList);
 
 const Session = @This();
 
+instance: ?Widget = null,
 label: *EnvironmentLabel,
 user_list: *UserList,
 
@@ -31,6 +32,7 @@ pub fn init(
     bg: u32,
 ) !Session {
     return .{
+        .instance = null,
         .label = try EnvironmentLabel.init(
             allocator,
             buffer,
@@ -55,8 +57,9 @@ pub fn deinit(self: *Session) void {
     self.label.deinit();
 }
 
-pub fn widget(self: *Session) Widget {
-    return Widget.init(
+pub fn widget(self: *Session) *Widget {
+    if (self.instance) |*instance| return instance;
+    self.instance = Widget.init(
         "Session",
         self.label.keybinds,
         self,
@@ -67,6 +70,7 @@ pub fn widget(self: *Session) Widget {
         handle,
         null,
     );
+    return &self.instance.?;
 }
 
 pub fn addEnvironment(self: *Session, environment: Environment) !void {

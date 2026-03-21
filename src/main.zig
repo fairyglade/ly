@@ -94,7 +94,7 @@ const UiState = struct {
     saved_users: SavedUsers,
     login: UserList,
     password: *Text,
-    password_widget: Widget,
+    password_widget: *Widget,
     insert_mode: bool,
     edge_margin: Position,
     config: Config,
@@ -910,7 +910,7 @@ pub fn main() !void {
     }
 
     // Initialize the animation, if any
-    var animation: ?Widget = null;
+    var animation: ?*Widget = null;
     switch (state.config.animation) {
         .none => {},
         .doom => {
@@ -985,7 +985,7 @@ pub fn main() !void {
             animation = dur.widget();
         },
     }
-    defer if (animation) |*a| a.deinit();
+    defer if (animation) |a| a.deinit();
 
     var cascade = Cascade.init(
         &state.buffer,
@@ -1030,17 +1030,17 @@ pub fn main() !void {
     const session_widget = state.session.widget();
     const login_widget = state.login.widget();
 
-    var widgets: std.ArrayList([]Widget) = .empty;
+    var widgets: std.ArrayList([]*Widget) = .empty;
     defer widgets.deinit(state.allocator);
 
     // Layer 1
     if (animation) |a| {
-        var layer1 = [_]Widget{a};
+        var layer1 = [_]*Widget{a};
         try widgets.append(state.allocator, &layer1);
     }
 
     // Layer 2
-    var layer2: std.ArrayList(Widget) = .empty;
+    var layer2: std.ArrayList(*Widget) = .empty;
     defer layer2.deinit(state.allocator);
 
     if (!state.config.hide_key_hints) {
@@ -1089,7 +1089,7 @@ pub fn main() !void {
 
     // Layer 3
     if (state.config.auth_fails > 0) {
-        var layer3 = [_]Widget{cascade.widget()};
+        var layer3 = [_]*Widget{cascade.widget()};
         try widgets.append(state.allocator, &layer3);
     }
 
