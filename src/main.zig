@@ -9,7 +9,7 @@ const clap = @import("clap");
 const ly_ui = @import("ly-ui");
 const Position = ly_ui.Position;
 const BigLabel = ly_ui.BigLabel;
-const CenteredBox = ly_ui.CenteredBox;
+const Box = ly_ui.Box;
 const Label = ly_ui.Label;
 const Text = ly_ui.Text;
 const TerminalBuffer = ly_ui.TerminalBuffer;
@@ -87,7 +87,7 @@ const UiState = struct {
     password_label: Label,
     version_label: Label,
     bigclock_label: BigLabel,
-    box: CenteredBox,
+    box: Box,
     info_line: InfoLine,
     animate: bool,
     session: Session,
@@ -524,7 +524,7 @@ pub fn main() !void {
     );
     defer state.bigclock_label.deinit();
 
-    state.box = CenteredBox.init(
+    state.box = Box.init(
         &state.buffer,
         state.config.margin_box_h,
         state.config.margin_box_v,
@@ -1681,7 +1681,7 @@ fn calculateBigClockTimeout(_: *BigLabel, ptr: *anyopaque) !?usize {
     return @intCast((60 - @rem(time.seconds, 60)) * 1000 - @divTrunc(time.microseconds, 1000) + 1);
 }
 
-fn updateBox(self: *CenteredBox, ptr: *anyopaque) !void {
+fn updateBox(self: *Box, ptr: *anyopaque) !void {
     const state: *UiState = @ptrCast(@alignCast(ptr));
 
     if (state.config.vi_mode) {
@@ -1753,7 +1753,9 @@ fn positionWidgets(ptr: *anyopaque) !void {
         .childrenPosition()
         .removeX(TerminalBuffer.strWidth(state.lang.numlock) + TerminalBuffer.strWidth(state.lang.capslock) + 1));
 
-    state.box.positionXY(TerminalBuffer.START_POSITION);
+    state.box.positionXY(TerminalBuffer.START_POSITION
+        .addX((state.buffer.width - @min(state.buffer.width - 2, state.box.width)) / 2)
+        .addY((state.buffer.height - @min(state.buffer.height - 2, state.box.height)) / 2));
 
     if (state.config.bigclock != .none) {
         const half_width = state.buffer.width / 2;

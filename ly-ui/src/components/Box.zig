@@ -5,7 +5,7 @@ const Position = @import("../Position.zig");
 const TerminalBuffer = @import("../TerminalBuffer.zig");
 const Widget = @import("../Widget.zig");
 
-const CenteredBox = @This();
+const Box = @This();
 
 instance: ?Widget = null,
 buffer: *TerminalBuffer,
@@ -20,7 +20,7 @@ bottom_title: ?[]const u8,
 border_fg: u32,
 title_fg: u32,
 bg: u32,
-update_fn: ?*const fn (*CenteredBox, *anyopaque) anyerror!void,
+update_fn: ?*const fn (*Box, *anyopaque) anyerror!void,
 left_pos: Position,
 right_pos: Position,
 children_pos: Position,
@@ -38,8 +38,8 @@ pub fn init(
     border_fg: u32,
     title_fg: u32,
     bg: u32,
-    update_fn: ?*const fn (*CenteredBox, *anyopaque) anyerror!void,
-) CenteredBox {
+    update_fn: ?*const fn (*Box, *anyopaque) anyerror!void,
+) Box {
     return .{
         .instance = null,
         .buffer = buffer,
@@ -61,10 +61,10 @@ pub fn init(
     };
 }
 
-pub fn widget(self: *CenteredBox) *Widget {
+pub fn widget(self: *Box) *Widget {
     if (self.instance) |*instance| return instance;
     self.instance = Widget.init(
-        "CenteredBox",
+        "Box",
         null,
         self,
         null,
@@ -77,30 +77,26 @@ pub fn widget(self: *CenteredBox) *Widget {
     return &self.instance.?;
 }
 
-pub fn positionXY(self: *CenteredBox, original_pos: Position) void {
+pub fn positionXY(self: *Box, original_pos: Position) void {
     if (self.buffer.width < 2 or self.buffer.height < 2) return;
 
-    self.left_pos = Position.init(
-        (self.buffer.width - @min(self.buffer.width - 2, self.width)) / 2,
-        (self.buffer.height - @min(self.buffer.height - 2, self.height)) / 2,
-    ).add(original_pos);
-
+    self.left_pos = original_pos;
     self.right_pos = Position.init(
-        (self.buffer.width + @min(self.buffer.width, self.width)) / 2,
-        (self.buffer.height + @min(self.buffer.height, self.height)) / 2,
-    ).add(original_pos);
+        @min(self.buffer.width, self.width),
+        @min(self.buffer.height, self.height),
+    ).add(self.left_pos);
 
     self.children_pos = Position.init(
-        self.left_pos.x + self.horizontal_margin,
-        self.left_pos.y + self.vertical_margin,
-    ).add(original_pos);
+        self.horizontal_margin,
+        self.vertical_margin,
+    ).add(self.left_pos);
 }
 
-pub fn childrenPosition(self: CenteredBox) Position {
+pub fn childrenPosition(self: Box) Position {
     return self.children_pos;
 }
 
-fn draw(self: *CenteredBox) void {
+fn draw(self: *Box) void {
     if (self.show_borders) {
         var left_up = Cell.init(
             self.buffer.box_chars.left_up,
@@ -183,7 +179,7 @@ fn draw(self: *CenteredBox) void {
     }
 }
 
-fn update(self: *CenteredBox, ctx: *anyopaque) !void {
+fn update(self: *Box, ctx: *anyopaque) !void {
     if (self.update_fn) |update_fn| {
         return @call(
             .auto,
