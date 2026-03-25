@@ -12,7 +12,6 @@ Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.
 ## Dependencies
 
 - Compile-time:
-
   - zig 0.15.x
 
   - libc
@@ -22,7 +21,6 @@ Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.
   - xcb (optional, required by default; needed for X11 support)
 
 - Runtime (with default config):
-
   - xorg
 
   - xorg-xauth
@@ -254,7 +252,7 @@ A typical shebang for a shell script looks like this:
 
 The name "Ly" is a tribute to the fairy from the game Rayman. Ly was tested by oxodao, who is some seriously awesome dude.
 
-Also, Ly wouldn't be there today without [Kawaii-Ash](https://github.com/Kawaii-Ash), who has done significant contributions to the project for the Zig rewrite, which lead to the release of Ly v1.0.0. Massive thanks, and sorry for not crediting you enough beforehand!
+Also, Ly wouldn't be there today without [ashametrine](https://github.com/ashametrine), who has done significant contributions to the project for the Zig rewrite, which lead to the release of Ly v1.0.0. Massive thanks, and sorry for not crediting you enough beforehand!
 
 ### Donate
 
