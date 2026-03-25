@@ -2,6 +2,8 @@
 
 ![Ly screenshot](.github/screenshot.png "Ly screenshot")
 
+_Note: the above animation can be found [here](https://codeberg.org/attachments/f336d6ac-8331-4323-91fc-0e4619803401)!_
+
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD, designed with portability in mind and doesn't require systemd to run.
 
 Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.org)!
