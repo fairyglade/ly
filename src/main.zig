@@ -1860,14 +1860,14 @@ fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: Displa
         const entry_path = try std.fmt.allocPrint(session.label.allocator, "{s}/{s}", .{ path, item.name });
         defer session.label.allocator.free(entry_path);
         var entry_ini = Ini(Entry).init(session.label.allocator);
-        _ = try entry_ini.readFileToStruct(entry_path, .{
+        const data = try entry_ini.readFileToStruct(entry_path, .{
             .fieldHandler = null,
             .comment_characters = "#",
         });
         errdefer entry_ini.deinit();
 
         const file_name = try session.label.allocator.dupe(u8, std.fs.path.stem(item.name));
-        const entry = entry_ini.data.@"Desktop Entry";
+        const entry = data.@"Desktop Entry";
         var maybe_xdg_session_desktop: ?[]const u8 = null;
         var maybe_xdg_desktop_names: ?[]const u8 = null;
 

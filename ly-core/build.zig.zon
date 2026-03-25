@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.15.0",
     .dependencies = .{
         .zigini = .{
-            .url = "git+https://github.com/AnErrupTion/zigini?ref=zig-0.15.0#9281f47702b57779e831d7618e158abb8eb4d4a2",
-            .hash = "zigini-0.3.3-36M0FRJJAADZVq5HPm-hYKMpFFTr0OgjbEYcK2ijKZ5n",
+            .url = "git+https://github.com/AshAmetrine/zigini?ref=master#831f6aff55703b7fa34b43c972d60eb3d5d6f4a4",
+            .hash = "zigini-0.3.2-BSkB7UVDAAAErcEC6s7zF9bKTe7CjdBgrV35K3DGHpbr",
         },
     },
     .paths = .{
