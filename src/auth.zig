@@ -404,7 +404,7 @@ fn mcookie() [Md5.digest_length * 2]u8 {
     return std.fmt.bytesToHex(&out, .lower);
 }
 
-fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, home: []const u8, xauth_buffer: []u8, options: AuthOptions) !void {
+fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, display_name: []u8, shell: [*:0]const u8, home: []const u8, xauth_buffer: []u8, options: AuthOptions) ![]const u8 {
     const xauthority = try createXauthFile(log_file, home, xauth_buffer);
     try interop.setEnvironmentVariable(allocator, "XAUTHORITY", xauthority, true);
     try interop.setEnvironmentVariable(allocator, "DISPLAY", display_name, true);
@@ -427,6 +427,8 @@ fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, display_name: []u8, s
         try log_file.file_writer.interface.print("xauth command failed with status {d}\n", .{status.status});
         return error.XauthFailed;
     }
+
+    return xauthority;
 }
 
 fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []const u8, home: []const u8, options: AuthOptions, desktop_cmd: []const u8, vt: []const u8) !void {
@@ -442,14 +444,14 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, shell: []cons
     defer allocator.free(shell_z);
 
     try log_file.info("auth/x11", "creating xauth file", .{});
-    try xauth(log_file, allocator, display_name, shell_z, home, &xauth_buffer, options);
+    const xauthority = try xauth(log_file, allocator, display_name, shell_z, home, &xauth_buffer, options);
 
     try log_file.info("auth/x11", "starting x server", .{});
     const pid = try std.posix.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s}", .{ options.x_cmd, display_name, vt }) catch std.process.exit(1);
-        try log_file.info("auth/x11", "executing: {s} -c {s}", .{ shell, cmd_str });
+        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s} -auth {s}", .{ options.x_cmd, display_name, vt, xauthority }) catch std.process.exit(1);
+        try log_file.info("auth/x11", "executing: {s} -c {s} -auth {s}", .{ shell, cmd_str, xauthority });
 
         const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
         std.posix.execveZ(shell_z, &args, std.c.environ) catch {};
