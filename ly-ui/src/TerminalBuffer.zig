@@ -208,12 +208,10 @@ pub fn runEventLoop(
     var inactivity_time_start = try interop.getTimeOfDay();
 
     while (self.run) {
+        var maybe_timeout: ?usize = null;
+
         if (self.update) {
-            for (layers) |layer| {
-                for (layer) |widget| {
-                    try widget.update(context);
-                }
-            }
+            try TerminalBuffer.clearScreen(false);
 
             // Reset cursor
             const current_widget = self.getActiveWidget();
@@ -226,24 +224,18 @@ pub fn runEventLoop(
                 );
             };
 
-            try TerminalBuffer.clearScreen(false);
-
             for (layers) |layer| {
                 for (layer) |widget| {
+                    try widget.update(context);
                     widget.draw();
+
+                    if (try widget.calculateTimeout(context)) |widget_timeout| {
+                        if (maybe_timeout == null or widget_timeout < maybe_timeout.?) maybe_timeout = widget_timeout;
+                    }
                 }
             }
 
             TerminalBuffer.presentBuffer();
-        }
-
-        var maybe_timeout: ?usize = null;
-        for (layers) |layer| {
-            for (layer) |widget| {
-                if (try widget.calculateTimeout(context)) |widget_timeout| {
-                    if (maybe_timeout == null or widget_timeout < maybe_timeout.?) maybe_timeout = widget_timeout;
-                }
-            }
         }
 
         if (inactivity_event_fn) |inactivity_fn| {
@@ -257,7 +249,7 @@ pub fn runEventLoop(
 
         const event_error = if (maybe_timeout) |timeout| termbox.tb_peek_event(&event, @intCast(timeout)) else termbox.tb_poll_event(&event);
 
-        self.update = maybe_timeout != null;
+        self.update = maybe_timeout != null or event_error >= 0;
 
         if (event_error < 0) continue;
 
