@@ -12,8 +12,8 @@ body:
         - label: I have looked for any other duplicate issues
           required: true
         - label: I have reproduced the issue on a fresh install of my OS & Ly with default settings, except ones I will mention
-          required: true
-        - label: I have confirmed this issue also occurs on the latest development version
+          required: false
+        - label: I have confirmed this issue also occurs on the latest development version (found in the `master` branch)
           required: true
   - type: input
     id: version
