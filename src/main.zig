@@ -225,20 +225,20 @@ pub fn main() !void {
     var config_parser = try IniParser(Config).init(state.allocator, config_path, migrator.configFieldHandler);
     defer config_parser.deinit();
     defer if (!shutdown or !restart) {
-            var iter = custom.binds.iterator();
-            while (iter.next()) |i| {
-                temporary_allocator.free(i.key_ptr.*);
-                temporary_allocator.free(i.value_ptr.*.cmd);
-                temporary_allocator.free(i.value_ptr.*.name);
-            }
-            custom.binds.deinit();
-            var labelIter = custom.labels.iterator();
-            while (labelIter.next()) |i| {
-                temporary_allocator.free(i.key_ptr.*);
-                if (i.value_ptr.cmd) |cmd|
-                    temporary_allocator.free(cmd);
-            }
-            custom.labels.deinit();
+        var iter = custom.binds.iterator();
+        while (iter.next()) |i| {
+            temporary_allocator.free(i.key_ptr.*);
+            temporary_allocator.free(i.value_ptr.*.cmd);
+            temporary_allocator.free(i.value_ptr.*.name);
+        }
+        custom.binds.deinit();
+        var labelIter = custom.labels.iterator();
+        while (labelIter.next()) |i| {
+            temporary_allocator.free(i.key_ptr.*);
+            if (i.value_ptr.cmd) |cmd|
+                temporary_allocator.free(cmd);
+        }
+        custom.labels.deinit();
     };
 
     state.config = config_parser.structure;
@@ -1096,7 +1096,7 @@ pub fn main() !void {
         latest.info.counter = 1;
     }
     defer for (state.custom_info.items) |*item| {
-            item.lbl.deinit();
+        item.lbl.deinit();
     };
 
     var iter = custom.binds.iterator();
@@ -1122,7 +1122,7 @@ pub fn main() !void {
         state.custom_binds.items[state.custom_binds.items.len - 1].lbl.allocator = state.allocator;
     }
     defer for (state.custom_binds.items) |*i| {
-            i.lbl.deinit();
+        i.lbl.deinit();
     };
 
     if (!state.config.hide_key_hints) {
@@ -1907,11 +1907,11 @@ fn positionWidgets(ptr: *anyopaque) !void {
     }
     for (state.custom_info.items, 0..) |*item, i| {
         item.lbl.positionXY(state.edge_margin
-            .addY(@intCast(i))
             .invertX(state.buffer.width)
             .removeX(item.lbl.text.len)
             .invertY(state.buffer.height)
-            .removeY(1));
+            .removeY(state.custom_info.items.len)
+            .addY(i));
     }
 
     state.battery_label.positionXY(state.edge_margin
