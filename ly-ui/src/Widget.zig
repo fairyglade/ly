@@ -12,6 +12,8 @@ const VTable = struct {
     calculate_timeout_fn: ?*const fn (ptr: *anyopaque, ctx: *anyopaque) anyerror!?usize,
 };
 
+pub var idCounter: u64 = 0;
+
 id: u64,
 display_name: []const u8,
 keybinds: ?TerminalBuffer.KeybindMap,
@@ -101,8 +103,9 @@ pub fn init(
         };
     };
 
+    idCounter += 1;
     return .{
-        .id = @intFromPtr(Impl.vtable.draw_fn),
+        .id = idCounter,
         .display_name = display_name,
         .keybinds = keybinds,
         .pointer = pointer,
