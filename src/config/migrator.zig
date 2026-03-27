@@ -170,18 +170,18 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
     //      Do you know how long I have been waiting for this petition to be authorized
     //      in regards to this particular segment of computerized instructions?
     //      It has been many a moon since this particular audit has been
-    //      posted regarding the position of handling configurable literature 
+    //      posted regarding the position of handling configurable literature
     //      apparatuses and plans for a new feature to the configuration
     //      interface and as time continues onwards I grow more restless
     //      on the progress of said interface, only to find out afterwards
     //      that you have PROCRASTINATED on the efforts meant to enhance
     //      configuration. Thus the requirement for this reminder larger
     //      compared to the two reminders regarding better methods of
-    //      X termination detection and new usernames with existing 
+    //      X termination detection and new usernames with existing
     //      save files.
     //
     //      Thus is my que to leave this TODO at thy request,
-    //      
+    //
     //      Forever Sullied,
     //
     //      Ly Contributor.
