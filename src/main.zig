@@ -38,6 +38,7 @@ const Lang = @import("config/Lang.zig");
 const migrator = @import("config/migrator.zig");
 const OldSave = @import("config/OldSave.zig");
 const SavedUsers = @import("config/SavedUsers.zig");
+const custom = @import("config/custom.zig");
 const DisplayServer = @import("enums.zig").DisplayServer;
 const Environment = @import("Environment.zig");
 const Entry = Environment.Entry;
@@ -62,6 +63,17 @@ fn signalHandler(i: c_int) callconv(.c) void {
 fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
     TerminalBuffer.shutdown();
 }
+
+const CustomBindLabel = struct {
+    cmd: custom.CustomCommandBind,
+    key: []const u8,
+    lbl: Label,
+};
+
+const CustomInfoLabel = struct {
+    info: custom.CustomCommandInfo,
+    lbl: Label,
+};
 
 const UiState = struct {
     allocator: Allocator,
@@ -107,6 +119,8 @@ const UiState = struct {
     bigclock_format_buf: [16:0]u8,
     clock_buf: [64:0]u8,
     bigclock_buf: [32:0]u8,
+    custom_binds: std.ArrayList(CustomBindLabel),
+    custom_info: std.ArrayList(CustomInfoLabel),
 };
 
 var shutdown = false;
@@ -206,8 +220,26 @@ pub fn main() !void {
     const config_path = try std.fs.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.ini" });
     defer state.allocator.free(config_path);
 
+    custom.binds = .init(state.allocator);
+    custom.labels = .init(state.allocator);
     var config_parser = try IniParser(Config).init(state.allocator, config_path, migrator.configFieldHandler);
     defer config_parser.deinit();
+    defer if (!shutdown or !restart) {
+            var iter = custom.binds.iterator();
+            while (iter.next()) |i| {
+                temporary_allocator.free(i.key_ptr.*);
+                temporary_allocator.free(i.value_ptr.*.cmd);
+                temporary_allocator.free(i.value_ptr.*.name);
+            }
+            custom.binds.deinit();
+            var labelIter = custom.labels.iterator();
+            while (labelIter.next()) |i| {
+                temporary_allocator.free(i.key_ptr.*);
+                if (i.value_ptr.cmd) |cmd|
+                    temporary_allocator.free(cmd);
+            }
+            custom.labels.deinit();
+    };
 
     state.config = config_parser.structure;
 
@@ -1043,6 +1075,56 @@ pub fn main() !void {
     var layer2: std.ArrayList(*Widget) = .empty;
     defer layer2.deinit(state.allocator);
 
+    state.custom_binds = .empty;
+    defer state.custom_binds.deinit(state.allocator);
+
+    state.custom_info = .empty;
+    defer state.custom_info.deinit(state.allocator);
+
+    var lblIter = custom.labels.iterator();
+    // NOTE: Because widgets have a pointer to the underlying Label, we have to ensure
+    // that the ArrayList doesn't allocate more memory than what we ensured. Otherwise
+    // the pointer to the Label becomes invalid.
+    try state.custom_info.ensureTotalCapacity(state.allocator, @intCast(custom.labels.count()));
+    while (lblIter.next()) |i| {
+        try state.custom_info.append(state.allocator, .{
+            .info = i.value_ptr.*,
+            .lbl = .init("", null, state.buffer.fg, state.buffer.bg, updateCustomInfo, null),
+        });
+        var latest = &state.custom_info.items[state.custom_info.items.len - 1];
+        latest.info.id = latest.lbl.widget().id;
+        latest.info.counter = 1;
+    }
+    defer for (state.custom_info.items) |*item| {
+            item.lbl.deinit();
+    };
+
+    var iter = custom.binds.iterator();
+    while (iter.next()) |i| {
+        var concat = try std.mem.concat(state.allocator, u8, &[_][]const u8{ i.key_ptr.*, " ", i.value_ptr.name });
+        inline for (@typeInfo(Lang).@"struct".fields) |lang_key| {
+            const new = try std.mem.replaceOwned(u8, state.allocator, concat, "$" ++ lang_key.name, @field(state.lang, lang_key.name));
+            state.allocator.free(concat);
+            concat = new;
+        }
+        try state.custom_binds.append(state.allocator, .{
+            .lbl = .init(
+                concat,
+                null,
+                state.buffer.fg,
+                state.buffer.bg,
+                null,
+                null,
+            ),
+            .cmd = i.value_ptr.*,
+            .key = i.key_ptr.*,
+        });
+        state.custom_binds.items[state.custom_binds.items.len - 1].lbl.allocator = state.allocator;
+    }
+    defer for (state.custom_binds.items) |*i| {
+            i.lbl.deinit();
+    };
+
     if (!state.config.hide_key_hints) {
         try layer2.append(state.allocator, state.shutdown_label.widget());
         try layer2.append(state.allocator, state.restart_label.widget());
@@ -1085,12 +1167,23 @@ pub fn main() !void {
         try layer2.append(state.allocator, state.version_label.widget());
     }
 
+    for (state.custom_binds.items) |*item| {
+        try layer2.append(state.allocator, item.lbl.widget());
+    }
+    for (state.custom_info.items) |*item| {
+        try layer2.append(state.allocator, item.lbl.widget());
+    }
+
     try widgets.append(state.allocator, layer2.items);
 
     // Layer 3
     if (state.config.auth_fails > 0) {
         var layer3 = [_]*Widget{cascade.widget()};
         try widgets.append(state.allocator, &layer3);
+    }
+
+    for (state.custom_binds.items) |*item| {
+        try state.buffer.registerGlobalKeybind(item.key, &customCommand, item);
     }
 
     try state.buffer.registerGlobalKeybind("Esc", &disableInsertMode, &state);
@@ -1250,6 +1343,16 @@ fn quit(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
     state.buffer.stopEventLoop();
+    return false;
+}
+
+fn customCommand(ptr: *anyopaque) !bool {
+    const lbl: *CustomBindLabel = @ptrCast(@alignCast(ptr));
+    var proc = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", lbl.cmd.cmd }, lbl.lbl.allocator.?);
+    proc.stdout_behavior = .Ignore;
+    proc.stderr_behavior = .Ignore;
+    const res = proc.spawnAndWait() catch return false;
+    if (res.Exited != 0) return error.CommandFailed;
     return false;
 }
 
@@ -1639,6 +1742,63 @@ fn updateClock(self: *Label, ptr: *anyopaque) !void {
     }
 }
 
+fn updateCustomInfo(lbl: *Label, ptr: *anyopaque) !void {
+    const state: *UiState = @ptrCast(@alignCast(ptr));
+    const wid = lbl.widget().id;
+    var stdout = std.ArrayList(u8).empty;
+    defer stdout.deinit(state.allocator);
+
+    var stderr = std.ArrayList(u8).empty;
+    defer stderr.deinit(state.allocator);
+    for (state.custom_info.items) |*i| {
+        if (i.info.id != wid) continue;
+        // Here, a counter ticks down every time `updateCustomInfo` runs on that
+        // particular label. It will only run the command and update the label
+        // once it reaches to 1. If a refresh value is defined it's then reset to
+        // that refresh value.
+        if (i.info.counter == 1) {
+            var c = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", i.info.cmd orelse custom.UNDEFINED_CMD }, state.allocator);
+            c.stderr_behavior = .Pipe;
+            c.stdout_behavior = .Pipe;
+            try c.spawn();
+
+            c.collectOutput(state.allocator, &stdout, &stderr, state.buffer.width) catch {
+                try stdout.print(state.allocator, "{s}: [{s}]", .{ i.info.name, state.lang.custom_info_err_output_long });
+            };
+
+            const newlineIdx = std.mem.indexOfAny(u8, stdout.items, "\n");
+            if (newlineIdx) |idx| {
+                stdout.shrinkAndFree(state.allocator, idx);
+            }
+
+            if (stdout.items.len > state.buffer.width) {
+                stdout.clearRetainingCapacity();
+                try stdout.print(state.allocator, "{s}: [{s}]", .{ i.info.name, state.lang.custom_info_err_output_long });
+            }
+
+            _ = try c.wait();
+
+            // Sometimes, the output of a command would have an unprintable character at
+            // the end of its output, causing '�' (U+FFFD) to appear in its place. Here, we check
+            // if this is the case and remove it.
+            if (stdout.items.len != 0 and !std.ascii.isPrint(stdout.items[stdout.items.len - 1])) {
+                _ = stdout.pop();
+            } else if (stdout.items.len == 0) {
+                try stdout.print(state.allocator, "{s}: [{s}{s}]", .{ i.info.name, state.lang.custom_info_err_no_output, if (stderr.items.len > 0) state.lang.custom_info_err_no_output_error else "" });
+            }
+            state.allocator.free(lbl.text);
+            try lbl.setTextAlloc(state.allocator, "{s}", .{stdout.items});
+
+            // Called to re-position the widgets after they receive their output.
+            try positionWidgets(state);
+            if (i.info.refresh != 0)
+                i.info.counter = i.info.refresh;
+        }
+        if (i.info.counter != 0)
+            i.info.counter -= 1;
+    }
+}
+
 fn calculateClockTimeout(_: *Label, _: *anyopaque) !?usize {
     const time = try interop.getTimeOfDay();
 
@@ -1732,6 +1892,26 @@ fn positionWidgets(ptr: *anyopaque) !void {
         state.brightness_up_label.positionXY(last_label
             .childrenPosition()
             .addX(1));
+        var x_offset: usize = 0;
+        var y_offset: usize = 1;
+        for (state.custom_binds.items) |*item| {
+            item.lbl.positionXY(state.edge_margin
+                .addY(y_offset)
+                .addX(x_offset));
+            x_offset += item.lbl.text.len + 1;
+            if (x_offset + item.lbl.text.len > state.config.custom_bind_width orelse state.buffer.width) {
+                x_offset = 0;
+                y_offset += 1;
+            }
+        }
+    }
+    for (state.custom_info.items, 0..) |*item, i| {
+        item.lbl.positionXY(state.edge_margin
+            .addY(@intCast(i))
+            .invertX(state.buffer.width)
+            .removeX(item.lbl.text.len)
+            .invertY(state.buffer.height)
+            .removeY(1));
     }
 
     state.battery_label.positionXY(state.edge_margin

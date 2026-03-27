@@ -16,6 +16,7 @@ const ini = ly_core.ini;
 const Config = @import("Config.zig");
 const OldSave = @import("OldSave.zig");
 const SavedUsers = @import("SavedUsers.zig");
+const custom = @import("custom.zig");
 
 const color_properties = [_][]const u8{
     "bg",
@@ -160,6 +161,61 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         mapped_field.key = "animation_frame_delay";
 
         return mapped_field;
+    }
+
+    // TODO: Dearest Melpert,
+    //      I pray this message finds you well, as daylight dwindles and the witching hour
+    //      approaches, I find it more and more imperative as time continues that I place
+    //      this reminder here in such a format that you cannot ignore.
+    //      Do you know how long I have been waiting for this petition to be authorized
+    //      in regards to this particular segment of computerized instructions?
+    //      It has been many a moon since this particular audit has been
+    //      posted regarding the position of handling configurable literature 
+    //      apparatuses and plans for a new feature to the configuration
+    //      interface and as time continues onwards I grow more restless
+    //      on the progress of said interface, only to find out afterwards
+    //      that you have PROCRASTINATED on the efforts meant to enhance
+    //      configuration. Thus the requirement for this reminder larger
+    //      compared to the two reminders regarding better methods of
+    //      X termination detection and new usernames with existing 
+    //      save files.
+    //
+    //      Thus is my que to leave this TODO at thy request,
+    //      
+    //      Forever Sullied,
+    //
+    //      Ly Contributor.
+    //
+    if (std.mem.startsWith(u8, field.header, "cmd:")) {
+        const key = field.header["cmd:".len..];
+        const keyZ = temporary_allocator.dupe(u8, key) catch "";
+        if (!custom.binds.contains(key)) {
+            custom.binds.put(keyZ, .{}) catch {};
+        }
+        if (custom.binds.getPtr(keyZ)) |command| {
+            if (std.mem.eql(u8, field.key, "name")) {
+                command.name = temporary_allocator.dupe(u8, field.value) catch "";
+            }
+            if (std.mem.eql(u8, field.key, "cmd")) {
+                command.cmd = temporary_allocator.dupe(u8, field.value) catch "";
+            }
+        }
+    }
+
+    if (std.mem.startsWith(u8, field.header, "lbl:")) {
+        const key = field.header["lbl:".len..];
+        const keyZ = temporary_allocator.dupe(u8, key) catch "";
+        if (!custom.labels.contains(keyZ)) {
+            custom.labels.put(keyZ, .{ .name = keyZ }) catch {};
+        }
+        if (custom.labels.getPtr(keyZ)) |label| {
+            if (std.mem.eql(u8, field.key, "cmd")) {
+                label.cmd = temporary_allocator.dupe(u8, field.value) catch "";
+            }
+            if (std.mem.eql(u8, field.key, "refresh")) {
+                label.refresh = std.fmt.parseInt(u32, field.value, 10) catch 0;
+            }
+        }
     }
 
     return field;
