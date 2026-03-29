@@ -80,6 +80,7 @@ path: ?[]const u8 = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bi
 restart_cmd: []const u8 = "/sbin/shutdown -r now",
 restart_key: []const u8 = "F2",
 save: bool = true,
+shell: bool = true,
 service_name: [:0]const u8 = "ly",
 session_log: ?[]const u8 = "ly-session.log",
 setup_cmd: []const u8 = build_options.config_directory ++ "/ly/setup.sh",
