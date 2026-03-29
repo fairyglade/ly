@@ -769,29 +769,33 @@ pub fn main() !void {
     var has_crawl_error = false;
 
     // Crawl session directories (Wayland, X11 and custom respectively)
-    var wayland_session_dirs = std.mem.splitScalar(u8, state.config.waylandsessions, ':');
-    while (wayland_session_dirs.next()) |dir| {
-        crawl(&state.session, state.lang, dir, .wayland) catch |err| {
-            has_crawl_error = true;
-            try state.log_file.err(
-                "sys",
-                "failed to crawl wayland session directory '{s}': {s}",
-                .{ dir, @errorName(err) },
-            );
-        };
-    }
-
-    if (build_options.enable_x11_support) {
-        var x_session_dirs = std.mem.splitScalar(u8, state.config.xsessions, ':');
-        while (x_session_dirs.next()) |dir| {
-            crawl(&state.session, state.lang, dir, .x11) catch |err| {
+    if (state.config.waylandsessions) |waylandsessions| {
+        var wayland_session_dirs = std.mem.splitScalar(u8, waylandsessions, ':');
+        while (wayland_session_dirs.next()) |dir| {
+            crawl(&state.session, state.lang, dir, .wayland) catch |err| {
                 has_crawl_error = true;
                 try state.log_file.err(
                     "sys",
-                    "failed to crawl x11 session directory '{s}': {s}",
+                    "failed to crawl wayland session directory '{s}': {s}",
                     .{ dir, @errorName(err) },
                 );
             };
+        }
+    }
+
+    if (build_options.enable_x11_support) {
+        if (state.config.xsessions) |xsessions| {
+            var x_session_dirs = std.mem.splitScalar(u8, xsessions, ':');
+            while (x_session_dirs.next()) |dir| {
+                crawl(&state.session, state.lang, dir, .x11) catch |err| {
+                    has_crawl_error = true;
+                    try state.log_file.err(
+                        "sys",
+                        "failed to crawl x11 session directory '{s}': {s}",
+                        .{ dir, @errorName(err) },
+                    );
+                };
+            }
         }
     }
 
