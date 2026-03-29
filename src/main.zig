@@ -1058,6 +1058,45 @@ pub fn main() !void {
         }
     }
 
+    // Apply VT-specific default session if configured.
+    // Format: vt_default_sessions = 1:wayland:ubuntu,3:custom:desktop-environment
+    // The type field (wayland/x11/custom/shell/xinitrc) is optional:
+    //   vt:type:name  — match session by type and name
+    //   vt:name       — match first session with that name regardless of type
+    // VT defaults take priority over the per-user save file so each VT
+    // reliably starts on the intended session.
+    if (!state.is_autologin) {
+        if (state.config.vt_default_sessions) |vt_sessions_str| {
+            var vt_iter = std.mem.splitScalar(u8, vt_sessions_str, ',');
+            while (vt_iter.next()) |entry| {
+                const trimmed = std.mem.trim(u8, entry, " \t");
+                var parts = std.mem.splitScalar(u8, trimmed, ':');
+                const vt_str = parts.next() orelse continue;
+                const second = parts.next() orelse continue;
+                const vt_num = std.fmt.parseInt(u8, std.mem.trim(u8, vt_str, " \t"), 10) catch continue;
+                if (vt_num != state.active_tty) continue;
+
+                // Determine if second field is a type qualifier or the session name
+                const maybe_type_str = std.mem.trim(u8, second, " \t");
+                const maybe_name = parts.next();
+                const ds: ?DisplayServer = if (maybe_name != null) ds_parse: {
+                    if (std.ascii.eqlIgnoreCase(maybe_type_str, "wayland")) break :ds_parse .wayland;
+                    if (std.ascii.eqlIgnoreCase(maybe_type_str, "x11")) break :ds_parse .x11;
+                    if (std.ascii.eqlIgnoreCase(maybe_type_str, "custom")) break :ds_parse .custom;
+                    if (std.ascii.eqlIgnoreCase(maybe_type_str, "shell")) break :ds_parse .shell;
+                    if (std.ascii.eqlIgnoreCase(maybe_type_str, "xinitrc")) break :ds_parse .xinitrc;
+                    break :ds_parse null;
+                } else null;
+                const session_name = if (maybe_name) |n| std.mem.trim(u8, n, " \t") else maybe_type_str;
+
+                if (findSessionByNameAndType(&state.session, session_name, ds)) |idx| {
+                    state.session.label.current = idx;
+                }
+                break;
+            }
+        }
+    }
+
     const info_line_widget = state.info_line.widget();
     const session_widget = state.session.widget();
     const login_widget = state.login.widget();
@@ -2093,7 +2132,14 @@ fn isValidUsername(username: []const u8, usernames: StringList) bool {
 }
 
 fn findSessionByName(session: *Session, name: []const u8) ?usize {
+    return findSessionByNameAndType(session, name, null);
+}
+
+fn findSessionByNameAndType(session: *Session, name: []const u8, display_server: ?DisplayServer) ?usize {
     for (session.label.list.items, 0..) |env, i| {
+        if (display_server) |ds| {
+            if (env.environment.display_server != ds) continue;
+        }
         if (std.ascii.eqlIgnoreCase(env.environment.file_name, name)) return i;
         if (std.ascii.eqlIgnoreCase(env.environment.name, name)) return i;
         if (env.environment.xdg_session_desktop) |session_desktop| {
