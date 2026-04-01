@@ -94,6 +94,7 @@ const UiState = struct {
     capslock_label: Label,
     battery_label: Label,
     clock_label: Label,
+    tty_label: Label,
     session_specifier_label: Label,
     login_label: Label,
     password_label: Label,
@@ -118,6 +119,7 @@ const UiState = struct {
     battery_buf: [16:0]u8,
     bigclock_format_buf: [16:0]u8,
     clock_buf: [64:0]u8,
+    tty_buf: [8:0]u8,
     bigclock_buf: [32:0]u8,
     custom_binds: std.ArrayList(CustomBindLabel),
     custom_info: std.ArrayList(CustomInfoLabel),
@@ -541,6 +543,16 @@ pub fn main() !void {
     );
     defer state.clock_label.deinit();
 
+    state.tty_label = Label.init(
+        "",
+        null,
+        state.buffer.fg,
+        state.buffer.bg,
+        null,
+        null,
+    );
+    defer state.tty_label.deinit();
+
     state.bigclock_label = BigLabel.init(
         &state.buffer,
         "",
@@ -945,6 +957,10 @@ pub fn main() !void {
         };
     }
 
+    if (state.config.show_tty) {
+        try state.tty_label.setTextBuf(&state.tty_buf, "tty{d}", .{state.active_tty});
+    }
+
     // Initialize the animation, if any
     var animation: ?*Widget = null;
     switch (state.config.animation) {
@@ -1151,6 +1167,9 @@ pub fn main() !void {
     }
     if (state.config.clock != null) {
         try layer2.append(state.allocator, state.clock_label.widget());
+    }
+    if (state.config.show_tty) {
+        try layer2.append(state.allocator, state.tty_label.widget());
     }
     if (state.config.bigclock != .none) {
         try layer2.append(state.allocator, state.bigclock_label.widget());
@@ -1922,10 +1941,17 @@ fn positionWidgets(ptr: *anyopaque) !void {
         .add(TerminalBuffer.START_POSITION)
         .addYFromIf(state.brightness_up_label.childrenPosition(), !state.config.hide_key_hints)
         .removeYFromIf(state.edge_margin, !state.config.hide_key_hints));
+
+    const tty_label_width = if (state.config.show_tty) TerminalBuffer.strWidth(state.tty_label.text) else 0;
+    const tty_label_gap = if (state.config.show_tty and state.config.clock != null) @as(usize, 1) else 0;
+    state.tty_label.positionXY(state.edge_margin
+        .add(TerminalBuffer.START_POSITION)
+        .invertX(state.buffer.width)
+        .removeXIf(tty_label_width, state.buffer.width > tty_label_width + state.edge_margin.x));
     state.clock_label.positionXY(state.edge_margin
         .add(TerminalBuffer.START_POSITION)
         .invertX(state.buffer.width)
-        .removeXIf(TerminalBuffer.strWidth(state.clock_label.text), state.buffer.width > TerminalBuffer.strWidth(state.clock_label.text) + state.edge_margin.x));
+        .removeXIf(TerminalBuffer.strWidth(state.clock_label.text) + tty_label_width + tty_label_gap, state.buffer.width > TerminalBuffer.strWidth(state.clock_label.text) + tty_label_width + tty_label_gap + state.edge_margin.x));
 
     state.numlock_label.positionX(state.edge_margin
         .add(TerminalBuffer.START_POSITION)
