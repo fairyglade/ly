@@ -737,18 +737,20 @@ pub fn main() !void {
     try state.buffer.registerKeybind(&state.login.label.keybinds, "H", &viGoLeft, &state);
     try state.buffer.registerKeybind(&state.login.label.keybinds, "L", &viGoRight, &state);
 
-    addOtherEnvironment(&state.session, state.lang, .shell, null) catch |err| {
-        try state.info_line.addMessage(
-            state.lang.err_alloc,
-            state.config.error_bg,
-            state.config.error_fg,
-        );
-        try state.log_file.err(
-            "sys",
-            "failed to add shell environment: {s}",
-            .{@errorName(err)},
-        );
-    };
+    if (state.config.shell) {
+        addOtherEnvironment(&state.session, state.lang, .shell, null) catch |err| {
+            try state.info_line.addMessage(
+                state.lang.err_alloc,
+                state.config.error_bg,
+                state.config.error_fg,
+            );
+            try state.log_file.err(
+                "sys",
+                "failed to add shell environment: {s}",
+                .{@errorName(err)},
+            );
+        };
+    }
 
     if (build_options.enable_x11_support) {
         if (state.config.xinitrc) |xinitrc_cmd| {
