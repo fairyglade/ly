@@ -219,12 +219,17 @@ pub fn main() !void {
         state.allocator.free(state.old_save_path);
     };
 
-    const config_path = try std.fs.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.ini" });
+    const config_path = try std.fs.path.join(
+        state.allocator,
+        &[_][]const u8{ config_parent_path, "config.ini" });
     defer state.allocator.free(config_path);
 
     custom.binds = .init(state.allocator);
     custom.labels = .init(state.allocator);
-    var config_parser = try IniParser(Config).init(state.allocator, config_path, migrator.configFieldHandler);
+    var config_parser = try IniParser(Config).init(
+        state.allocator,
+        config_path,
+        migrator.configFieldHandler);
     defer config_parser.deinit();
     defer if (!shutdown or !restart) {
         var iter = custom.binds.iterator();
@@ -1965,20 +1970,29 @@ fn positionWidgets(ptr: *anyopaque) !void {
         .childrenPosition()
         .removeX(TerminalBuffer.strWidth(state.lang.numlock) + TerminalBuffer.strWidth(state.lang.capslock) + 1));
 
+    const v_center = @as(f32, @floatFromInt(state.buffer.height)) * state.config.box_v_position;
+    const v_position = @max(1, v_center - @as(f32, @floatFromInt(state.box.height)) * state.config.box_v_position);
+    const h_center = @as(f32, @floatFromInt(state.buffer.width)) * state.config.box_h_position;
+    const h_position = @max(1, h_center - @as(f32, @floatFromInt(state.box.width)) * state.config.box_h_position);
+
     state.box.positionXY(TerminalBuffer.START_POSITION
-        .addX((state.buffer.width - @min(state.buffer.width - 2, state.box.width)) / 2)
-        .addY((state.buffer.height - @min(state.buffer.height - 2, state.box.height)) / 2));
+        .addX(@intFromFloat(h_position))
+        .addY(@intFromFloat(v_position)));
 
     if (state.config.bigclock != .none) {
-        const half_width = state.buffer.width / 2;
-        const half_label_width = (TerminalBuffer.strWidth(state.bigclock_label.text) * (BigLabel.CHAR_WIDTH + 1)) / 2;
-        const half_height = (if (state.buffer.height > state.box.height) state.buffer.height - state.box.height else state.buffer.height) / 2;
+        const bc_v_position = v_position - BigLabel.CHAR_HEIGHT - 2;
+        const bc_h_offset: f32 = @floatFromInt(TerminalBuffer.strWidth(state.bigclock_label.text) * (BigLabel.CHAR_WIDTH + 1));
+        const bc_h_position = h_position + (@as(f32, @floatFromInt(state.box.width)) - bc_h_offset) / 2;
+
+        state.box.positionXY(state.box.left_pos
+            .removeXIf(@intFromFloat(bc_h_position - 2), bc_h_position < 0)
+            .removeYIf(@intFromFloat(bc_v_position - 2), bc_v_position < 0));
 
         state.bigclock_label.positionXY(TerminalBuffer.START_POSITION
-            .addX(half_width)
-            .removeXIf(half_label_width, half_width > half_label_width)
-            .addY(half_height)
-            .removeYIf(BigLabel.CHAR_HEIGHT + 2, half_height > BigLabel.CHAR_HEIGHT + 2));
+            .addX(1)
+            .addXIf(@intFromFloat(bc_h_position - 1), bc_h_position >= 0)
+            .addY(1)
+            .addYIf(@intFromFloat(bc_v_position - 1), bc_v_position >= 0));
     }
 
     state.info_line.label.positionY(state.box
