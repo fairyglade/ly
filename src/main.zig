@@ -1965,29 +1965,29 @@ fn positionWidgets(ptr: *anyopaque) !void {
         .childrenPosition()
         .removeX(TerminalBuffer.strWidth(state.lang.numlock) + TerminalBuffer.strWidth(state.lang.capslock) + 1));
 
-    const v_center = @as(f32, @floatFromInt(state.buffer.height)) * state.config.box_v_position;
-    const v_position = @max(1, v_center - @as(f32, @floatFromInt(state.box.height)) * state.config.box_v_position);
-    const h_center = @as(f32, @floatFromInt(state.buffer.width)) * state.config.box_h_position;
-    const h_position = @max(1, h_center - @as(f32, @floatFromInt(state.box.width)) * state.config.box_h_position);
+    const v_space = (state.buffer.height - @min(state.box.height, state.buffer.height));
+    const v_position: usize = @intFromFloat(@as(f32, @floatFromInt(v_space)) * state.config.box_v_position + 2);
+    const h_space = (state.buffer.width - @min(state.box.width, state.buffer.width));
+    const h_position: usize = @intFromFloat(@as(f32, @floatFromInt(h_space)) * state.config.box_h_position + 2);
 
     state.box.positionXY(TerminalBuffer.START_POSITION
-        .addX(@intFromFloat(h_position))
-        .addY(@intFromFloat(v_position)));
+        .addX(h_position)
+        .addY(v_position));
 
     if (state.config.bigclock != .none) {
-        const bc_v_position = v_position - BigLabel.CHAR_HEIGHT - 2;
-        const bc_h_offset: f32 = @floatFromInt(TerminalBuffer.strWidth(state.bigclock_label.text) * (BigLabel.CHAR_WIDTH + 1));
-        const bc_h_position = h_position + (@as(f32, @floatFromInt(state.box.width)) - bc_h_offset) / 2;
+        const bc_v_position = @as(isize, @intCast(v_position)) - BigLabel.CHAR_HEIGHT - 2;
+        const bc_h_offset: isize = @intCast(TerminalBuffer.strWidth(state.bigclock_label.text) * (BigLabel.CHAR_WIDTH + 1));
+        const bc_h_position: isize = @as(isize, @intCast(h_position)) + @divFloor(@as(isize, @intCast(state.box.width)) - bc_h_offset, 2);
 
         state.box.positionXY(state.box.left_pos
-            .removeXIf(@intFromFloat(bc_h_position - 2), bc_h_position < 0)
-            .removeYIf(@intFromFloat(bc_v_position - 2), bc_v_position < 0));
+            .addXIf(@abs(bc_h_position - 1), bc_h_position < 1)
+            .addYIf(@abs(bc_v_position - 1), bc_v_position < 1));
 
         state.bigclock_label.positionXY(TerminalBuffer.START_POSITION
             .addX(1)
-            .addXIf(@intFromFloat(bc_h_position - 1), bc_h_position >= 0)
+            .addXIf(@abs(bc_h_position - 1), bc_h_position > 1)
             .addY(1)
-            .addYIf(@intFromFloat(bc_v_position - 1), bc_v_position >= 0));
+            .addYIf(@abs(bc_v_position - 1), bc_v_position > 1));
     }
 
     state.info_line.label.positionY(state.box
