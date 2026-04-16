@@ -219,17 +219,12 @@ pub fn main() !void {
         state.allocator.free(state.old_save_path);
     };
 
-    const config_path = try std.fs.path.join(
-        state.allocator,
-        &[_][]const u8{ config_parent_path, "config.ini" });
+    const config_path = try std.fs.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.ini" });
     defer state.allocator.free(config_path);
 
     custom.binds = .init(state.allocator);
     custom.labels = .init(state.allocator);
-    var config_parser = try IniParser(Config).init(
-        state.allocator,
-        config_path,
-        migrator.configFieldHandler);
+    var config_parser = try IniParser(Config).init(state.allocator, config_path, migrator.configFieldHandler);
     defer config_parser.deinit();
     defer if (!shutdown or !restart) {
         var iter = custom.binds.iterator();
