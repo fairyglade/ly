@@ -23,6 +23,7 @@ label: *MessageLabel,
 
 pub fn init(
     allocator: Allocator,
+    io: std.Io,
     buffer: *TerminalBuffer,
     width: usize,
     arrow_fg: u32,
@@ -32,6 +33,7 @@ pub fn init(
         .instance = null,
         .label = try MessageLabel.init(
             allocator,
+            io,
             buffer,
             drawItem,
             null,

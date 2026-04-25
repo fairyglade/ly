@@ -1,10 +1,12 @@
 const std = @import("std");
 
 const ErrInt = std.meta.Int(.unsigned, @bitSizeOf(anyerror));
+const PaddingInt = std.meta.Int(.unsigned, 8 - (@bitSizeOf(ErrInt) + @bitSizeOf(bool)) % 8);
 
 const ErrorHandler = packed struct {
     has_error: bool = false,
     err_int: ErrInt = 0,
+    padding: PaddingInt = 0,
 };
 
 const SharedError = @This();
@@ -17,7 +19,7 @@ pub fn init(
     write_error_event_fn: ?*const fn (anyerror, *anyopaque) anyerror!void,
     ctx: ?*anyopaque,
 ) !SharedError {
-    const data = try std.posix.mmap(null, @sizeOf(ErrorHandler), std.posix.PROT.READ | std.posix.PROT.WRITE, .{ .TYPE = .SHARED, .ANONYMOUS = true }, -1, 0);
+    const data = try std.posix.mmap(null, @sizeOf(ErrorHandler), .{ .READ = true, .WRITE = true }, .{ .TYPE = .SHARED, .ANONYMOUS = true }, -1, 0);
 
     return .{
         .data = data,
@@ -31,9 +33,8 @@ pub fn deinit(self: *SharedError) void {
 }
 
 pub fn writeError(self: SharedError, err: anyerror) void {
-    var buf_stream = std.io.fixedBufferStream(self.data);
-    const writer = buf_stream.writer();
-    writer.writeStruct(ErrorHandler{ .has_error = true, .err_int = @intFromError(err) }) catch {};
+    var writer: std.Io.Writer = .fixed(self.data);
+    writer.writeStruct(ErrorHandler{ .has_error = true, .err_int = @intFromError(err) }, .native) catch {};
 
     if (self.write_error_event_fn) |write_error_event_fn| {
         @call(.auto, write_error_event_fn, .{ err, self.ctx.? }) catch {};
@@ -41,9 +42,8 @@ pub fn writeError(self: SharedError, err: anyerror) void {
 }
 
 pub fn readError(self: SharedError) ?anyerror {
-    var buf_stream = std.io.fixedBufferStream(self.data);
-    const reader = buf_stream.reader();
-    const err_handler = try reader.readStruct(ErrorHandler);
+    var reader: std.Io.Reader = .fixed(self.data);
+    const err_handler = try reader.takeStruct(ErrorHandler, .native);
 
     if (err_handler.has_error)
         return @errorFromInt(err_handler.err_int);

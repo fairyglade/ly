@@ -8,17 +8,20 @@ const Widget = ly_ui.Widget;
 
 const Cascade = @This();
 
+io: std.Io,
 instance: ?Widget = null,
 buffer: *TerminalBuffer,
 current_auth_fails: *usize,
 max_auth_fails: usize,
 
 pub fn init(
+    io: std.Io,
     buffer: *TerminalBuffer,
     current_auth_fails: *usize,
     max_auth_fails: usize,
 ) Cascade {
     return .{
+        .io = io,
         .instance = null,
         .buffer = buffer,
         .current_auth_fails = current_auth_fails,
@@ -44,7 +47,7 @@ pub fn widget(self: *Cascade) *Widget {
 
 fn draw(self: *Cascade) void {
     while (self.current_auth_fails.* >= self.max_auth_fails) {
-        std.Thread.sleep(std.time.ns_per_ms * 10);
+        self.io.sleep(.fromMilliseconds(10), .real) catch {};
 
         var changed = false;
         var y = self.buffer.height - 2;
@@ -80,7 +83,7 @@ fn draw(self: *Cascade) void {
         }
 
         if (!changed) {
-            std.Thread.sleep(std.time.ns_per_s * 7);
+            self.io.sleep(.fromSeconds(7), .real) catch {};
             self.current_auth_fails.* = 0;
         }
 

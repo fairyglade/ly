@@ -1,49 +1,17 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const UidRange = @import("UidRange.zig");
+const pwd = @import("pwd");
+const stdlib = @import("stdlib");
+const unistd = @import("unistd");
+const grp = @import("grp");
+const system_time = @import("system_time");
+const time = @import("time");
 
-pub const pam = @cImport({
-    @cInclude("security/pam_appl.h");
-});
-
-pub const utmp = @cImport({
-    @cInclude("utmpx.h");
-});
-
+pub const pam = @import("pam");
+pub const utmp = @import("utmp");
 // Exists for X11 support only
-pub const xcb = @cImport({
-    @cInclude("xcb/xcb.h");
-});
-
-const pwd = @cImport({
-    @cInclude("pwd.h");
-    // We include a FreeBSD-specific header here since login_cap.h references
-    // the passwd struct directly, so we can't import it separately
-    if (builtin.os.tag == .freebsd) {
-        @cInclude("sys/types.h");
-        @cInclude("login_cap.h");
-    }
-});
-
-const stdlib = @cImport({
-    @cInclude("stdlib.h");
-});
-
-const unistd = @cImport({
-    @cInclude("unistd.h");
-});
-
-const grp = @cImport({
-    @cInclude("grp.h");
-});
-
-const system_time = @cImport({
-    @cInclude("sys/time.h");
-});
-
-const time = @cImport({
-    @cInclude("time.h");
-});
+pub const xcb = @import("xcb");
 
 pub const TimeOfDay = struct {
     seconds: i64,
@@ -83,8 +51,8 @@ fn PlatformStruct() type {
                 const status = grp.initgroups(username, @intCast(entry.gid));
                 if (status != 0) return error.GroupInitializationFailed;
 
-                std.posix.setgid(@intCast(entry.gid)) catch return error.SetUserGidFailed;
-                std.posix.setuid(@intCast(entry.uid)) catch return error.SetUserUidFailed;
+                if (isError(std.posix.system.setgid(@intCast(entry.gid)))) return error.SetUserGidFailed;
+                if (isError(std.posix.system.setuid(@intCast(entry.uid)))) return error.SetUserUidFailed;
             }
 
             // Procedure:
@@ -96,14 +64,14 @@ fn PlatformStruct() type {
             // 4. Finally, compare the major and minor device numbers with the
             //    extracted values. If they correspond, parse [dir] to get the
             //    TTY ID
-            pub fn getActiveTtyImpl(allocator: std.mem.Allocator, use_kmscon_vt: bool) !u8 {
+            pub fn getActiveTtyImpl(allocator: std.mem.Allocator, io: std.Io, use_kmscon_vt: bool) !u8 {
                 var file_buffer: [256]u8 = undefined;
 
                 if (use_kmscon_vt) {
-                    var file = try std.fs.openFileAbsolute("/sys/class/tty/tty0/active", .{});
-                    defer file.close();
+                    var file = try std.Io.Dir.openFileAbsolute(io, "/sys/class/tty/tty0/active", .{});
+                    defer file.close(io);
 
-                    var reader = file.reader(&file_buffer);
+                    var reader = file.reader(io, &file_buffer);
                     var buffer: [16]u8 = undefined;
                     const read = try readBuffer(&reader.interface, &buffer);
 
@@ -115,10 +83,10 @@ fn PlatformStruct() type {
                 var tty_minor: u16 = undefined;
 
                 {
-                    var file = try std.fs.openFileAbsolute("/proc/self/stat", .{});
-                    defer file.close();
+                    var file = try std.Io.Dir.openFileAbsolute(io, "/proc/self/stat", .{});
+                    defer file.close(io);
 
-                    var reader = file.reader(&file_buffer);
+                    var reader = file.reader(io, &file_buffer);
                     var buffer: [1024]u8 = undefined;
                     const read = try readBuffer(&reader.interface, &buffer);
 
@@ -136,18 +104,18 @@ fn PlatformStruct() type {
                     tty_minor = tty_nr % 256;
                 }
 
-                var directory = try std.fs.openDirAbsolute("/sys/class/tty", .{ .iterate = true });
-                defer directory.close();
+                var directory = try std.Io.Dir.openDirAbsolute(io, "/sys/class/tty", .{ .iterate = true });
+                defer directory.close(io);
 
                 var iterator = directory.iterate();
-                while (try iterator.next()) |entry| {
+                while (try iterator.next(io)) |entry| {
                     const path = try std.fmt.allocPrint(allocator, "/sys/class/tty/{s}/dev", .{entry.name});
                     defer allocator.free(path);
 
-                    var file = try std.fs.openFileAbsolute(path, .{});
-                    defer file.close();
+                    var file = try std.Io.Dir.openFileAbsolute(io, path, .{});
+                    defer file.close(io);
 
-                    var reader = file.reader(&file_buffer);
+                    var reader = file.reader(io, &file_buffer);
                     var buffer: [16]u8 = undefined;
                     const read = try readBuffer(&reader.interface, &buffer);
 
@@ -170,11 +138,14 @@ fn PlatformStruct() type {
             // This is very bad parsing, but we only need to get 2 values..
             // and the format of the file seems to be standard? So this should
             // be fine...
-            pub fn getUserIdRange(allocator: std.mem.Allocator, file_path: []const u8) !UidRange {
-                const login_defs_file = try std.fs.cwd().openFile(file_path, .{});
-                defer login_defs_file.close();
+            pub fn getUserIdRange(allocator: std.mem.Allocator, io: std.Io, file_path: []const u8) !UidRange {
+                const login_defs_file = try std.Io.Dir.cwd().openFile(io, file_path, .{});
+                defer login_defs_file.close(io);
 
-                const login_defs_buffer = try login_defs_file.readToEndAlloc(allocator, std.math.maxInt(u16));
+                var buffer: [4096]u8 = undefined;
+                var reader = login_defs_file.reader(io, &buffer);
+
+                const login_defs_buffer = try reader.interface.allocRemaining(allocator, .unlimited);
                 defer allocator.free(login_defs_buffer);
 
                 var iterator = std.mem.splitScalar(u8, login_defs_buffer, '\n');
@@ -255,11 +226,11 @@ fn PlatformStruct() type {
                 if (result != 0) return error.SetUserUidFailed;
             }
 
-            pub fn getActiveTtyImpl(_: std.mem.Allocator, _: bool) !u8 {
+            pub fn getActiveTtyImpl(_: std.mem.Allocator, _: std.Io, _: bool) !u8 {
                 return error.FeatureUnimplemented;
             }
 
-            pub fn getUserIdRange(_: std.mem.Allocator, _: []const u8) !UidRange {
+            pub fn getUserIdRange(_: std.mem.Allocator, _: std.Io, _: []const u8) !UidRange {
                 return .{
                     // Hardcoded default values chosen from
                     // /usr/src/usr.sbin/pw/pw_conf.c
@@ -274,12 +245,28 @@ fn PlatformStruct() type {
 
 const platform_struct = PlatformStruct();
 
+// TODO 0.16.0: Can we get away with this?
+pub fn isError(result: anytype) bool {
+    if (@typeInfo(@TypeOf(result)).int.signedness == .signed) {
+        return result < 0;
+    }
+
+    if (@typeInfo(@TypeOf(result)).int.signedness == .unsigned) {
+        return switch (builtin.os.tag) {
+            .linux => std.os.linux.errno(result) != .SUCCESS,
+            else => @compileError("interop.isError() not implemented for current target!"),
+        };
+    }
+
+    unreachable;
+}
+
 pub fn supportsUnicode() bool {
     return builtin.os.tag == .linux or builtin.os.tag == .freebsd;
 }
 
-pub fn timeAsString(buf: [:0]u8, format: [:0]const u8) []u8 {
-    const timer = std.time.timestamp();
+pub fn timeAsString(io: std.Io, buf: [:0]u8, format: [:0]const u8) []u8 {
+    const timer = std.Io.Timestamp.now(io, .real).toSeconds();
     const tm_info = time.localtime(&timer);
     const len = time.strftime(buf, buf.len, format, tm_info);
 
@@ -298,8 +285,8 @@ pub fn getTimeOfDay() !TimeOfDay {
     };
 }
 
-pub fn getActiveTty(allocator: std.mem.Allocator, use_kmscon_vt: bool) !u8 {
-    return platform_struct.getActiveTtyImpl(allocator, use_kmscon_vt);
+pub fn getActiveTty(allocator: std.mem.Allocator, io: std.Io, use_kmscon_vt: bool) !u8 {
+    return platform_struct.getActiveTtyImpl(allocator, io, use_kmscon_vt);
 }
 
 pub fn switchTty(tty: u8) !void {
@@ -402,6 +389,6 @@ pub fn closePasswordDatabase() void {
 
 // This is very bad parsing, but we only need to get 2 values... and the format
 // of the file doesn't seem to be standard? So this should be fine...
-pub fn getUserIdRange(allocator: std.mem.Allocator, file_path: []const u8) !UidRange {
-    return platform_struct.getUserIdRange(allocator, file_path);
+pub fn getUserIdRange(allocator: std.mem.Allocator, io: std.Io, file_path: []const u8) !UidRange {
+    return platform_struct.getUserIdRange(allocator, io, file_path);
 }

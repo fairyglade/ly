@@ -113,7 +113,7 @@ fn draw(self: *ColorMix) void {
                 uv -= @splat(1.0 * math.cos(uv[0] + uv[1]) - math.sin(uv[0] * 0.7 - uv[1]));
             }
 
-            const cell = self.palette[@as(usize, @intFromFloat(math.floor(length(uv) * 5.0))) % palette_len];
+            const cell = self.palette[@as(usize, @trunc(math.floor(length(uv) * 5.0))) % palette_len];
             cell.put(x, y);
         }
     }

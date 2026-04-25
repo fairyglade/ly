@@ -2,14 +2,18 @@
     .name = .ly_ui,
     .version = "1.0.0",
     .fingerprint = 0x8d11bf85a74ec803,
-    .minimum_zig_version = "0.15.0",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .ly_core = .{
             .path = "../ly-core",
         },
         .termbox2 = .{
-            .url = "git+https://github.com/AnErrupTion/termbox2?ref=master#496730697c662893eec43192f48ff616c2539da6",
-            .hash = "N-V-__8AAOEWBQDt5tNdIzIFY6n8DdZsCP-6MyLoNS20wgpA",
+            .url = "git+https://github.com/AnErrupTion/termbox2?ref=master#c7f241e8888ce243e1748b05c26a42fcfaaad936",
+            .hash = "N-V-__8AAAUXBQD6Fwpi9m0MBqWXFFaqW5l1lVrJC2Ynj7a-",
+        },
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c#7a1a9fdc4ab00835748a6657ecbb835e3d5d45f7",
+            .hash = "translate_c-0.0.0-Q_BUWvP1BgCjAk6PWv5286tOlvzD9-X-NkuTzh0KxY0Q",
         },
     },
     .paths = .{

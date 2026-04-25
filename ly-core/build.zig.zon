@@ -2,11 +2,15 @@
     .name = .ly_core,
     .version = "1.0.0",
     .fingerprint = 0xddda7afda795472,
-    .minimum_zig_version = "0.15.0",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .zigini = .{
-            .url = "git+https://github.com/AshAmetrine/zigini?ref=master#831f6aff55703b7fa34b43c972d60eb3d5d6f4a4",
-            .hash = "zigini-0.3.2-BSkB7UVDAAAErcEC6s7zF9bKTe7CjdBgrV35K3DGHpbr",
+            .url = "git+https://github.com/AshAmetrine/zigini?ref=master#a665d081dda42664a96da2840ea09c5ccf9d0692",
+            .hash = "zigini-0.5.0-BSkB7e9WAACfyCBABNZiWL3gFMw18GKn3qBcPs8L1Ec1",
+        },
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c#7a1a9fdc4ab00835748a6657ecbb835e3d5d45f7",
+            .hash = "translate_c-0.0.0-Q_BUWvP1BgCjAk6PWv5286tOlvzD9-X-NkuTzh0KxY0Q",
         },
     },
     .paths = .{

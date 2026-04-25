@@ -190,7 +190,7 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         const key = field.header["cmd:".len..];
         const keyZ = temporary_allocator.dupe(u8, key) catch "";
         if (!custom.binds.contains(key)) {
-            custom.binds.put(keyZ, .{}) catch {};
+            custom.binds.put(temporary_allocator, keyZ, .{}) catch {};
         }
         if (custom.binds.getPtr(keyZ)) |command| {
             if (std.mem.eql(u8, field.key, "name")) {
@@ -206,7 +206,7 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         const key = field.header["lbl:".len..];
         const keyZ = temporary_allocator.dupe(u8, key) catch "";
         if (!custom.labels.contains(keyZ)) {
-            custom.labels.put(keyZ, .{ .name = keyZ }) catch {};
+            custom.labels.put(temporary_allocator, keyZ, .{ .name = keyZ }) catch {};
         }
         if (custom.labels.getPtr(keyZ)) |label| {
             if (std.mem.eql(u8, field.key, "cmd")) {
@@ -254,12 +254,12 @@ pub fn lateConfigFieldHandler(config: *Config) void {
     }
 }
 
-pub fn tryMigrateIniSaveFile(allocator: std.mem.Allocator, path: []const u8, saved_users: *SavedUsers, usernames: [][]const u8) !?IniParser(OldSave) {
-    var save_parser = try IniParser(OldSave).init(allocator, path, null);
+pub fn tryMigrateIniSaveFile(allocator: std.mem.Allocator, io: std.Io, path: []const u8, saved_users: *SavedUsers, usernames: [][]const u8) !?IniParser(OldSave) {
+    var save_parser = try IniParser(OldSave).init(allocator, io, path, null);
     errdefer save_parser.deinit();
 
     var user_buf: [32]u8 = undefined;
-    const maybe_save = if (save_parser.maybe_load_error == null) save_parser.structure else tryMigrateFirstSaveFile(&user_buf);
+    const maybe_save = if (save_parser.maybe_load_error == null) save_parser.structure else tryMigrateFirstSaveFile(io, &user_buf);
 
     if (maybe_save) |save| {
         // Add all other users to the list
@@ -282,16 +282,16 @@ pub fn tryMigrateIniSaveFile(allocator: std.mem.Allocator, path: []const u8, sav
     return null;
 }
 
-fn tryMigrateFirstSaveFile(user_buf: *[32]u8) ?OldSave {
+fn tryMigrateFirstSaveFile(io: std.Io, user_buf: *[32]u8) ?OldSave {
     if (maybe_save_file) |path| {
         defer temporary_allocator.free(path);
 
         var save = OldSave{};
-        var file = std.fs.openFileAbsolute(path, .{}) catch return null;
-        defer file.close();
+        var file = std.Io.Dir.openFileAbsolute(io, path, .{}) catch return null;
+        defer file.close(io);
 
         var file_buffer: [64]u8 = undefined;
-        var file_reader = file.reader(&file_buffer);
+        var file_reader = file.reader(io, &file_buffer);
         var reader = &file_reader.interface;
 
         var user_writer = std.Io.Writer.fixed(user_buf);

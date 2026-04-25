@@ -29,6 +29,7 @@ keybinds: TerminalBuffer.KeybindMap,
 
 pub fn init(
     allocator: Allocator,
+    io: std.Io,
     buffer: *TerminalBuffer,
     should_insert: bool,
     masked: bool,
@@ -57,11 +58,11 @@ pub fn init(
         .keybinds = .init(allocator),
     };
 
-    try buffer.registerKeybind(&self.keybinds, "Left", &goLeft, self);
-    try buffer.registerKeybind(&self.keybinds, "Right", &goRight, self);
-    try buffer.registerKeybind(&self.keybinds, "Delete", &delete, self);
-    try buffer.registerKeybind(&self.keybinds, "Backspace", &backspace, self);
-    try buffer.registerKeybind(&self.keybinds, "Ctrl+U", &clearTextEntry, self);
+    try buffer.registerKeybind(io, &self.keybinds, "Left", &goLeft, self);
+    try buffer.registerKeybind(io, &self.keybinds, "Right", &goRight, self);
+    try buffer.registerKeybind(io, &self.keybinds, "Delete", &delete, self);
+    try buffer.registerKeybind(io, &self.keybinds, "Backspace", &backspace, self);
+    try buffer.registerKeybind(io, &self.keybinds, "Ctrl+U", &clearTextEntry, self);
 
     return self;
 }

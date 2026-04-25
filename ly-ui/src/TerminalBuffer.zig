@@ -97,6 +97,7 @@ active_widget_index: usize,
 
 pub fn init(
     allocator: Allocator,
+    io: std.Io,
     options: InitOptions,
     log_file: *LogFile,
     random: Random,
@@ -106,9 +107,9 @@ pub fn init(
 
     if (options.full_color) {
         _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
-        try log_file.info("tui", "termbox2 set to 24-bit color output mode", .{});
+        try log_file.info(io, "tui", "termbox2 set to 24-bit color output mode", .{});
     } else {
-        try log_file.info("tui", "termbox2 set to eight-color output mode", .{});
+        try log_file.info(io, "tui", "termbox2 set to eight-color output mode", .{});
     }
 
     _ = termbox.tb_clear();
@@ -119,7 +120,7 @@ pub fn init(
     const width: usize = @intCast(termbox.tb_width());
     const height: usize = @intCast(termbox.tb_height());
 
-    try log_file.info("tui", "screen resolution is {d}x{d}", .{ width, height });
+    try log_file.info(io, "tui", "screen resolution is {d}x{d}", .{ width, height });
 
     return .{
         .log_file = log_file,
@@ -168,6 +169,7 @@ pub fn deinit(self: *TerminalBuffer) void {
 pub fn runEventLoop(
     self: *TerminalBuffer,
     allocator: Allocator,
+    io: std.Io,
     shared_error: SharedError,
     layers: [][]*Widget,
     active_widget: *Widget,
@@ -176,14 +178,14 @@ pub fn runEventLoop(
     inactivity_event_fn: ?*const fn (*anyopaque) anyerror!void,
     context: *anyopaque,
 ) !void {
-    try self.registerGlobalKeybind("Ctrl+K", &moveCursorUp, self);
-    try self.registerGlobalKeybind("Up", &moveCursorUp, self);
+    try self.registerGlobalKeybind(io, "Ctrl+K", &moveCursorUp, self);
+    try self.registerGlobalKeybind(io, "Up", &moveCursorUp, self);
 
-    try self.registerGlobalKeybind("Ctrl+J", &moveCursorDown, self);
-    try self.registerGlobalKeybind("Down", &moveCursorDown, self);
+    try self.registerGlobalKeybind(io, "Ctrl+J", &moveCursorDown, self);
+    try self.registerGlobalKeybind(io, "Down", &moveCursorDown, self);
 
-    try self.registerGlobalKeybind("Tab", &wrapCursor, self);
-    try self.registerGlobalKeybind("Shift+Tab", &wrapCursorReverse, self);
+    try self.registerGlobalKeybind(io, "Tab", &wrapCursor, self);
+    try self.registerGlobalKeybind(io, "Shift+Tab", &wrapCursorReverse, self);
 
     defer self.handlable_widgets.deinit(allocator);
 
@@ -218,6 +220,7 @@ pub fn runEventLoop(
             current_widget.handle(null) catch |err| {
                 shared_error.writeError(error.SetCursorFailed);
                 try self.log_file.err(
+                    io,
                     "tui",
                     "failed to set cursor in active widget '{s}': {s}",
                     .{ current_widget.display_name, @errorName(err) },
@@ -261,6 +264,7 @@ pub fn runEventLoop(
             self.height = TerminalBuffer.getHeight();
 
             try self.log_file.info(
+                io,
                 "tui",
                 "screen resolution updated to {d}x{d}",
                 .{ self.width, self.height },
@@ -271,6 +275,7 @@ pub fn runEventLoop(
                     widget.realloc() catch |err| {
                         shared_error.writeError(error.WidgetReallocationFailed);
                         try self.log_file.err(
+                            io,
                             "tui",
                             "failed to reallocate widget '{s}': {s}",
                             .{ widget.display_name, @errorName(err) },
@@ -294,6 +299,7 @@ pub fn runEventLoop(
                 current_widget.handle(key) catch |err| {
                     shared_error.writeError(error.CurrentWidgetHandlingFailed);
                     try self.log_file.err(
+                        io,
                         "tui",
                         "failed to handle active widget '{s}': {s}",
                         .{ current_widget.display_name, @errorName(err) },
@@ -390,18 +396,20 @@ pub fn reclaim(self: TerminalBuffer) !void {
 
 pub fn registerKeybind(
     self: *TerminalBuffer,
+    io: std.Io,
     keybinds: *KeybindMap,
     keybind: []const u8,
     callback: KeybindCallbackFn,
     context: *anyopaque,
 ) !void {
-    const key = try self.parseKeybind(keybind);
+    const key = try self.parseKeybind(io, keybind);
 
     keybinds.put(key, .{
         .callback = callback,
         .context = context,
     }) catch |err| {
         try self.log_file.err(
+            io,
             "tui",
             "failed to register keybind {s}: {s}",
             .{ keybind, @errorName(err) },
@@ -411,15 +419,16 @@ pub fn registerKeybind(
 
 pub fn registerGlobalKeybind(
     self: *TerminalBuffer,
+    io: std.Io,
     keybind: []const u8,
     callback: KeybindCallbackFn,
     context: *anyopaque,
 ) !void {
-    try self.registerKeybind(&self.keybinds, keybind, callback, context);
+    try self.registerKeybind(io, &self.keybinds, keybind, callback, context);
 }
 
-pub fn simulateKeybind(self: *TerminalBuffer, keybind: []const u8) !bool {
-    const key = try self.parseKeybind(keybind);
+pub fn simulateKeybind(self: *TerminalBuffer, io: std.Io, keybind: []const u8) !bool {
+    const key = try self.parseKeybind(io, keybind);
 
     if (self.keybinds.get(key)) |binding| {
         return try @call(
@@ -509,10 +518,13 @@ fn clearBackBuffer() !void {
     // Clear the TTY because termbox2 doesn't seem to do it properly
     const capability = termbox.global.caps[termbox.TB_CAP_CLEAR_SCREEN];
     const capability_slice = std.mem.span(capability);
-    _ = try std.posix.write(termbox.global.ttyfd, capability_slice);
+    const result = std.posix.system.write(termbox.global.ttyfd, capability_slice.ptr, capability_slice.len);
+
+    if (result != capability_slice.len) return error.PartialClearBackBuffer;
+    if (result < 0) return error.ClearBackBufferFailed;
 }
 
-fn parseKeybind(self: *TerminalBuffer, keybind: []const u8) !keyboard.Key {
+fn parseKeybind(self: *TerminalBuffer, io: std.Io, keybind: []const u8) !keyboard.Key {
     var key = std.mem.zeroes(keyboard.Key);
     var iterator = std.mem.splitScalar(u8, keybind, '+');
 
@@ -529,6 +541,7 @@ fn parseKeybind(self: *TerminalBuffer, keybind: []const u8) !keyboard.Key {
 
         if (!found) {
             try self.log_file.err(
+                io,
                 "tui",
                 "failed to parse key {s} of keybind {s}",
                 .{ item, keybind },

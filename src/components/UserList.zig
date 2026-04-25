@@ -26,6 +26,7 @@ label: *UserLabel,
 
 pub fn init(
     allocator: Allocator,
+    io: std.Io,
     buffer: *TerminalBuffer,
     usernames: StringList,
     saved_users: *SavedUsers,
@@ -39,6 +40,7 @@ pub fn init(
         .instance = null,
         .label = try UserLabel.init(
             allocator,
+            io,
             buffer,
             drawItem,
             usernameChanged,

@@ -32,6 +32,7 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
 
         pub fn init(
             allocator: Allocator,
+            io: std.Io,
             buffer: *TerminalBuffer,
             draw_item_fn: DrawItemFn,
             change_item_fn: ?ChangeItemFn,
@@ -60,10 +61,10 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
                 .keybinds = .init(allocator),
             };
 
-            try buffer.registerKeybind(&self.keybinds, "Left", &goLeft, self);
-            try buffer.registerKeybind(&self.keybinds, "Ctrl+H", &goLeft, self);
-            try buffer.registerKeybind(&self.keybinds, "Right", &goRight, self);
-            try buffer.registerKeybind(&self.keybinds, "Ctrl+L", &goRight, self);
+            try buffer.registerKeybind(io, &self.keybinds, "Left", &goLeft, self);
+            try buffer.registerKeybind(io, &self.keybinds, "Ctrl+H", &goLeft, self);
+            try buffer.registerKeybind(io, &self.keybinds, "Right", &goRight, self);
+            try buffer.registerKeybind(io, &self.keybinds, "Ctrl+L", &goRight, self);
 
             return self;
         }

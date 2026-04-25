@@ -24,6 +24,7 @@ user_list: *UserList,
 
 pub fn init(
     allocator: Allocator,
+    io: std.Io,
     buffer: *TerminalBuffer,
     user_list: *UserList,
     width: usize,
@@ -35,6 +36,7 @@ pub fn init(
         .instance = null,
         .label = try EnvironmentLabel.init(
             allocator,
+            io,
             buffer,
             drawItem,
             sessionChanged,

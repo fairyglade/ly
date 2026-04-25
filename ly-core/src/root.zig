@@ -27,6 +27,7 @@ pub fn IniParser(comptime Struct: type) type {
 
         pub fn init(
             allocator: std.mem.Allocator,
+            io: std.Io,
             path: []const u8,
             field_handler: ?fn (allocator: std.mem.Allocator, field: ini.IniField) ?ini.IniField,
         ) !Self {
@@ -35,7 +36,7 @@ pub fn IniParser(comptime Struct: type) type {
 
             var maybe_load_error: ?anyerror = null;
 
-            const structure = ini_struct.readFileToStruct(path, .{
+            const structure = ini_struct.readFileToStruct(io, path, .{
                 .fieldHandler = field_handler,
                 .errorHandler = errorHandler,
                 .comment_characters = "#",

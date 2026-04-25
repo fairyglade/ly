@@ -46,21 +46,21 @@ const Entry = Environment.Entry;
 const ly_version_str = "Ly version " ++ build_options.version;
 
 var session_pid: std.posix.pid_t = -1;
-fn signalHandler(i: c_int) callconv(.c) void {
+fn signalHandler(sig: std.posix.SIG) callconv(.c) void {
     if (session_pid == 0) return;
 
     // Forward signal to session to clean up
     if (session_pid > 0) {
-        _ = std.c.kill(session_pid, i);
+        _ = std.c.kill(session_pid, sig);
         var status: c_int = 0;
         _ = std.c.waitpid(session_pid, &status, 0);
     }
 
     TerminalBuffer.shutdown();
-    std.c.exit(i);
+    std.c.exit(@intCast(@intFromEnum(sig)));
 }
 
-fn ttyControlTransferSignalHandler(_: c_int) callconv(.c) void {
+fn ttyControlTransferSignalHandler(_: std.posix.SIG) callconv(.c) void {
     TerminalBuffer.shutdown();
 }
 
@@ -68,6 +68,7 @@ const CustomBindLabel = struct {
     cmd: custom.CustomCommandBind,
     key: []const u8,
     lbl: Label,
+    io: std.Io,
 };
 
 const CustomInfoLabel = struct {
@@ -77,6 +78,7 @@ const CustomInfoLabel = struct {
 
 const UiState = struct {
     allocator: Allocator,
+    io: std.Io,
     auth_fails: u64,
     is_autologin: bool,
     use_kmscon_vt: bool,
@@ -128,24 +130,26 @@ const UiState = struct {
 var shutdown = false;
 var restart = false;
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     var shutdown_cmd: []const u8 = undefined;
     var restart_cmd: []const u8 = undefined;
     var commands_allocated = false;
     var state: UiState = undefined;
 
+    state.io = init.io;
+
     var stderr_buffer: [128]u8 = undefined;
-    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    var stderr_writer = std.Io.File.stderr().writer(state.io, &stderr_buffer);
     var stderr = &stderr_writer.interface;
 
     defer {
         // If we can't shutdown or restart due to an error, we print it to standard error. If that fails, just bail out
         if (shutdown) {
-            const shutdown_error = std.process.execv(temporary_allocator, &[_][]const u8{ "/bin/sh", "-c", shutdown_cmd });
+            const shutdown_error = std.process.replace(state.io, .{ .argv = &[_][]const u8{ "/bin/sh", "-c", shutdown_cmd } });
             stderr.print("error: couldn't shutdown: {s}\n", .{@errorName(shutdown_error)}) catch std.process.exit(1);
             stderr.flush() catch std.process.exit(1);
         } else if (restart) {
-            const restart_error = std.process.execv(temporary_allocator, &[_][]const u8{ "/bin/sh", "-c", restart_cmd });
+            const restart_error = std.process.replace(state.io, .{ .argv = &[_][]const u8{ "/bin/sh", "-c", restart_cmd } });
             stderr.print("error: couldn't restart: {s}\n", .{@errorName(restart_error)}) catch std.process.exit(1);
             stderr.flush() catch std.process.exit(1);
         } else {
@@ -173,7 +177,7 @@ pub fn main() !void {
 
     var diag = clap.Diagnostic{};
     var arg_parse_error: anyerror = undefined;
-    var maybe_res = clap.parse(clap.Help, &params, clap.parsers.default, .{ .diagnostic = &diag, .allocator = state.allocator }) catch |err| parse_error: {
+    var maybe_res = clap.parse(clap.Help, &params, clap.parsers.default, init.minimal.args, .{ .diagnostic = &diag, .allocator = state.allocator }) catch |err| parse_error: {
         arg_parse_error = err;
         diag.report(stderr, err) catch {};
         try stderr.flush();
@@ -219,12 +223,12 @@ pub fn main() !void {
         state.allocator.free(state.old_save_path);
     };
 
-    const config_path = try std.fs.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.ini" });
+    const config_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.ini" });
     defer state.allocator.free(config_path);
 
-    custom.binds = .init(state.allocator);
-    custom.labels = .init(state.allocator);
-    var config_parser = try IniParser(Config).init(state.allocator, config_path, migrator.configFieldHandler);
+    custom.binds = .empty;
+    custom.labels = .empty;
+    var config_parser = try IniParser(Config).init(state.allocator, state.io, config_path, migrator.configFieldHandler);
     defer config_parser.deinit();
     defer if (!shutdown or !restart) {
         var iter = custom.binds.iterator();
@@ -233,14 +237,14 @@ pub fn main() !void {
             temporary_allocator.free(i.value_ptr.*.cmd);
             temporary_allocator.free(i.value_ptr.*.name);
         }
-        custom.binds.deinit();
+        custom.binds.deinit(temporary_allocator);
         var labelIter = custom.labels.iterator();
         while (labelIter.next()) |i| {
             temporary_allocator.free(i.key_ptr.*);
             if (i.value_ptr.cmd) |cmd|
                 temporary_allocator.free(cmd);
         }
-        custom.labels.deinit();
+        custom.labels.deinit(temporary_allocator);
     };
 
     state.config = config_parser.structure;
@@ -248,17 +252,17 @@ pub fn main() !void {
     var lang_buffer: [16]u8 = undefined;
     const lang_file = try std.fmt.bufPrint(&lang_buffer, "{s}.ini", .{state.config.lang});
 
-    const lang_path = try std.fs.path.join(state.allocator, &[_][]const u8{ config_parent_path, "lang", lang_file });
+    const lang_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "lang", lang_file });
     defer state.allocator.free(lang_path);
 
-    var lang_parser = try IniParser(Lang).init(state.allocator, lang_path, null);
+    var lang_parser = try IniParser(Lang).init(state.allocator, state.io, lang_path, null);
     defer lang_parser.deinit();
 
     state.lang = lang_parser.structure;
 
     if (state.config.save) {
-        state.save_path = try std.fs.path.join(state.allocator, &[_][]const u8{ config_parent_path, "save.txt" });
-        state.old_save_path = try std.fs.path.join(state.allocator, &[_][]const u8{ config_parent_path, "save.ini" });
+        state.save_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "save.txt" });
+        state.old_save_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "save.ini" });
         save_path_alloc = true;
     }
 
@@ -267,7 +271,7 @@ pub fn main() !void {
     }
 
     var maybe_uid_range_error: ?anyerror = null;
-    var usernames = try getAllUsernames(state.allocator, state.config.login_defs_path, &maybe_uid_range_error);
+    var usernames = try getAllUsernames(state.allocator, state.io, state.config.login_defs_path, &maybe_uid_range_error);
     defer {
         for (usernames.items) |username| state.allocator.free(username);
         usernames.deinit(state.allocator);
@@ -276,7 +280,7 @@ pub fn main() !void {
     state.has_old_save = false;
 
     if (state.config.save) read_save_file: {
-        old_save_parser = migrator.tryMigrateIniSaveFile(state.allocator, state.old_save_path, &state.saved_users, usernames.items) catch break :read_save_file;
+        old_save_parser = migrator.tryMigrateIniSaveFile(state.allocator, state.io, state.old_save_path, &state.saved_users, usernames.items) catch break :read_save_file;
 
         // Don't read the new save file if the old one still exists
         if (old_save_parser != null) {
@@ -284,11 +288,11 @@ pub fn main() !void {
             break :read_save_file;
         }
 
-        var save_file = std.fs.cwd().openFile(state.save_path, .{}) catch break :read_save_file;
-        defer save_file.close();
+        var save_file = std.Io.Dir.cwd().openFile(state.io, state.save_path, .{}) catch break :read_save_file;
+        defer save_file.close(state.io);
 
         var file_buffer: [256]u8 = undefined;
-        var file_reader = save_file.reader(&file_buffer);
+        var file_reader = save_file.reader(state.io, &file_buffer);
         var reader = &file_reader.interface;
 
         const last_username_index_str = reader.takeDelimiterInclusive('\n') catch break :read_save_file;
@@ -327,10 +331,10 @@ pub fn main() !void {
 
     var log_file_buffer: [1024]u8 = undefined;
 
-    state.log_file = try LogFile.init(state.config.ly_log, &log_file_buffer);
-    defer state.log_file.deinit();
+    state.log_file = try LogFile.init(state.io, state.config.ly_log, &log_file_buffer);
+    defer state.log_file.deinit(state.io);
 
-    try state.log_file.info("tui", "using {s} vt", .{if (state.use_kmscon_vt) "kmscon" else "default"});
+    try state.log_file.info(state.io, "tui", "using {s} vt", .{if (state.use_kmscon_vt) "kmscon" else "default"});
 
     // These strings only end up getting freed if the user quits Ly using Ctrl+C, which is fine since in the other cases
     // we end up shutting down or restarting the system
@@ -338,25 +342,27 @@ pub fn main() !void {
     restart_cmd = try temporary_allocator.dupe(u8, state.config.restart_cmd);
     commands_allocated = true;
 
-    if (state.config.start_cmd) |start_cmd| {
-        var start = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", start_cmd }, state.allocator);
-        start.stdout_behavior = .Inherit;
-        start.stderr_behavior = .Ignore;
+    if (state.config.start_cmd) |start_cmd| handle_start_cmd: {
+        var process = std.process.spawn(state.io, .{
+            .argv = &[_][]const u8{ "/bin/sh", "-c", start_cmd },
+            .stdout = .inherit,
+            .stderr = .ignore,
+        }) catch {
+            break :handle_start_cmd;
+        };
 
-        handle_start_cmd: {
-            const process_result = start.spawnAndWait() catch {
-                break :handle_start_cmd;
-            };
-            start_cmd_exit_code = process_result.Exited;
-        }
+        const process_result = process.wait(state.io) catch {
+            break :handle_start_cmd;
+        };
+        start_cmd_exit_code = process_result.exited;
     }
 
     // Initialize terminal buffer
-    try state.log_file.info("tui", "initializing terminal buffer", .{});
+    try state.log_file.info(state.io, "tui", "initializing terminal buffer", .{});
     state.labels_max_length = @max(TerminalBuffer.strWidth(state.lang.login), TerminalBuffer.strWidth(state.lang.password));
 
     var seed: u64 = undefined;
-    std.crypto.random.bytes(std.mem.asBytes(&seed)); // Get a random seed for the PRNG (used by animations)
+    state.io.random(std.mem.asBytes(&seed)); // Get a random seed for the PRNG (used by animations)
 
     var prng = std.Random.DefaultPrng.init(seed);
     const random = prng.random();
@@ -370,12 +376,13 @@ pub fn main() !void {
     };
     state.buffer = try TerminalBuffer.init(
         state.allocator,
+        state.io,
         buffer_options,
         &state.log_file,
         random,
     );
     defer {
-        state.log_file.info("tui", "shutting down terminal buffer", .{}) catch {};
+        state.log_file.info(state.io, "tui", "shutting down terminal buffer", .{}) catch {};
         state.buffer.deinit();
     }
 
@@ -586,6 +593,7 @@ pub fn main() !void {
 
     state.info_line = try InfoLine.init(
         state.allocator,
+        state.io,
         &state.buffer,
         state.box.width - 2 * state.box.horizontal_margin,
         state.buffer.fg,
@@ -593,8 +601,8 @@ pub fn main() !void {
     );
     defer state.info_line.deinit();
 
-    try state.buffer.registerKeybind(&state.info_line.label.keybinds, "H", &viGoLeft, &state);
-    try state.buffer.registerKeybind(&state.info_line.label.keybinds, "L", &viGoRight, &state);
+    try state.buffer.registerKeybind(state.io, &state.info_line.label.keybinds, "H", &viGoLeft, &state);
+    try state.buffer.registerKeybind(state.io, &state.info_line.label.keybinds, "L", &viGoRight, &state);
 
     if (maybe_res == null) {
         var longest = diag.name.longest();
@@ -607,6 +615,7 @@ pub fn main() !void {
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "cli",
             "unable to parse argument '{s}{s}': {s}",
             .{ longest.kind.prefix(), longest.name, @errorName(arg_parse_error) },
@@ -620,6 +629,7 @@ pub fn main() !void {
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "sys",
             "failed to get uid range: {s}; falling back to default",
             .{@errorName(err)},
@@ -633,6 +643,7 @@ pub fn main() !void {
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "sys",
             "failed to execute start command: exit code {d}",
             .{start_cmd_exit_code},
@@ -647,6 +658,7 @@ pub fn main() !void {
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "conf",
             "unable to parse config file: {s}",
             .{@errorName(load_error)},
@@ -654,6 +666,7 @@ pub fn main() !void {
 
         for (config_parser.errors.items) |err| {
             try state.log_file.err(
+                state.io,
                 "conf",
                 "failed to convert value '{s}' of option '{s}' to type '{s}': {s}",
                 .{ err.value, err.key, err.type_name, err.error_name },
@@ -668,6 +681,7 @@ pub fn main() !void {
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "sys",
             "failed to open log file",
             .{},
@@ -681,6 +695,7 @@ pub fn main() !void {
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "sys",
             "failed to set numlock: {s}",
             .{@errorName(err)},
@@ -699,6 +714,7 @@ pub fn main() !void {
 
     state.session = try Session.init(
         state.allocator,
+        state.io,
         &state.buffer,
         &state.login,
         state.box.width - 2 * state.box.horizontal_margin - state.labels_max_length - 1,
@@ -708,8 +724,8 @@ pub fn main() !void {
     );
     defer state.session.deinit();
 
-    try state.buffer.registerKeybind(&state.session.label.keybinds, "H", &viGoLeft, &state);
-    try state.buffer.registerKeybind(&state.session.label.keybinds, "L", &viGoRight, &state);
+    try state.buffer.registerKeybind(state.io, &state.session.label.keybinds, "H", &viGoLeft, &state);
+    try state.buffer.registerKeybind(state.io, &state.session.label.keybinds, "L", &viGoRight, &state);
 
     state.login_label = Label.init(
         state.lang.login,
@@ -723,6 +739,7 @@ pub fn main() !void {
 
     state.login = try UserList.init(
         state.allocator,
+        state.io,
         &state.buffer,
         usernames,
         &state.saved_users,
@@ -734,8 +751,8 @@ pub fn main() !void {
     );
     defer state.login.deinit();
 
-    try state.buffer.registerKeybind(&state.login.label.keybinds, "H", &viGoLeft, &state);
-    try state.buffer.registerKeybind(&state.login.label.keybinds, "L", &viGoRight, &state);
+    try state.buffer.registerKeybind(state.io, &state.login.label.keybinds, "H", &viGoLeft, &state);
+    try state.buffer.registerKeybind(state.io, &state.login.label.keybinds, "L", &viGoRight, &state);
 
     if (state.config.shell) {
         addOtherEnvironment(&state.session, state.lang, .shell, null) catch |err| {
@@ -745,6 +762,7 @@ pub fn main() !void {
                 state.config.error_fg,
             );
             try state.log_file.err(
+                state.io,
                 "sys",
                 "failed to add shell environment: {s}",
                 .{@errorName(err)},
@@ -761,6 +779,7 @@ pub fn main() !void {
                     state.config.error_fg,
                 );
                 try state.log_file.err(
+                    state.io,
                     "sys",
                     "failed to add xinitrc environment: {s}",
                     .{@errorName(err)},
@@ -774,6 +793,7 @@ pub fn main() !void {
             state.config.fg,
         );
         try state.log_file.info(
+            state.io,
             "comp",
             "x11 support disabled at compile-time",
             .{},
@@ -786,9 +806,10 @@ pub fn main() !void {
     if (state.config.waylandsessions) |waylandsessions| {
         var wayland_session_dirs = std.mem.splitScalar(u8, waylandsessions, ':');
         while (wayland_session_dirs.next()) |dir| {
-            crawl(&state.session, state.lang, dir, .wayland) catch |err| {
+            crawl(&state.session, state.io, state.lang, dir, .wayland) catch |err| {
                 has_crawl_error = true;
                 try state.log_file.err(
+                    state.io,
                     "sys",
                     "failed to crawl wayland session directory '{s}': {s}",
                     .{ dir, @errorName(err) },
@@ -801,9 +822,10 @@ pub fn main() !void {
         if (state.config.xsessions) |xsessions| {
             var x_session_dirs = std.mem.splitScalar(u8, xsessions, ':');
             while (x_session_dirs.next()) |dir| {
-                crawl(&state.session, state.lang, dir, .x11) catch |err| {
+                crawl(&state.session, state.io, state.lang, dir, .x11) catch |err| {
                     has_crawl_error = true;
                     try state.log_file.err(
+                        state.io,
                         "sys",
                         "failed to crawl x11 session directory '{s}': {s}",
                         .{ dir, @errorName(err) },
@@ -815,9 +837,10 @@ pub fn main() !void {
 
     var custom_session_dirs = std.mem.splitScalar(u8, state.config.custom_sessions, ':');
     while (custom_session_dirs.next()) |dir| {
-        crawl(&state.session, state.lang, dir, .custom) catch |err| {
+        crawl(&state.session, state.io, state.lang, dir, .custom) catch |err| {
             has_crawl_error = true;
             try state.log_file.err(
+                state.io,
                 "sys",
                 "failed to crawl custom session directory '{s}': {s}",
                 .{ dir, @errorName(err) },
@@ -839,7 +862,7 @@ pub fn main() !void {
         // accounts *and* no root account...but at this point, if that's the
         // case, you have bigger problems to deal with in the first place. :D
         try state.info_line.addMessage(state.lang.err_no_users, state.config.error_bg, state.config.error_fg);
-        try state.log_file.err("sys", "no users found", .{});
+        try state.log_file.err(state.io, "sys", "no users found", .{});
     }
 
     state.password_label = Label.init(
@@ -856,6 +879,7 @@ pub fn main() !void {
 
     state.password = try Text.init(
         state.allocator,
+        state.io,
         &state.buffer,
         state.insert_mode,
         true,
@@ -866,8 +890,8 @@ pub fn main() !void {
     );
     defer state.password.deinit();
 
-    try state.buffer.registerKeybind(&state.password.keybinds, "H", &viGoLeft, &state);
-    try state.buffer.registerKeybind(&state.password.keybinds, "L", &viGoRight, &state);
+    try state.buffer.registerKeybind(state.io, &state.password.keybinds, "H", &viGoLeft, &state);
+    try state.buffer.registerKeybind(state.io, &state.password.keybinds, "L", &viGoRight, &state);
 
     state.password_widget = state.password.widget();
 
@@ -894,6 +918,7 @@ pub fn main() !void {
                 state.config.error_fg,
             );
             try state.log_file.err(
+                state.io,
                 "auth",
                 "autologin failed: username '{s}' not found",
                 .{auto_user},
@@ -903,6 +928,7 @@ pub fn main() !void {
 
         const session_index = findSessionByName(&state.session, auto_session) orelse {
             try state.log_file.err(
+                state.io,
                 "auth",
                 "autologin failed: session '{s}' not found",
                 .{auto_session},
@@ -915,6 +941,7 @@ pub fn main() !void {
             break :check_autologin;
         };
         try state.log_file.info(
+            state.io,
             "auth",
             "attempting autologin for user '{s}' with session '{s}'",
             .{ auto_user, auto_session },
@@ -931,13 +958,14 @@ pub fn main() !void {
     }
 
     // Switch to selected TTY
-    state.active_tty = interop.getActiveTty(state.allocator, state.use_kmscon_vt) catch |err| no_tty_found: {
+    state.active_tty = interop.getActiveTty(state.allocator, state.io, state.use_kmscon_vt) catch |err| no_tty_found: {
         try state.info_line.addMessage(
             state.lang.err_get_active_tty,
             state.config.error_bg,
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "sys",
             "failed to get active tty: {s}",
             .{@errorName(err)},
@@ -952,6 +980,7 @@ pub fn main() !void {
                 state.config.error_fg,
             );
             try state.log_file.err(
+                state.io,
                 "sys",
                 "failed to switch to tty {d}: {s}",
                 .{ state.active_tty, @errorName(err) },
@@ -1025,6 +1054,7 @@ pub fn main() !void {
         .dur_file => {
             var dur = try DurFile.init(
                 state.allocator,
+                state.io,
                 &state.buffer,
                 &state.log_file,
                 state.config.dur_file_path,
@@ -1042,6 +1072,7 @@ pub fn main() !void {
     defer if (animation) |a| a.deinit();
 
     var cascade = Cascade.init(
+        state.io,
         &state.buffer,
         &state.auth_fails,
         state.config.auth_fails,
@@ -1140,6 +1171,7 @@ pub fn main() !void {
             ),
             .cmd = i.value_ptr.*,
             .key = i.key_ptr.*,
+            .io = state.io,
         });
         state.custom_binds.items[state.custom_binds.items.len - 1].lbl.allocator = state.allocator;
     }
@@ -1208,26 +1240,26 @@ pub fn main() !void {
     }
 
     for (state.custom_binds.items) |*item| {
-        try state.buffer.registerGlobalKeybind(item.key, &customCommand, item);
+        try state.buffer.registerGlobalKeybind(state.io, item.key, &customCommand, item);
     }
 
-    try state.buffer.registerGlobalKeybind("Esc", &disableInsertMode, &state);
-    try state.buffer.registerGlobalKeybind("I", &enableInsertMode, &state);
+    try state.buffer.registerGlobalKeybind(state.io, "Esc", &disableInsertMode, &state);
+    try state.buffer.registerGlobalKeybind(state.io, "I", &enableInsertMode, &state);
 
-    try state.buffer.registerGlobalKeybind("Ctrl+C", &quit, &state);
+    try state.buffer.registerGlobalKeybind(state.io, "Ctrl+C", &quit, &state);
 
-    try state.buffer.registerGlobalKeybind("K", &viMoveCursorUp, &state);
-    try state.buffer.registerGlobalKeybind("J", &viMoveCursorDown, &state);
+    try state.buffer.registerGlobalKeybind(state.io, "K", &viMoveCursorUp, &state);
+    try state.buffer.registerGlobalKeybind(state.io, "J", &viMoveCursorDown, &state);
 
-    try state.buffer.registerGlobalKeybind("Enter", &authenticate, &state);
+    try state.buffer.registerGlobalKeybind(state.io, "Enter", &authenticate, &state);
 
-    try state.buffer.registerGlobalKeybind(state.config.shutdown_key, &shutdownCmd, &state);
-    try state.buffer.registerGlobalKeybind(state.config.restart_key, &restartCmd, &state);
-    try state.buffer.registerGlobalKeybind(state.config.show_password_key, &togglePasswordMask, &state);
-    if (state.config.sleep_cmd != null) try state.buffer.registerGlobalKeybind(state.config.sleep_key, &sleepCmd, &state);
-    if (state.config.hibernate_cmd != null) try state.buffer.registerGlobalKeybind(state.config.hibernate_key, &hibernateCmd, &state);
-    if (state.config.brightness_down_key) |key| try state.buffer.registerGlobalKeybind(key, &decreaseBrightnessCmd, &state);
-    if (state.config.brightness_up_key) |key| try state.buffer.registerGlobalKeybind(key, &increaseBrightnessCmd, &state);
+    try state.buffer.registerGlobalKeybind(state.io, state.config.shutdown_key, &shutdownCmd, &state);
+    try state.buffer.registerGlobalKeybind(state.io, state.config.restart_key, &restartCmd, &state);
+    try state.buffer.registerGlobalKeybind(state.io, state.config.show_password_key, &togglePasswordMask, &state);
+    if (state.config.sleep_cmd != null) try state.buffer.registerGlobalKeybind(state.io, state.config.sleep_key, &sleepCmd, &state);
+    if (state.config.hibernate_cmd != null) try state.buffer.registerGlobalKeybind(state.io, state.config.hibernate_key, &hibernateCmd, &state);
+    if (state.config.brightness_down_key) |key| try state.buffer.registerGlobalKeybind(state.io, key, &decreaseBrightnessCmd, &state);
+    if (state.config.brightness_up_key) |key| try state.buffer.registerGlobalKeybind(state.io, key, &increaseBrightnessCmd, &state);
 
     if (state.config.initial_info_text) |text| {
         try state.info_line.addMessage(text, state.config.bg, state.config.fg);
@@ -1241,6 +1273,7 @@ pub fn main() !void {
                 state.config.error_fg,
             );
             try state.log_file.err(
+                state.io,
                 "sys",
                 "failed to get hostname: {s}",
                 .{@errorName(err)},
@@ -1268,6 +1301,7 @@ pub fn main() !void {
 
     try state.buffer.runEventLoop(
         state.allocator,
+        state.io,
         shared_error,
         widgets.items,
         active_widget,
@@ -1329,31 +1363,31 @@ fn enableInsertMode(ptr: *anyopaque) !bool {
 }
 
 fn viGoLeft(ptr: *anyopaque) !bool {
-    var self: *UiState = @ptrCast(@alignCast(ptr));
-    if (self.insert_mode) return true;
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+    if (state.insert_mode) return true;
 
-    return try self.buffer.simulateKeybind("Left");
+    return try state.buffer.simulateKeybind(state.io, "Left");
 }
 
 fn viGoRight(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
     if (state.insert_mode) return true;
 
-    return try state.buffer.simulateKeybind("Right");
+    return try state.buffer.simulateKeybind(state.io, "Right");
 }
 
 fn viMoveCursorUp(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
     if (state.insert_mode) return true;
 
-    return try state.buffer.simulateKeybind("Up");
+    return try state.buffer.simulateKeybind(state.io, "Up");
 }
 
 fn viMoveCursorDown(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
     if (state.insert_mode) return true;
 
-    return try state.buffer.simulateKeybind("Down");
+    return try state.buffer.simulateKeybind(state.io, "Down");
 }
 
 fn togglePasswordMask(ptr: *anyopaque) !bool {
@@ -1373,18 +1407,21 @@ fn quit(ptr: *anyopaque) !bool {
 
 fn customCommand(ptr: *anyopaque) !bool {
     const lbl: *CustomBindLabel = @ptrCast(@alignCast(ptr));
-    var proc = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", lbl.cmd.cmd }, lbl.lbl.allocator.?);
-    proc.stdout_behavior = .Ignore;
-    proc.stderr_behavior = .Ignore;
-    const res = proc.spawnAndWait() catch return false;
-    if (res.Exited != 0) return error.CommandFailed;
+    var proc = std.process.spawn(lbl.io, .{
+        .argv = &[_][]const u8{ "/bin/sh", "-c", lbl.cmd.cmd },
+        .stdout = .ignore,
+        .stderr = .ignore,
+    }) catch return false;
+
+    const res = proc.wait(lbl.io) catch return false;
+    if (res.exited != 0) return error.CommandFailed;
     return false;
 }
 
 fn authenticate(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
-    try state.log_file.info("auth", "starting authentication", .{});
+    try state.log_file.info(state.io, "auth", "starting authentication", .{});
 
     if (!state.config.allow_empty_password and state.password.text.items.len == 0) {
         // Let's not log this message for security reasons
@@ -1400,6 +1437,7 @@ fn authenticate(ptr: *anyopaque) !bool {
                 state.config.error_fg,
             );
             try state.log_file.err(
+                state.io,
                 "tui",
                 "failed to clear info line: {s}",
                 .{@errorName(err)},
@@ -1422,6 +1460,7 @@ fn authenticate(ptr: *anyopaque) !bool {
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "tui",
             "failed to clear info line: {s}",
             .{@errorName(err)},
@@ -1435,23 +1474,25 @@ fn authenticate(ptr: *anyopaque) !bool {
         // handling, so let's just report a generic error message,
         // that should be good enough for debugging anyway.
         errdefer state.log_file.err(
+            state.io,
             "conf",
             "failed to save current user data",
             .{},
         ) catch {};
 
-        var file = std.fs.cwd().createFile(state.save_path, .{}) catch |err| {
+        var file = std.Io.Dir.cwd().createFile(state.io, state.save_path, .{}) catch |err| {
             state.log_file.err(
+                state.io,
                 "sys",
                 "failed to create save file: {s}",
                 .{@errorName(err)},
             ) catch break :save_last_settings;
             break :save_last_settings;
         };
-        defer file.close();
+        defer file.close(state.io);
 
         var file_buffer: [256]u8 = undefined;
-        var file_writer = file.writer(&file_buffer);
+        var file_writer = file.writer(state.io, &file_buffer);
         var writer = &file_writer.interface;
 
         try writer.print("{d}\n", .{state.login.label.current});
@@ -1462,9 +1503,9 @@ fn authenticate(ptr: *anyopaque) !bool {
 
         // Delete previous save file if it exists
         if (migrator.maybe_save_file) |path| {
-            std.fs.cwd().deleteFile(path) catch {};
+            std.Io.Dir.cwd().deleteFile(state.io, path) catch {};
         } else if (state.has_old_save) {
-            std.fs.cwd().deleteFile(state.old_save_path) catch {};
+            std.Io.Dir.cwd().deleteFile(state.io, state.old_save_path) catch {};
         }
     }
 
@@ -1472,9 +1513,9 @@ fn authenticate(ptr: *anyopaque) !bool {
     defer shared_err.deinit();
 
     {
-        state.log_file.deinit();
+        state.log_file.deinit(state.io);
 
-        session_pid = try std.posix.fork();
+        session_pid = std.posix.system.fork();
         if (session_pid == 0) {
             const current_environment = state.session.label.list.items[state.session.label.current].environment;
 
@@ -1504,10 +1545,11 @@ fn authenticate(ptr: *anyopaque) !bool {
             };
             std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);
 
-            try state.log_file.reinit();
+            try state.log_file.reinit(state.io);
 
             auth.authenticate(
                 state.allocator,
+                state.io,
                 &state.log_file,
                 auth_options,
                 current_environment,
@@ -1516,21 +1558,22 @@ fn authenticate(ptr: *anyopaque) !bool {
             ) catch |err| {
                 shared_err.writeError(err);
 
-                state.log_file.deinit();
+                state.log_file.deinit(state.io);
                 std.process.exit(1);
             };
 
-            state.log_file.deinit();
+            state.log_file.deinit(state.io);
             std.process.exit(0);
         }
 
-        _ = std.posix.waitpid(session_pid, 0);
+        var session_status: c_int = undefined;
+        _ = std.posix.system.waitpid(session_pid, &session_status, 0);
         // HACK: It seems like the session process is not exiting immediately after the waitpid call.
         // This is a workaround to ensure the session process has exited before re-initializing the TTY.
-        std.Thread.sleep(std.time.ns_per_s * 1);
+        state.io.sleep(.fromSeconds(1), .real) catch {};
         session_pid = -1;
 
-        try state.log_file.reinit();
+        try state.log_file.reinit(state.io);
     }
 
     try state.buffer.reclaim();
@@ -1546,6 +1589,7 @@ fn authenticate(ptr: *anyopaque) !bool {
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "auth",
             "failed to authenticate: {s}",
             .{@errorName(err)},
@@ -1553,9 +1597,11 @@ fn authenticate(ptr: *anyopaque) !bool {
 
         if (state.config.clear_password or err != error.PamAuthError) state.password.clear();
     } else {
-        if (state.config.logout_cmd) |logout_cmd| {
-            var logout_process = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", logout_cmd }, state.allocator);
-            _ = logout_process.spawnAndWait() catch .{};
+        if (state.config.logout_cmd) |logout_cmd| execute_cmd: {
+            var process = std.process.spawn(state.io, .{
+                .argv = &[_][]const u8{ "/bin/sh", "-c", logout_cmd },
+            }) catch break :execute_cmd;
+            _ = process.wait(state.io) catch {};
         }
 
         state.password.clear();
@@ -1565,7 +1611,7 @@ fn authenticate(ptr: *anyopaque) !bool {
             state.config.bg,
             state.config.fg,
         );
-        try state.log_file.info("auth", "logged out", .{});
+        try state.log_file.info(state.io, "auth", "logged out", .{});
     }
 
     if (state.config.auth_fails == 0 or state.auth_fails < state.config.auth_fails) {
@@ -1599,21 +1645,24 @@ fn sleepCmd(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
     if (state.config.sleep_cmd) |sleep_cmd| {
-        var sleep = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", sleep_cmd }, state.allocator);
-        sleep.stdout_behavior = .Ignore;
-        sleep.stderr_behavior = .Ignore;
+        var process = std.process.spawn(state.io, .{
+            .argv = &[_][]const u8{ "/bin/sh", "-c", sleep_cmd },
+            .stdout = .ignore,
+            .stderr = .ignore,
+        }) catch return false;
 
-        const process_result = sleep.spawnAndWait() catch return false;
-        if (process_result.Exited != 0) {
+        const process_result = process.wait(state.io) catch return false;
+        if (process_result.exited != 0) {
             try state.info_line.addMessage(
                 state.lang.err_sleep,
                 state.config.error_bg,
                 state.config.error_fg,
             );
             try state.log_file.err(
+                state.io,
                 "sys",
                 "failed to execute sleep command: exit code {d}",
-                .{process_result.Exited},
+                .{process_result.exited},
             );
         }
     }
@@ -1624,21 +1673,24 @@ fn hibernateCmd(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
     if (state.config.hibernate_cmd) |hibernate_cmd| {
-        var hibernate = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", hibernate_cmd }, state.allocator);
-        hibernate.stdout_behavior = .Ignore;
-        hibernate.stderr_behavior = .Ignore;
+        var process = std.process.spawn(state.io, .{
+            .argv = &[_][]const u8{ "/bin/sh", "-c", hibernate_cmd },
+            .stdout = .ignore,
+            .stderr = .ignore,
+        }) catch return false;
 
-        const process_result = hibernate.spawnAndWait() catch return false;
-        if (process_result.Exited != 0) {
+        const process_result = process.wait(state.io) catch return false;
+        if (process_result.exited != 0) {
             try state.info_line.addMessage(
                 state.lang.err_hibernate,
                 state.config.error_bg,
                 state.config.error_fg,
             );
             try state.log_file.err(
+                state.io,
                 "sys",
                 "failed to execute hibernate command: exit code {d}",
-                .{process_result.Exited},
+                .{process_result.exited},
             );
         }
     }
@@ -1648,13 +1700,14 @@ fn hibernateCmd(ptr: *anyopaque) !bool {
 fn decreaseBrightnessCmd(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
-    adjustBrightness(state.allocator, state.config.brightness_down_cmd) catch |err| {
+    adjustBrightness(state.io, state.config.brightness_down_cmd) catch |err| {
         try state.info_line.addMessage(
             state.lang.err_brightness_change,
             state.config.error_bg,
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "sys",
             "failed to decrease brightness: {s}",
             .{@errorName(err)},
@@ -1666,13 +1719,14 @@ fn decreaseBrightnessCmd(ptr: *anyopaque) !bool {
 fn increaseBrightnessCmd(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
-    adjustBrightness(state.allocator, state.config.brightness_up_cmd) catch |err| {
+    adjustBrightness(state.io, state.config.brightness_up_cmd) catch |err| {
         try state.info_line.addMessage(
             state.lang.err_brightness_change,
             state.config.error_bg,
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "sys",
             "failed to increase brightness: {s}",
             .{@errorName(err)},
@@ -1692,6 +1746,7 @@ fn updateNumlock(self: *Label, ptr: *anyopaque) !void {
             state.config.error_fg,
         );
         try state.log_file.err(
+            state.io,
             "sys",
             "failed to get lock state: {s}",
             .{@errorName(err)},
@@ -1708,7 +1763,7 @@ fn updateCapslock(self: *Label, ptr: *anyopaque) !void {
     const lock_state = interop.getLockState() catch |err| {
         self.update_fn = null;
         try state.info_line.addMessage(state.lang.err_lock_state, state.config.error_bg, state.config.error_fg);
-        try state.log_file.err("sys", "failed to get lock state: {s}", .{@errorName(err)});
+        try state.log_file.err(state.io, "sys", "failed to get lock state: {s}", .{@errorName(err)});
         return;
     };
 
@@ -1719,9 +1774,10 @@ fn updateBattery(self: *Label, ptr: *anyopaque) !void {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
     if (state.config.battery_id) |id| {
-        const battery_percentage = getBatteryPercentage(id) catch |err| {
+        const battery_percentage = getBatteryPercentage(state.io, id) catch |err| {
             self.update_fn = null;
             try state.log_file.err(
+                state.io,
                 "sys",
                 "failed to get battery percentage: {s}",
                 .{@errorName(err)},
@@ -1746,7 +1802,7 @@ fn updateClock(self: *Label, ptr: *anyopaque) !void {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
     if (state.config.clock) |clock| draw_clock: {
-        const clock_str = interop.timeAsString(&state.clock_buf, clock);
+        const clock_str = interop.timeAsString(state.io, &state.clock_buf, clock);
 
         if (clock_str.len == 0) {
             self.update_fn = null;
@@ -1756,6 +1812,7 @@ fn updateClock(self: *Label, ptr: *anyopaque) !void {
                 state.config.error_fg,
             );
             try state.log_file.err(
+                state.io,
                 "tui",
                 "clock string too long",
                 .{},
@@ -1770,11 +1827,7 @@ fn updateClock(self: *Label, ptr: *anyopaque) !void {
 fn updateCustomInfo(lbl: *Label, ptr: *anyopaque) !void {
     const state: *UiState = @ptrCast(@alignCast(ptr));
     const wid = lbl.widget().id;
-    var stdout = std.ArrayList(u8).empty;
-    defer stdout.deinit(state.allocator);
 
-    var stderr = std.ArrayList(u8).empty;
-    defer stderr.deinit(state.allocator);
     for (state.custom_info.items) |*i| {
         if (i.info.id != wid) continue;
         // Here, a counter ticks down every time `updateCustomInfo` runs on that
@@ -1782,37 +1835,40 @@ fn updateCustomInfo(lbl: *Label, ptr: *anyopaque) !void {
         // once it reaches to 1. If a refresh value is defined it's then reset to
         // that refresh value.
         if (i.info.counter == 1) {
-            var c = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", i.info.cmd orelse custom.UNDEFINED_CMD }, state.allocator);
-            c.stderr_behavior = .Pipe;
-            c.stdout_behavior = .Pipe;
-            try c.spawn();
+            var c = try std.process.spawn(state.io, .{
+                .argv = &[_][]const u8{ "/bin/sh", "-c", i.info.cmd orelse custom.UNDEFINED_CMD },
+                .stdout = .pipe,
+                .stderr = .pipe,
+            });
 
-            c.collectOutput(state.allocator, &stdout, &stderr, state.buffer.width) catch {
-                try stdout.print(state.allocator, "{s}: [{s}]", .{ i.info.name, state.lang.custom_info_err_output_long });
+            var stdout_buffer: [1024]u8 = undefined;
+            var stdout_file_reader = c.stdout.?.reader(state.io, &stdout_buffer);
+
+            const stdout = stdout_file_reader.interface.allocRemaining(state.allocator, .limited(state.buffer.width)) catch alloc_error: {
+                break :alloc_error try std.fmt.allocPrint(state.allocator, "{s}: [{s}]", .{ i.info.name, state.lang.custom_info_err_output_long });
             };
+            defer state.allocator.free(stdout);
 
-            const newlineIdx = std.mem.indexOfAny(u8, stdout.items, "\n");
-            if (newlineIdx) |idx| {
-                stdout.shrinkAndFree(state.allocator, idx);
-            }
+            var cur_stdout = stdout;
+            const newline_index = std.mem.indexOfAny(u8, stdout, "\n");
+            if (newline_index) |idx| cur_stdout = stdout[0..idx];
 
-            if (stdout.items.len > state.buffer.width) {
-                stdout.clearRetainingCapacity();
-                try stdout.print(state.allocator, "{s}: [{s}]", .{ i.info.name, state.lang.custom_info_err_output_long });
-            }
-
-            _ = try c.wait();
+            _ = try c.wait(state.io);
 
             // Sometimes, the output of a command would have an unprintable character at
             // the end of its output, causing '�' (U+FFFD) to appear in its place. Here, we check
             // if this is the case and remove it.
-            if (stdout.items.len != 0 and !std.ascii.isPrint(stdout.items[stdout.items.len - 1])) {
-                _ = stdout.pop();
-            } else if (stdout.items.len == 0) {
-                try stdout.print(state.allocator, "{s}: [{s}{s}]", .{ i.info.name, state.lang.custom_info_err_no_output, if (stderr.items.len > 0) state.lang.custom_info_err_no_output_error else "" });
+            if (cur_stdout.len != 0 and !std.ascii.isPrint(cur_stdout[cur_stdout.len - 1])) {
+                cur_stdout = cur_stdout[0 .. cur_stdout.len - 1];
             }
+
             state.allocator.free(lbl.text);
-            try lbl.setTextAlloc(state.allocator, "{s}", .{stdout.items});
+            if (cur_stdout.len == 0) {
+                const stderr_length = try c.stderr.?.length(state.io);
+                try lbl.setTextAlloc(state.allocator, "{s}: [{s}{s}]", .{ i.info.name, state.lang.custom_info_err_no_output, if (stderr_length > 0) state.lang.custom_info_err_no_output_error else "" });
+            } else {
+                try lbl.setTextAlloc(state.allocator, "{s}", .{cur_stdout});
+            }
 
             // Called to re-position the widgets after they receive their output.
             try positionWidgets(state);
@@ -1851,7 +1907,7 @@ fn updateBigClock(self: *BigLabel, ptr: *anyopaque) !void {
         },
     );
 
-    const clock_str = interop.timeAsString(&state.bigclock_buf, format);
+    const clock_str = interop.timeAsString(state.io, &state.bigclock_buf, format);
     self.setText(clock_str);
 }
 
@@ -2015,27 +2071,28 @@ fn positionWidgets(ptr: *anyopaque) !void {
 fn handleInactivity(ptr: *anyopaque) !void {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
-    if (state.config.inactivity_cmd) |inactivity_cmd| {
-        var inactivity = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", inactivity_cmd }, state.allocator);
-        inactivity.stdout_behavior = .Ignore;
-        inactivity.stderr_behavior = .Ignore;
+    if (state.config.inactivity_cmd) |inactivity_cmd| handle_inactivity_cmd: {
+        var process = std.process.spawn(state.io, .{
+            .argv = &[_][]const u8{ "/bin/sh", "-c", inactivity_cmd },
+            .stdout = .ignore,
+            .stderr = .ignore,
+        }) catch break :handle_inactivity_cmd;
 
-        handle_inactivity_cmd: {
-            const process_result = inactivity.spawnAndWait() catch {
-                break :handle_inactivity_cmd;
-            };
-            if (process_result.Exited != 0) {
-                try state.info_line.addMessage(
-                    state.lang.err_inactivity,
-                    state.config.error_bg,
-                    state.config.error_fg,
-                );
-                try state.log_file.err(
-                    "sys",
-                    "failed to execute inactivity command: exit code {d}",
-                    .{process_result.Exited},
-                );
-            }
+        const process_result = process.wait(state.io) catch {
+            break :handle_inactivity_cmd;
+        };
+        if (process_result.exited != 0) {
+            try state.info_line.addMessage(
+                state.lang.err_inactivity,
+                state.config.error_bg,
+                state.config.error_fg,
+            );
+            try state.log_file.err(
+                state.io,
+                "sys",
+                "failed to execute inactivity command: exit code {d}",
+                .{process_result.exited},
+            );
         }
     }
 }
@@ -2059,26 +2116,26 @@ fn addOtherEnvironment(session: *Session, lang: Lang, display_server: DisplaySer
     });
 }
 
-fn crawl(session: *Session, lang: Lang, path: []const u8, display_server: DisplayServer) !void {
-    if (!std.fs.path.isAbsolute(path)) return error.PathNotAbsolute;
+fn crawl(session: *Session, io: std.Io, lang: Lang, path: []const u8, display_server: DisplayServer) !void {
+    if (!std.Io.Dir.path.isAbsolute(path)) return error.PathNotAbsolute;
 
-    var iterable_directory = try std.fs.openDirAbsolute(path, .{ .iterate = true });
-    defer iterable_directory.close();
+    var iterable_directory = try std.Io.Dir.openDirAbsolute(io, path, .{ .iterate = true });
+    defer iterable_directory.close(io);
 
     var iterator = iterable_directory.iterate();
-    while (try iterator.next()) |item| {
-        if (!std.mem.eql(u8, std.fs.path.extension(item.name), ".desktop")) continue;
+    while (try iterator.next(io)) |item| {
+        if (!std.mem.eql(u8, std.Io.Dir.path.extension(item.name), ".desktop")) continue;
 
         const entry_path = try std.fmt.allocPrint(session.label.allocator, "{s}/{s}", .{ path, item.name });
         defer session.label.allocator.free(entry_path);
         var entry_ini = Ini(Entry).init(session.label.allocator);
-        const data = try entry_ini.readFileToStruct(entry_path, .{
+        const data = try entry_ini.readFileToStruct(io, entry_path, .{
             .fieldHandler = null,
             .comment_characters = "#",
         });
         errdefer entry_ini.deinit();
 
-        const file_name = try session.label.allocator.dupe(u8, std.fs.path.stem(item.name));
+        const file_name = try session.label.allocator.dupe(u8, std.Io.Dir.path.stem(item.name));
         const entry = data.@"Desktop Entry";
         var maybe_xdg_session_desktop: ?[]const u8 = null;
         var maybe_xdg_desktop_names: ?[]const u8 = null;
@@ -2138,8 +2195,8 @@ fn findSessionByName(session: *Session, name: []const u8) ?usize {
     return null;
 }
 
-fn getAllUsernames(allocator: Allocator, login_defs_path: []const u8, uid_range_error: *?anyerror) !StringList {
-    const uid_range = interop.getUserIdRange(allocator, login_defs_path) catch |err| no_uid_range: {
+fn getAllUsernames(allocator: Allocator, io: std.Io, login_defs_path: []const u8, uid_range_error: *?anyerror) !StringList {
+    const uid_range = interop.getUserIdRange(allocator, io, login_defs_path) catch |err| no_uid_range: {
         uid_range_error.* = err;
         break :no_uid_range UidRange{
             .uid_min = build_options.fallback_uid_min,
@@ -2185,29 +2242,31 @@ fn getAllUsernames(allocator: Allocator, login_defs_path: []const u8, uid_range_
     return usernames;
 }
 
-fn adjustBrightness(allocator: Allocator, cmd: []const u8) !void {
-    var brightness = std.process.Child.init(&[_][]const u8{ "/bin/sh", "-c", cmd }, allocator);
-    brightness.stdout_behavior = .Ignore;
-    brightness.stderr_behavior = .Ignore;
+fn adjustBrightness(io: std.Io, cmd: []const u8) !void {
+    var process = std.process.spawn(io, .{
+        .argv = &[_][]const u8{ "/bin/sh", "-c", cmd },
+        .stdout = .ignore,
+        .stderr = .ignore,
+    }) catch return;
 
-    const process_result = brightness.spawnAndWait() catch return;
-    if (process_result.Exited != 0) {
+    const process_result = process.wait(io) catch return;
+    if (process_result.exited != 0) {
         return error.BrightnessChangeFailed;
     }
 }
 
-fn getBatteryPercentage(battery_id: []const u8) !u8 {
+fn getBatteryPercentage(io: std.Io, battery_id: []const u8) !u8 {
     const path = try std.fmt.allocPrint(temporary_allocator, "/sys/class/power_supply/{s}/capacity", .{battery_id});
     defer temporary_allocator.free(path);
 
-    const battery_file = try std.fs.cwd().openFile(path, .{});
-    defer battery_file.close();
+    const battery_file = try std.Io.Dir.cwd().openFile(io, path, .{});
+    defer battery_file.close(io);
 
     var buffer: [8]u8 = undefined;
-    const bytes_read = try battery_file.read(&buffer);
+    const bytes_read = try battery_file.readStreaming(io, &.{&buffer});
     const capacity_str = buffer[0..bytes_read];
 
-    const trimmed = std.mem.trimRight(u8, capacity_str, "\n\r");
+    const trimmed = std.mem.trimEnd(u8, capacity_str, "\n\r");
 
     return try std.fmt.parseInt(u8, trimmed, 10);
 }

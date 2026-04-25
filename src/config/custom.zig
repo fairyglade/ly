@@ -21,5 +21,5 @@ pub const CustomCommandInfo = struct {
     counter: u32 = 0,
 };
 
-pub var binds: std.StringArrayHashMap(CustomCommandBind) = undefined;
-pub var labels: std.StringArrayHashMap(CustomCommandInfo) = undefined;
+pub var binds: std.array_hash_map.String(CustomCommandBind) = undefined;
+pub var labels: std.array_hash_map.String(CustomCommandInfo) = undefined;

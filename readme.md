@@ -14,7 +14,7 @@ Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.
 ## Dependencies
 
 - Compile-time:
-  - zig 0.15.x
+  - zig 0.16.x
 
   - libc
 

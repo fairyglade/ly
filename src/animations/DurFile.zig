@@ -19,16 +19,16 @@ const LogFile = ly_core.LogFile;
 const enums = @import("../enums.zig");
 const DurOffsetAlignment = enums.DurOffsetAlignment;
 
-fn read_decompress_file(allocator: Allocator, file_path: []const u8) ![]u8 {
-    const file_buffer = std.fs.cwd().openFile(file_path, .{}) catch {
+fn read_decompress_file(allocator: Allocator, io: std.Io, file_path: []const u8) ![]u8 {
+    const file_buffer = std.Io.Dir.cwd().openFile(io, file_path, .{}) catch {
         return error.FileNotFound;
     };
-    defer file_buffer.close();
+    defer file_buffer.close(io);
 
     var file_reader_buffer: [4096]u8 = undefined;
     var decompress_buffer: [flate.max_window_len]u8 = undefined;
 
-    var file_reader = file_buffer.reader(&file_reader_buffer);
+    var file_reader = file_buffer.reader(io, &file_reader_buffer);
     var decompress: flate.Decompress = .init(&file_reader.interface, .gzip, &decompress_buffer);
 
     const file_decompressed = decompress.reader.allocRemaining(allocator, .unlimited) catch {
@@ -150,8 +150,8 @@ const DurFormat = struct {
         }
     }
 
-    pub fn create_from_file(self: *DurFormat, allocator: Allocator, file_path: []const u8) !void {
-        const file_decompressed = try read_decompress_file(allocator, file_path);
+    pub fn create_from_file(self: *DurFormat, allocator: Allocator, io: std.Io, file_path: []const u8) !void {
+        const file_decompressed = try read_decompress_file(allocator, io, file_path);
         defer allocator.free(file_decompressed);
 
         const parsed = try Json.parseFromSlice(Json.Value, allocator, file_decompressed, .{});
@@ -307,6 +307,7 @@ const DurFile = @This();
 instance: ?Widget = null,
 start_time: TimeOfDay,
 allocator: Allocator,
+io: std.Io,
 terminal_buffer: *TerminalBuffer,
 dur_movie: DurFormat,
 frames: u64,
@@ -368,6 +369,7 @@ fn calc_frame_size(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat) UVec
 
 pub fn init(
     allocator: Allocator,
+    io: std.Io,
     terminal_buffer: *TerminalBuffer,
     log_file: *LogFile,
     file_path: []const u8,
@@ -381,13 +383,13 @@ pub fn init(
 ) !DurFile {
     var dur_movie: DurFormat = .init(allocator);
 
-    dur_movie.create_from_file(allocator, file_path) catch |err| switch (err) {
+    dur_movie.create_from_file(allocator, io, file_path) catch |err| switch (err) {
         error.FileNotFound => {
-            try log_file.err("tui", "dur_file was not found at: {s}", .{file_path});
+            try log_file.err(io, "tui", "dur_file was not found at: {s}", .{file_path});
             return err;
         },
         error.NotValidFile => {
-            try log_file.err("tui", "dur_file loaded was invalid or not a dur file!", .{});
+            try log_file.err(io, "tui", "dur_file loaded was invalid or not a dur file!", .{});
             return err;
         },
         else => return err,
@@ -395,7 +397,7 @@ pub fn init(
 
     // 4 bit mode with 256 color is unsupported
     if (!full_color and eql(u8, dur_movie.colorFormat.?, "256")) {
-        try log_file.err("tui", "dur_file can not be 256 color encoded when not using full_color option!", .{});
+        try log_file.err(io, "tui", "dur_file can not be 256 color encoded when not using full_color option!", .{});
         dur_movie.deinit();
         return error.InvalidColorFormat;
     }
@@ -406,15 +408,16 @@ pub fn init(
     const frame_size = calc_frame_size(terminal_buffer, &dur_movie);
 
     // Convert dur fps to frames per ms
-    const frame_time: u32 = @intFromFloat(1000 / dur_movie.framerate.?);
+    const frame_time: u32 = @trunc(1000 / dur_movie.framerate.?);
 
     return .{
         .instance = null,
         .start_time = try interop.getTimeOfDay(),
         .allocator = allocator,
+        .io = io,
         .terminal_buffer = terminal_buffer,
         .frames = 0,
-        .time_previous = std.time.milliTimestamp(),
+        .time_previous = std.Io.Timestamp.now(io, .real).toMilliseconds(),
         .frame_size = frame_size,
         .start_pos = start_pos,
         .full_color = full_color,
@@ -499,11 +502,11 @@ fn draw(self: *DurFile) void {
         }
     }
 
-    const time_current = std.time.milliTimestamp();
+    const time_current = std.Io.Timestamp.now(self.io, .real).toMilliseconds();
     const delta_time = time_current - self.time_previous;
 
     // Convert delay from sec to ms
-    const delay_time: u32 = @intFromFloat(current_frame.delay * 1000);
+    const delay_time: u32 = @trunc(current_frame.delay * 1000);
     if (delta_time > (self.frame_time + delay_time)) {
         self.time_previous = time_current;
 
