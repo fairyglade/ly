@@ -450,7 +450,7 @@ fn patchFile(allocator: std.mem.Allocator, io: std.Io, source_file: []const u8, 
 
     var buffer: [4096]u8 = undefined;
     var reader = file.reader(io, &buffer);
-    var text = try reader.interface.readAlloc(allocator, stat.size);
+    var text = try reader.interface.readAlloc(allocator, @intCast(stat.size));
 
     var iterator = patch_map.iterator();
     while (iterator.next()) |kv| {

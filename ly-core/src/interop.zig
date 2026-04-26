@@ -266,7 +266,7 @@ pub fn supportsUnicode() bool {
 }
 
 pub fn timeAsString(io: std.Io, buf: [:0]u8, format: [:0]const u8) []u8 {
-    const timer = std.Io.Timestamp.now(io, .real).toSeconds();
+    const timer: isize = @intCast(std.Io.Timestamp.now(io, .real).toSeconds());
     const tm_info = time.localtime(&timer);
     const len = time.strftime(buf, buf.len, format, tm_info);
 

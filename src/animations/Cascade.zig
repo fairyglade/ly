@@ -11,14 +11,14 @@ const Cascade = @This();
 io: std.Io,
 instance: ?Widget = null,
 buffer: *TerminalBuffer,
-current_auth_fails: *usize,
-max_auth_fails: usize,
+current_auth_fails: *u64,
+max_auth_fails: u64,
 
 pub fn init(
     io: std.Io,
     buffer: *TerminalBuffer,
-    current_auth_fails: *usize,
-    max_auth_fails: usize,
+    current_auth_fails: *u64,
+    max_auth_fails: u64,
 ) Cascade {
     return .{
         .io = io,
