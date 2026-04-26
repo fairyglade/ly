@@ -1153,33 +1153,33 @@ pub fn main(init: std.process.Init) !void {
     };
 
     var iter = custom.binds.iterator();
-    while (iter.next()) |i| {
-        var concat = try std.mem.concat(state.allocator, u8, &[_][]const u8{ i.key_ptr.*, " ", i.value_ptr.name });
-        inline for (@typeInfo(Lang).@"struct".fields) |lang_key| {
-            const new = try std.mem.replaceOwned(u8, state.allocator, concat, "$" ++ lang_key.name, @field(state.lang, lang_key.name));
-            state.allocator.free(concat);
-            concat = new;
-        }
-        try state.custom_binds.append(state.allocator, .{
-            .lbl = .init(
-                concat,
-                null,
-                state.buffer.fg,
-                state.buffer.bg,
-                null,
-                null,
-            ),
-            .cmd = i.value_ptr.*,
-            .key = i.key_ptr.*,
-            .io = state.io,
-        });
-        state.custom_binds.items[state.custom_binds.items.len - 1].lbl.allocator = state.allocator;
-    }
     defer for (state.custom_binds.items) |*i| {
         i.lbl.deinit();
     };
 
     if (!state.config.hide_key_hints) {
+        while (iter.next()) |i| {
+            var concat = try std.mem.concat(state.allocator, u8, &[_][]const u8{ i.key_ptr.*, " ", i.value_ptr.name });
+            inline for (@typeInfo(Lang).@"struct".fields) |lang_key| {
+                const new = try std.mem.replaceOwned(u8, state.allocator, concat, "$" ++ lang_key.name, @field(state.lang, lang_key.name));
+                state.allocator.free(concat);
+                concat = new;
+            }
+            try state.custom_binds.append(state.allocator, .{
+                .lbl = .init(
+                    concat,
+                    null,
+                    state.buffer.fg,
+                    state.buffer.bg,
+                    null,
+                    null,
+                ),
+                .cmd = i.value_ptr.*,
+                .key = i.key_ptr.*,
+                .io = state.io,
+            });
+            state.custom_binds.items[state.custom_binds.items.len - 1].lbl.allocator = state.allocator;
+        }
         try layer2.append(state.allocator, state.shutdown_label.widget());
         try layer2.append(state.allocator, state.restart_label.widget());
         if (state.config.sleep_cmd != null) {
@@ -1940,6 +1940,11 @@ fn updateSessionSpecifier(self: *Label, ptr: *anyopaque) !void {
 fn positionWidgets(ptr: *anyopaque) !void {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
+    // Offsets for custom bind placement. Declared here instead of the
+    // below if stmt as we need these for `battery_label` positioning.
+    var x_offset: usize = 0;
+    // To account for the first row of built-in key hints
+    var y_offset: usize = 1;
     if (!state.config.hide_key_hints) {
         state.shutdown_label.positionX(state.edge_margin
             .add(TerminalBuffer.START_POSITION));
@@ -1973,8 +1978,6 @@ fn positionWidgets(ptr: *anyopaque) !void {
         state.brightness_up_label.positionXY(last_label
             .childrenPosition()
             .addX(1));
-        var x_offset: usize = 0;
-        var y_offset: usize = 1;
         for (state.custom_binds.items) |*item| {
             item.lbl.positionXY(state.edge_margin
                 .addY(y_offset)
@@ -1998,6 +2001,7 @@ fn positionWidgets(ptr: *anyopaque) !void {
     state.battery_label.positionXY(state.edge_margin
         .add(TerminalBuffer.START_POSITION)
         .addYFromIf(state.brightness_up_label.childrenPosition(), !state.config.hide_key_hints)
+        .addYIf(y_offset, !state.config.hide_key_hints)
         .removeYFromIf(state.edge_margin, !state.config.hide_key_hints));
 
     const tty_label_width = if (state.config.show_tty) TerminalBuffer.strWidth(state.tty_label.text) else 0;
