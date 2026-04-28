@@ -431,7 +431,12 @@ fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, io: std.Io, display_n
     var status: c_int = undefined;
     const result = std.posix.system.waitpid(pid, &status, 0);
     if (interop.isError(result) or status != 0) {
-        try log_file.file_writer.interface.print("xauth command failed with status {d}\n", .{status});
+        try log_file.err(
+            io,
+            "auth/x11",
+            "xauth command failed with status: {d}",
+            .{status},
+        );
         return error.XauthFailed;
     }
 
