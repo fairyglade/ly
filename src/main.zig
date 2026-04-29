@@ -1541,7 +1541,7 @@ fn authenticate(ptr: *anyopaque) !bool {
             const tty_control_transfer_act = std.posix.Sigaction{
                 .handler = .{ .handler = &ttyControlTransferSignalHandler },
                 .mask = std.posix.sigemptyset(),
-                .flags = 0,
+                .flags = std.posix.SA.RESTART, // For waitpid()
             };
             std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);
 
