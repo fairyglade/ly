@@ -31,13 +31,8 @@ pub const UsernameEntry = struct {
 fn PlatformStruct() type {
     return switch (builtin.os.tag) {
         .linux => struct {
-            pub const kd = @cImport({
-                @cInclude("sys/kd.h");
-            });
-
-            pub const vt = @cImport({
-                @cInclude("sys/vt.h");
-            });
+            pub const kd = @import("kd");
+            pub const vt = @import("vt");
 
             pub const LedState = c_char;
             pub const get_led_state = kd.KDGKBLED;
@@ -197,13 +192,8 @@ fn PlatformStruct() type {
             }
         },
         .freebsd => struct {
-            pub const kbio = @cImport({
-                @cInclude("sys/kbio.h");
-            });
-
-            pub const consio = @cImport({
-                @cInclude("sys/consio.h");
-            });
+            pub const kbio = @import("kbio");
+            pub const consio = @import("consio");
 
             pub const LedState = c_int;
             pub const get_led_state = kbio.KDGETLED;

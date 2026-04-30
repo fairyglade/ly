@@ -36,6 +36,14 @@ pub fn build(b: *std.Build) void {
     addCImport(b, mod, translate_c, target, optimize, "system_time", "#include <sys/time.h>");
     addCImport(b, mod, translate_c, target, optimize, "time", "#include <time.h>");
 
+    if (target.result.os.tag == .linux) {
+        addCImport(b, mod, translate_c, target, optimize, "kd", "#include <sys/kd.h>");
+        addCImport(b, mod, translate_c, target, optimize, "vt", "#include <sys/vt.h>");
+    } else if (target.result.os.tag == .freebsd) {
+        addCImport(b, mod, translate_c, target, optimize, "kbio", "#include <sys/kbio.h>");
+        addCImport(b, mod, translate_c, target, optimize, "consio", "#include <sys/consio.h>");
+    }
+
     const mod_tests = b.addTest(.{
         .root_module = mod,
     });
