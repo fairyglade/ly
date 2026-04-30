@@ -201,7 +201,7 @@ fn startSession(
 
     // Signal to the session process to give up control on the TTY
     try log_file.info(io, "auth/sys", "releasing tty", .{});
-    std.posix.kill(options.session_pid, std.posix.SIG.CHLD) catch return error.TtyControlTransferFailed;
+    std.posix.kill(options.session_pid, std.posix.SIG.INT) catch return error.TtyControlTransferFailed;
 
     // Execute what the user requested
     switch (current_environment.display_server) {

@@ -1541,9 +1541,9 @@ fn authenticate(ptr: *anyopaque) !bool {
             const tty_control_transfer_act = std.posix.Sigaction{
                 .handler = .{ .handler = &ttyControlTransferSignalHandler },
                 .mask = std.posix.sigemptyset(),
-                .flags = std.posix.SA.RESTART, // For waitpid()
+                .flags = 0,
             };
-            std.posix.sigaction(std.posix.SIG.CHLD, &tty_control_transfer_act, null);
+            std.posix.sigaction(std.posix.SIG.INT, &tty_control_transfer_act, null);
 
             try state.log_file.reinit(state.io);
 
