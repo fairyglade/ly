@@ -146,12 +146,10 @@ pub fn main(init: std.process.Init) !void {
         // If we can't shutdown or restart due to an error, we print it to standard error. If that fails, just bail out
         if (shutdown) {
             const shutdown_error = std.process.replace(state.io, .{ .argv = &[_][]const u8{ "/bin/sh", "-c", shutdown_cmd } });
-            stderr.print("error: couldn't shutdown: {s}\n", .{@errorName(shutdown_error)}) catch std.process.exit(1);
-            stderr.flush() catch std.process.exit(1);
+            std.log.err("couldn't shutdown: {s}", .{@errorName(shutdown_error)});
         } else if (restart) {
             const restart_error = std.process.replace(state.io, .{ .argv = &[_][]const u8{ "/bin/sh", "-c", restart_cmd } });
-            stderr.print("error: couldn't restart: {s}\n", .{@errorName(restart_error)}) catch std.process.exit(1);
-            stderr.flush() catch std.process.exit(1);
+            std.log.err("couldn't restart: {s}", .{@errorName(restart_error)});
         } else {
             // The user has quit Ly using Ctrl+C
             if (commands_allocated) {
@@ -201,13 +199,11 @@ pub fn main(init: std.process.Init) !void {
         if (res.args.help != 0) {
             try clap.help(stderr, clap.Help, &params, .{});
 
-            _ = try stderr.write("Note: if you want to configure Ly, please check the config file, which is located at " ++ build_options.config_directory ++ "/ly/config.ini.\n");
-            try stderr.flush();
+            std.log.info("note: if you want to configure Ly, please check the config file, which is located at " ++ build_options.config_directory ++ "/ly/config.ini.", .{});
             std.process.exit(0);
         }
         if (res.args.version != 0) {
-            _ = try stderr.write("Ly version " ++ build_options.version ++ "\n");
-            try stderr.flush();
+            std.log.info("ly version " ++ build_options.version, .{});
             std.process.exit(0);
         }
         if (res.args.config) |path| config_parent_path = path;
