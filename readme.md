@@ -226,6 +226,12 @@ You can, of course, still select the init system of your choice when using this 
 
 You can find all the configuration in `/etc/ly/config.ini`. The file is fully commented, and includes the default values.
 
+You may also check the validity of your configuration file (i.e. if there are any errors in it) with the following command:
+
+```
+$ ly --validate-config /etc/ly/config.ini
+```
+
 ## Controls
 
 Use the Up/Down arrow keys to change the current field, and the Left/Right arrow keys to scroll through the different fields (whether it be the info line, the desktop environment, or the username). The info line is where messages and errors are displayed.

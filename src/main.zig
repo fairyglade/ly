@@ -172,7 +172,8 @@ pub fn main(init: std.process.Init) !void {
         \\-h, --help                Shows all commands.
         \\-v, --version             Shows the version of Ly.
         \\-c, --config <str>        Overrides the default configuration path. Example: --config /usr/share/ly
-        \\--use-kmscon-vt           Use KMSCON instead of kernel VT
+        \\--use-kmscon-vt           Uses KMSCON instead of the kernel VT.
+        \\--validate-config <str>   Validates the given configuration file.
     );
 
     var diag = clap.Diagnostic{};
@@ -211,6 +212,30 @@ pub fn main(init: std.process.Init) !void {
         }
         if (res.args.config) |path| config_parent_path = path;
         if (res.args.@"use-kmscon-vt" != 0) state.use_kmscon_vt = true;
+        if (res.args.@"validate-config") |path| {
+            var parser = try IniParser(Config).init(
+                state.allocator,
+                state.io,
+                path,
+                migrator.configFieldHandler,
+            );
+            defer parser.deinit();
+
+            for (parser.errors.items) |err| {
+                std.log.err(
+                    "failed to convert value '{s}' of option '{s}' to type '{s}': {s}",
+                    .{ err.value, err.key, err.type_name, err.error_name },
+                );
+            }
+
+            if (parser.maybe_load_error) |err| {
+                std.log.err("failed to load config file: {s}", .{@errorName(err)});
+                std.process.exit(1);
+            }
+
+            std.log.info("no errors detected!", .{});
+            std.process.exit(0);
+        }
     }
 
     // Load configuration file
