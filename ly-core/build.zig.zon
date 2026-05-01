@@ -1,6 +1,6 @@
 .{
     .name = .ly_core,
-    .version = "1.0.0",
+    .version = "1.1.0",
     .fingerprint = 0xddda7afda795472,
     .minimum_zig_version = "0.16.0",
     .dependencies = .{

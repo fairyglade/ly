@@ -1,6 +1,6 @@
 .{
     .name = .ly,
-    .version = "1.4.0",
+    .version = "1.5.0",
     .fingerprint = 0xa148ffcc5dc2cb59,
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
