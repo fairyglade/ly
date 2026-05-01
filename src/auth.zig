@@ -417,19 +417,27 @@ fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, io: std.Io, display_n
 
     const magic_cookie = mcookie(io);
 
+    log_file.deinit(io);
+
     const pid = std.posix.system.fork();
     if (pid == 0) {
+        try log_file.reinit(io);
+
         var cmd_buffer: [1024]u8 = undefined;
         const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . {s}", .{ options.xauth_cmd, display_name, magic_cookie }) catch std.process.exit(1);
 
         try log_file.info(io, "auth/x11", "executing: {s} -c {s}", .{ shell, cmd_str });
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
         _ = std.posix.system.execve(shell, &args, std.c.environ);
+
+        log_file.deinit(io);
         std.process.exit(1);
     }
 
     var status: c_int = undefined;
     const result = std.posix.system.waitpid(pid, &status, 0);
+
+    try log_file.reinit(io);
     if (interop.isError(result) or status != 0) {
         try log_file.err(
             io,
