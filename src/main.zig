@@ -2046,21 +2046,35 @@ fn positionWidgets(ptr: *anyopaque) !void {
         .childrenPosition()
         .removeX(TerminalBuffer.strWidth(state.lang.numlock) + TerminalBuffer.strWidth(state.lang.capslock) + 1));
 
-    state.box.positionXY(TerminalBuffer.START_POSITION
-        .addX((state.buffer.width - @min(state.buffer.width - 2, state.box.width)) / 2)
-        .addY((state.buffer.height - @min(state.buffer.height - 2, state.box.height)) / 2));
+    var bb_height = state.box.height;
+    var bb_width = state.box.width;
+    const clock_text_len = TerminalBuffer.strWidth(state.bigclock_label.text) * (BigLabel.CHAR_WIDTH + 1);
 
     if (state.config.bigclock != .none) {
-        const half_width = state.buffer.width / 2;
-        const half_label_width = (TerminalBuffer.strWidth(state.bigclock_label.text) * (BigLabel.CHAR_WIDTH + 1)) / 2;
-        const half_height = (if (state.buffer.height > state.box.height) state.buffer.height - state.box.height else state.buffer.height) / 2;
-
-        state.bigclock_label.positionXY(TerminalBuffer.START_POSITION
-            .addX(half_width)
-            .removeXIf(half_label_width, half_width > half_label_width)
-            .addY(half_height)
-            .removeYIf(BigLabel.CHAR_HEIGHT + 2, half_height > BigLabel.CHAR_HEIGHT + 2));
+        bb_height += BigLabel.CHAR_HEIGHT + 2;
+        bb_width = @max(bb_width, clock_text_len);
     }
+
+    const max_v_position: f32 = @floatFromInt(state.buffer.height - bb_height - 1);
+    const max_h_position: f32 = @floatFromInt(state.buffer.width - bb_width - 1);
+
+    bb_height = @min(bb_height, state.buffer.height - 2);
+    bb_width = @min(bb_width, state.buffer.width - 2);
+
+    const v_space: f32 = @floatFromInt(state.buffer.height - bb_height);
+    const v_position: usize = @intFromFloat(std.math.clamp(v_space * state.config.box_position_v, 1.0, max_v_position));
+    const h_space: f32 = @floatFromInt(state.buffer.width - bb_width);
+    const h_position: usize = @intFromFloat(std.math.clamp(h_space * state.config.box_position_h, 1.0, max_h_position));
+
+    if (state.config.bigclock != .none) {
+        state.bigclock_label.positionXY(TerminalBuffer.START_POSITION
+            .addX(h_position + (bb_width - clock_text_len) / 2)
+            .addY(v_position));
+    }
+
+    state.box.positionXY(TerminalBuffer.START_POSITION
+        .addX(h_position + (bb_width - state.box.width) / 2)
+        .addY(v_position + (bb_height - state.box.height)));
 
     state.info_line.label.positionY(state.box
         .childrenPosition());
