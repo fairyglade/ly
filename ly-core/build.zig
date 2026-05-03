@@ -4,6 +4,7 @@ const Translator = @import("translate_c").Translator;
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const enable_x11_support = b.option(bool, "enable_x11_support", "Enable X11 support") orelse true;
     const mod = b.addModule("ly-core", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -20,7 +21,9 @@ pub fn build(b: *std.Build) void {
 
     addCImport(b, mod, translate_c, target, optimize, "pam", "#include <security/pam_appl.h>");
     addCImport(b, mod, translate_c, target, optimize, "utmp", "#include <utmpx.h>");
-    addCImport(b, mod, translate_c, target, optimize, "xcb", "#include <xcb/xcb.h>");
+    if (enable_x11_support) {
+        addCImport(b, mod, translate_c, target, optimize, "xcb", "#include <xcb/xcb.h>");
+    }
     if (target.result.os.tag == .freebsd) {
         addCImport(b, mod, translate_c, target, optimize, "pwd",
             \\#include <pwd.h>

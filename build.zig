@@ -72,7 +72,11 @@ pub fn build(b: *std.Build) !void {
         .use_llvm = true,
     });
 
-    const ly_ui = b.dependency("ly_ui", .{ .target = target, .optimize = optimize });
+    const ly_ui = b.dependency("ly_ui", .{
+        .target = target,
+        .optimize = optimize,
+        .enable_x11_support = enable_x11_support,
+    });
     exe.root_module.addImport("ly-ui", ly_ui.module("ly-ui"));
 
     exe.root_module.addOptions("build_options", build_options);

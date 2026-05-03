@@ -4,13 +4,18 @@ const Translator = @import("translate_c").Translator;
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const enable_x11_support = b.option(bool, "enable_x11_support", "Enable X11 support") orelse true;
     const mod = b.addModule("ly-ui", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    const ly_core = b.dependency("ly_core", .{ .target = target, .optimize = optimize });
+    const ly_core = b.dependency("ly_core", .{
+        .target = target,
+        .optimize = optimize,
+        .enable_x11_support = enable_x11_support,
+    });
     mod.addImport("ly-core", ly_core.module("ly-core"));
 
     const termbox_dep = b.dependency("termbox2", .{
