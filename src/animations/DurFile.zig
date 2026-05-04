@@ -62,7 +62,7 @@ const Frame = struct {
 };
 
 // https://github.com/cmang/durdraw/blob/0.29.0/durformat.md
-const DurFormat = struct {
+const DurFormatRaw = struct {
     allocator: Allocator,
     formatVersion: ?i64 = null,
     colorFormat: ?[]const u8 = null,
@@ -72,38 +72,48 @@ const DurFormat = struct {
     lines: ?i64 = null,
     frames: std.ArrayList(Frame) = undefined,
 
-    pub fn valid(self: *DurFormat) bool {
-        if (self.formatVersion != null and
-            self.colorFormat != null and
-            self.encoding != null and
-            self.framerate != null and
-            self.columns != null and
-            self.lines != null and
-            self.frames.items.len >= 1)
-        {
-            // v8 may have breaking changes like changing the colormap xy direction
-            // (https://github.com/cmang/durdraw/issues/24)
-            if (self.formatVersion.? != 7) return false;
+    // Validate data and return a valid DurFormat
+    // Consumes `self`, making it unusable after
+    pub fn validate(self: *DurFormatRaw) !DurFormat {
+        // v8 may have breaking changes like changing the colormap xy direction
+        // (https://github.com/cmang/durdraw/issues/24)
+        const format_version = self.formatVersion orelse return error.MissingFieldVersion;
+        if (format_version != 7) return error.UnsupportedVersion;
 
-            // Code currently only supports 16 and 256 color format only
-            if (!(eql(u8, "16", self.colorFormat.?) or eql(u8, "256", self.colorFormat.?)))
-                return false;
+        const color_format_str = self.colorFormat orelse return error.MissingFieldColorFormat;
+        // Code currently only supports 16 and 256 color format only
+        const color_format: DurColorFormat =
+            if (eql(u8, color_format_str, "16")) .@"16" else if (eql(u8, color_format_str, "256")) .@"256" else return error.UnsupportedColorFormat;
 
-            // Code currently supports only utf-8 encoding
-            if (!eql(u8, self.encoding.?, "utf-8")) return false;
+        const encoding_str = self.encoding orelse return error.MissingFieldEncoding;
+        // Code currently supports only utf-8 encoding
+        const encoding: DurEncoding = if (eql(u8, encoding_str, "utf-8")) .utf_8 else return error.UnsupportedEncoding;
 
-            // Sanity check on file
-            if (self.columns.? <= 0) return false;
-            if (self.lines.? <= 0) return false;
-            if (self.framerate.? < 0) return false;
+        if (self.framerate == null) return error.MissingFieldFramerate;
+        if (self.framerate.? <= 0) return error.InvalidFramerate;
+        const framerate: f64 = self.framerate.?;
 
-            return true;
-        }
+        // Sanity check on file
+        if (self.columns == null or self.lines == null) return error.MissingDimensions;
+        const columns = std.math.cast(u32, self.columns.?) orelse return error.InvalidColumnCount;
+        const lines = std.math.cast(u32, self.lines.?) orelse return error.InvalidLineCount;
 
-        return false;
+        if (self.frames.items.len == 0) return error.NoFrames;
+        const frames = self.frames;
+
+        return .{
+            .allocator = self.allocator,
+            .formatVersion = format_version,
+            .colorFormat = color_format,
+            .encoding = encoding,
+            .framerate = framerate,
+            .columns = columns,
+            .lines = lines,
+            .frames = frames,
+        };
     }
 
-    fn parse_dur_from_json(self: *DurFormat, allocator: Allocator, dur_json_root: Json.Value) !void {
+    fn parse_dur_from_json(self: *DurFormatRaw, allocator: Allocator, dur_json_root: Json.Value) !void {
         var dur_movie = if (dur_json_root.object.get("DurMovie")) |dm| dm.object else return error.NotValidFile;
 
         // Depending on the version, a dur file can have different json object names (ie: columns vs sizeX)
@@ -150,7 +160,7 @@ const DurFormat = struct {
         }
     }
 
-    pub fn create_from_file(self: *DurFormat, allocator: Allocator, io: std.Io, file_path: []const u8) !void {
+    pub fn create_from_file(self: *DurFormatRaw, allocator: Allocator, io: std.Io, file_path: []const u8) !void {
         const file_decompressed = try read_decompress_file(allocator, io, file_path);
         defer allocator.free(file_decompressed);
 
@@ -158,20 +168,36 @@ const DurFormat = struct {
         defer parsed.deinit();
 
         try parse_dur_from_json(self, allocator, parsed.value);
-
-        if (!self.valid()) {
-            return error.NotValidFile;
-        }
     }
 
-    pub fn init(allocator: Allocator) DurFormat {
+    pub fn init(allocator: Allocator) DurFormatRaw {
         return .{ .allocator = allocator };
     }
 
-    pub fn deinit(self: *DurFormat) void {
+    pub fn deinit(self: *DurFormatRaw) void {
         if (self.colorFormat) |str| self.allocator.free(str);
         if (self.encoding) |str| self.allocator.free(str);
+    }
+};
 
+const DurColorFormat = enum {
+    @"16",
+    @"256",
+};
+
+const DurEncoding = enum { utf_8 };
+
+const DurFormat = struct {
+    allocator: Allocator,
+    formatVersion: i64,
+    colorFormat: DurColorFormat,
+    encoding: DurEncoding,
+    framerate: f64,
+    columns: u32,
+    lines: u32,
+    frames: std.ArrayList(Frame),
+
+    pub fn deinit(self: *DurFormat) void {
         for (self.frames.items) |frame| {
             frame.deinit(self.allocator);
         }
@@ -324,16 +350,16 @@ offset_alignment: DurOffsetAlignment,
 offset: IVec2,
 
 // if the user has an even number of columns or rows, we will default to the left or higher position (e.g. 4 columns center = .x..)
-fn center(v: u32) i64 {
-    return @intCast((v / 2) + (v % 2));
+fn center(v: i64) i64 {
+    return @intCast(@divTrunc(v, 2) + @mod(v, 2));
 }
 
 fn calc_start_position(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat, offset_alignment: DurOffsetAlignment, offset: IVec2) IVec2 {
     const buf_width: u32 = @intCast(terminal_buffer.width);
     const buf_height: u32 = @intCast(terminal_buffer.height);
 
-    var movie_width: u32 = @intCast(dur_movie.columns.?);
-    var movie_height: u32 = @intCast(dur_movie.lines.?);
+    var movie_width: u32 = dur_movie.columns;
+    var movie_height: u32 = dur_movie.lines;
 
     if (movie_width > buf_width) movie_width = buf_width;
     if (movie_height > buf_height) movie_height = buf_height;
@@ -357,8 +383,8 @@ fn calc_frame_size(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat) UVec
     const buf_width: u32 = @intCast(terminal_buffer.width);
     const buf_height: u32 = @intCast(terminal_buffer.height);
 
-    const movie_width: u32 = @intCast(dur_movie.columns.?);
-    const movie_height: u32 = @intCast(dur_movie.lines.?);
+    const movie_width: u32 = dur_movie.columns;
+    const movie_height: u32 = dur_movie.lines;
 
     // Draw only the needed amount if movie smaller than screen. If movie is bigger, we will just draw entire screen
     const frame_width = if (movie_width < buf_width) movie_width else buf_width;
@@ -381,9 +407,10 @@ pub fn init(
     timeout_sec: u12,
     frame_delay: u16,
 ) !DurFile {
-    var dur_movie: DurFormat = .init(allocator);
+    var dur_movie_raw: DurFormatRaw = .init(allocator);
+    defer dur_movie_raw.deinit();
 
-    dur_movie.create_from_file(allocator, io, file_path) catch |err| switch (err) {
+    dur_movie_raw.create_from_file(allocator, io, file_path) catch |err| switch (err) {
         error.FileNotFound => {
             try log_file.err(io, "tui", "dur_file was not found at: {s}", .{file_path});
             return err;
@@ -395,11 +422,62 @@ pub fn init(
         else => return err,
     };
 
+    var dur_movie = dur_movie_raw.validate() catch |err| switch (err) {
+        error.MissingFieldVersion => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: missing field formatVersion!", .{});
+            return err;
+        },
+        error.UnsupportedVersion => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: unsupported version ({d})!", .{dur_movie_raw.formatVersion.?});
+            return err;
+        },
+        error.MissingFieldColorFormat => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: missing field colorFormat!", .{});
+            return err;
+        },
+        error.UnsupportedColorFormat => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: unsupported colorFormat ({s})!", .{dur_movie_raw.colorFormat.?});
+            return err;
+        },
+        error.MissingFieldEncoding => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: missing field encoding!", .{});
+            return err;
+        },
+        error.UnsupportedEncoding => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: unsupported encoding ({s})!", .{dur_movie_raw.encoding.?});
+            return err;
+        },
+        error.MissingFieldFramerate => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: missing field framerate!", .{});
+            return err;
+        },
+        error.InvalidFramerate => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: negative framerate value found!", .{});
+            return err;
+        },
+        error.MissingDimensions => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: missing field(s) lines and/or columns!", .{});
+            return err;
+        },
+        error.InvalidColumnCount => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: columns value falls outside of supported range ({d})!", .{dur_movie_raw.columns.?});
+            return err;
+        },
+        error.InvalidLineCount => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: lines value falls outside of supported range ({d})!", .{dur_movie_raw.lines.?});
+            return err;
+        },
+        error.NoFrames => {
+            try log_file.err(io, "tui", "dur_file loaded was invalid: animation has no frames!", .{});
+            return err;
+        },
+    };
+
     // 4 bit mode with 256 color is unsupported
-    if (!full_color and eql(u8, dur_movie.colorFormat.?, "256")) {
+    if (!full_color and dur_movie.colorFormat == .@"256") {
         try log_file.err(io, "tui", "dur_file can not be 256 color encoded when not using full_color option!", .{});
         dur_movie.deinit();
-        return error.InvalidColorFormat;
+        return error.NotFullColor;
     }
 
     const offset: IVec2 = .{ x_offset, y_offset };
@@ -408,7 +486,7 @@ pub fn init(
     const frame_size = calc_frame_size(terminal_buffer, &dur_movie);
 
     // Convert dur fps to frames per ms
-    const frame_time: u32 = @trunc(1000 / dur_movie.framerate.?);
+    const frame_time: u32 = @trunc(1000 / dur_movie.framerate);
 
     return .{
         .instance = null,
@@ -426,7 +504,7 @@ pub fn init(
         .frame_delay = frame_delay,
         .dur_movie = dur_movie,
         .frame_time = frame_time,
-        .is_color_format_16 = eql(u8, dur_movie.colorFormat.?, "16"),
+        .is_color_format_16 = dur_movie.colorFormat == .@"16",
         .offset_alignment = offset_alignment,
         .offset = offset,
     };
