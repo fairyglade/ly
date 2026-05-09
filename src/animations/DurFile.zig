@@ -337,7 +337,6 @@ io: std.Io,
 terminal_buffer: *TerminalBuffer,
 dur_movie: DurFormat,
 frames: usize,
-frame_size: UVec2,
 start_pos: IVec2,
 full_color: bool,
 animate: *bool,
@@ -355,14 +354,11 @@ fn center(v: i64) i64 {
 }
 
 fn calc_start_position(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat, offset_alignment: DurOffsetAlignment, offset: IVec2) IVec2 {
-    const buf_width: u32 = @intCast(terminal_buffer.width);
-    const buf_height: u32 = @intCast(terminal_buffer.height);
+    const buf_width: i64 = @intCast(terminal_buffer.width);
+    const buf_height: i64 = @intCast(terminal_buffer.height);
 
-    var movie_width: u32 = dur_movie.columns;
-    var movie_height: u32 = dur_movie.lines;
-
-    if (movie_width > buf_width) movie_width = buf_width;
-    if (movie_height > buf_height) movie_height = buf_height;
+    const movie_width: i64 = @intCast(dur_movie.columns);
+    const movie_height: i64 = @intCast(dur_movie.lines);
 
     const start_pos: IVec2 = switch (offset_alignment) {
         DurOffsetAlignment.center => .{ center(buf_width) - center(movie_width), center(buf_height) - center(movie_height) },
@@ -377,20 +373,6 @@ fn calc_start_position(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat, 
     };
 
     return start_pos + offset;
-}
-
-fn calc_frame_size(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat) UVec2 {
-    const buf_width: u32 = @intCast(terminal_buffer.width);
-    const buf_height: u32 = @intCast(terminal_buffer.height);
-
-    const movie_width: u32 = dur_movie.columns;
-    const movie_height: u32 = dur_movie.lines;
-
-    // Draw only the needed amount if movie smaller than screen. If movie is bigger, we will just draw entire screen
-    const frame_width = if (movie_width < buf_width) movie_width else buf_width;
-    const frame_height = if (movie_height < buf_height) movie_height else buf_height;
-
-    return .{ frame_width, frame_height };
 }
 
 pub fn init(
@@ -483,7 +465,6 @@ pub fn init(
     const offset: IVec2 = .{ x_offset, y_offset };
 
     const start_pos = calc_start_position(terminal_buffer, &dur_movie, offset_alignment, offset);
-    const frame_size = calc_frame_size(terminal_buffer, &dur_movie);
 
     // Convert dur fps to frames per ms
     const frame_time: u32 = @trunc(1000 / dur_movie.framerate);
@@ -496,7 +477,6 @@ pub fn init(
         .terminal_buffer = terminal_buffer,
         .frames = 0,
         .time_previous = std.Io.Timestamp.now(io, .real).toMilliseconds(),
-        .frame_size = frame_size,
         .start_pos = start_pos,
         .full_color = full_color,
         .animate = animate,
@@ -531,9 +511,8 @@ fn deinit(self: *DurFile) void {
 }
 
 fn realloc(self: *DurFile) !void {
-    // when terminal size changes, we need to recalculate the start_pos and frame_size based on the new size
+    // when terminal size changes, we need to recalculate the start_pos based on the new size
     self.start_pos = calc_start_position(self.terminal_buffer, &self.dur_movie, self.offset_alignment, self.offset);
-    self.frame_size = calc_frame_size(self.terminal_buffer, &self.dur_movie);
 }
 
 fn draw(self: *DurFile) void {
@@ -541,24 +520,14 @@ fn draw(self: *DurFile) void {
 
     const current_frame = self.dur_movie.frames.items[self.frames];
 
-    const buf_width: u32 = @intCast(self.terminal_buffer.width);
-    const buf_height: u32 = @intCast(self.terminal_buffer.height);
-
     // y is used as an iterator in the durformat, while cell_y gives us the correct placement for the cell (same for x)
-    for (0..self.frame_size[VEC_Y]) |y| {
-        const y_offset_i = @as(i32, @intCast(y)) + self.start_pos[VEC_Y];
-        // we skip the pass if it falls outside of the draw window (ensure no int underflow)
-        const cell_y: u32 = if (y_offset_i >= 0 and y_offset_i < buf_height) @intCast(y_offset_i) else continue;
+    for (0..@intCast(self.dur_movie.lines)) |y| {
+        const cell_y = @as(i32, @intCast(y)) + self.start_pos[VEC_Y];
 
         var iter = std.unicode.Utf8View.initUnchecked(current_frame.contents[y]).iterator();
 
-        for (0..self.frame_size[VEC_X]) |x| {
-            const x_offset_i = @as(i32, @intCast(x)) + self.start_pos[VEC_X];
-            // skip pass, same as y but also increment the codepoint iter to fetch correct values in later passes
-            const cell_x: u32 = if (x_offset_i >= 0 and x_offset_i < buf_width) @intCast(x_offset_i) else {
-                _ = iter.nextCodepoint().?;
-                continue;
-            };
+        for (0..@intCast(self.dur_movie.columns)) |x| {
+            const cell_x = @as(i32, @intCast(x)) + self.start_pos[VEC_X];
 
             const codepoint: u21 = iter.nextCodepoint().?;
             const color_map = current_frame.colorMap[x][y];
@@ -576,7 +545,7 @@ fn draw(self: *DurFile) void {
 
             const cell = Cell{ .ch = @intCast(codepoint), .fg = fg_color, .bg = bg_color };
 
-            cell.put(cell_x, cell_y);
+            self.terminal_buffer.setCellBoundsChecked(cell_x, cell_y, cell);
         }
     }
 

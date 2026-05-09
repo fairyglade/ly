@@ -381,6 +381,12 @@ pub fn setCell(x: usize, y: usize, cell: Cell) void {
     );
 }
 
+pub fn setCellBoundsChecked(self: *TerminalBuffer, x: isize, y: isize, cell: Cell) void {
+    if (0 <= x and x < self.width and 0 <= y and y < self.height) {
+        cell.put(@intCast(x), @intCast(y));
+    }
+}
+
 pub fn reclaim(self: TerminalBuffer) !void {
     if (self.termios) |termios| {
         // Take back control of the TTY
