@@ -171,6 +171,7 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
         const code = if (tb_event.ch == 0 and tb_event.key < 128) tb_event.key else tb_event.ch;
 
         switch (code) {
+            // Non-standard control codes
             0 => {
                 key.ctrl = true;
                 key.@"2" = true;
@@ -342,7 +343,9 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
                 key = std.mem.zeroes(Key);
                 key._ = true;
             },
+            // Standard ASCII characters
             32 => {
+                key = std.mem.zeroes(Key);
                 key.@" " = true;
             },
             33 => {
@@ -370,6 +373,7 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
                 key.@"&" = true;
             },
             39 => {
+                key = std.mem.zeroes(Key);
                 key.@"'" = true;
             },
             40 => {
@@ -389,74 +393,86 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
                 key.@"+" = true;
             },
             44 => {
+                key = std.mem.zeroes(Key);
                 key.@"," = true;
             },
             45 => {
+                key = std.mem.zeroes(Key);
                 key.@"-" = true;
             },
             46 => {
+                key = std.mem.zeroes(Key);
                 key.@"." = true;
             },
             47 => {
+                key = std.mem.zeroes(Key);
                 key.@"/" = true;
             },
             48 => {
+                key = std.mem.zeroes(Key);
                 key.@"0" = true;
             },
             49 => {
+                key = std.mem.zeroes(Key);
                 key.@"1" = true;
             },
             50 => {
+                key = std.mem.zeroes(Key);
                 key.@"2" = true;
             },
             51 => {
+                key = std.mem.zeroes(Key);
                 key.@"3" = true;
             },
             52 => {
+                key = std.mem.zeroes(Key);
                 key.@"4" = true;
             },
             53 => {
+                key = std.mem.zeroes(Key);
                 key.@"5" = true;
             },
             54 => {
+                key = std.mem.zeroes(Key);
                 key.@"6" = true;
             },
             55 => {
+                key = std.mem.zeroes(Key);
                 key.@"7" = true;
             },
             56 => {
+                key = std.mem.zeroes(Key);
                 key.@"8" = true;
             },
             57 => {
+                key = std.mem.zeroes(Key);
                 key.@"9" = true;
             },
             58 => {
-                key.shift = true;
+                key = std.mem.zeroes(Key);
                 key.@":" = true;
             },
             59 => {
+                key = std.mem.zeroes(Key);
                 key.@";" = true;
             },
             60 => {
-                key.shift = true;
+                key = std.mem.zeroes(Key);
                 key.@"<" = true;
             },
             61 => {
+                key = std.mem.zeroes(Key);
                 key.@"=" = true;
             },
             62 => {
-                key.shift = true;
+                key = std.mem.zeroes(Key);
                 key.@">" = true;
             },
             63 => {
-                key.shift = true;
+                key = std.mem.zeroes(Key);
                 key.@"?" = true;
             },
             64 => {
-                key.shift = true;
-                key.@"2" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"@" = true;
             },
@@ -565,12 +581,15 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
                 key.z = true;
             },
             91 => {
+                key = std.mem.zeroes(Key);
                 key.@"[" = true;
             },
             92 => {
+                key = std.mem.zeroes(Key);
                 key.@"\\" = true;
             },
             93 => {
+                key = std.mem.zeroes(Key);
                 key.@"]" = true;
             },
             94 => {
@@ -578,14 +597,11 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
                 key.@"^" = true;
             },
             95 => {
-                key.shift = true;
-                key.@"-" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key._ = true;
             },
             96 => {
+                key = std.mem.zeroes(Key);
                 key.@"`" = true;
             },
             97 => {
@@ -667,34 +683,21 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
                 key.z = true;
             },
             123 => {
-                key.shift = true;
                 key.@"{" = true;
             },
             124 => {
-                key.shift = true;
-                key.@"\\" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"|" = true;
             },
             125 => {
-                key.shift = true;
+                key = std.mem.zeroes(Key);
                 key.@"}" = true;
             },
             126 => {
-                key.shift = true;
-                key.@"`" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.@"~" = true;
             },
             127 => {
-                key.ctrl = true;
-                key.@"8" = true;
-                try keys.append(allocator, key);
-
                 key = std.mem.zeroes(Key);
                 key.backspace = true;
             },
