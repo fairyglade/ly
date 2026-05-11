@@ -323,8 +323,8 @@ offset_alignment: DurOffsetAlignment,
 offset: IVec2,
 
 // if the user has an even number of columns or rows, we will default to the left or higher position (e.g. 4 columns center = .x..)
-fn center(v: u32) i64 {
-    return @intCast((v / 2) + (v % 2));
+fn center(v: i64) i64 {
+    return @intCast(@divTrunc(v, 2) + @mod(v, 2));
 }
 
 fn calc_start_position(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat, offset_alignment: DurOffsetAlignment, offset: IVec2) IVec2 {
@@ -443,12 +443,12 @@ fn draw(self: *DurFile) void {
     const current_frame = self.dur_movie.frames.items[self.frames];
 
     // y is used as an iterator in the durformat, while cell_y gives us the correct placement for the cell (same for x)
-    for (0..@intCast(self.dur_movie.lines)) |y| {
+    for (0..@intCast(self.dur_movie.lines.?)) |y| {
         const cell_y = @as(i32, @intCast(y)) + self.start_pos[VEC_Y];
 
         var iter = std.unicode.Utf8View.initUnchecked(current_frame.contents[y]).iterator();
 
-        for (0..@intCast(self.dur_movie.columns)) |x| {
+        for (0..@intCast(self.dur_movie.columns.?)) |x| {
             const cell_x = @as(i32, @intCast(x)) + self.start_pos[VEC_X];
 
             const codepoint: u21 = iter.nextCodepoint().?;
