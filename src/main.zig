@@ -359,7 +359,16 @@ pub fn main(init: std.process.Init) !void {
 
     // Initialize terminal buffer
     try state.log_file.info(state.io, "tui", "initializing terminal buffer", .{});
-    state.labels_max_length = @max(TerminalBuffer.strWidth(state.lang.login), TerminalBuffer.strWidth(state.lang.password));
+    var labels = [_][]const u8{
+        state.lang.login,
+        state.lang.password,
+        state.lang.wayland,
+        state.lang.x11,
+        state.lang.shell,
+        state.lang.xinitrc,
+        state.lang.custom,
+    };
+    state.labels_max_length = maxWidths(&labels);
 
     var seed: u64 = undefined;
     state.io.random(std.mem.asBytes(&seed)); // Get a random seed for the PRNG (used by animations)
@@ -1310,6 +1319,16 @@ pub fn main(init: std.process.Init) !void {
         handleInactivity,
         &state,
     );
+}
+
+fn maxWidths(labels: [][]const u8) usize {
+    var max_width: usize = 0;
+
+    for (labels) |label| {
+        max_width = @max(max_width, TerminalBuffer.strWidth(label));
+    }
+
+    return max_width;
 }
 
 fn uiErrorHandler(err: anyerror, ctx: *anyopaque) anyerror!void {
