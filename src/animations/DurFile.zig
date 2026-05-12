@@ -19,7 +19,7 @@ const LogFile = ly_core.LogFile;
 const enums = @import("../enums.zig");
 const DurOffsetAlignment = enums.DurOffsetAlignment;
 
-fn read_decompress_file(allocator: Allocator, io: std.Io, file_path: []const u8) ![]u8 {
+fn readDecompressFile(allocator: Allocator, io: std.Io, file_path: []const u8) ![]u8 {
     const file_buffer = std.Io.Dir.cwd().openFile(io, file_path, .{}) catch {
         return error.FileNotFound;
     };
@@ -113,7 +113,7 @@ const DurFormatRaw = struct {
         };
     }
 
-    fn parse_dur_from_json(self: *DurFormatRaw, allocator: Allocator, dur_json_root: Json.Value) !void {
+    fn parseFromJson(self: *DurFormatRaw, allocator: Allocator, dur_json_root: Json.Value) !void {
         var dur_movie = if (dur_json_root.object.get("DurMovie")) |dm| dm.object else return error.NotValidFile;
 
         // Depending on the version, a dur file can have different json object names (ie: columns vs sizeX)
@@ -160,14 +160,14 @@ const DurFormatRaw = struct {
         }
     }
 
-    pub fn create_from_file(self: *DurFormatRaw, allocator: Allocator, io: std.Io, file_path: []const u8) !void {
-        const file_decompressed = try read_decompress_file(allocator, io, file_path);
+    pub fn createFromFile(self: *DurFormatRaw, allocator: Allocator, io: std.Io, file_path: []const u8) !void {
+        const file_decompressed = try readDecompressFile(allocator, io, file_path);
         defer allocator.free(file_decompressed);
 
         const parsed = try Json.parseFromSlice(Json.Value, allocator, file_decompressed, .{});
         defer parsed.deinit();
 
-        try parse_dur_from_json(self, allocator, parsed.value);
+        try parseFromJson(self, allocator, parsed.value);
     }
 
     pub fn init(allocator: Allocator) DurFormatRaw {
@@ -266,7 +266,7 @@ const durcolor_table_to_color16 = [17]u32{
     15, // 16 bright white
 };
 
-fn sixcube_to_channel(sixcube: u32) u32 {
+fn sixCubeToChannel(sixcube: u32) u32 {
     // Although the range top for the extended range is 0xFF, 6 is not divisible into 0xFF,
     // so we use 0xF0 instead with a scaler
     const equal_divisions = 0xF0 / 6;
@@ -277,7 +277,7 @@ fn sixcube_to_channel(sixcube: u32) u32 {
     return if (sixcube > 0) (sixcube * equal_divisions) + scaler else 0;
 }
 
-fn convert_256_to_rgb(color_256: u32) u32 {
+fn convert256ToRgb(color_256: u32) u32 {
     var rgb_color: u32 = 0;
 
     // 0 - 15 is the standard color range, map to array table
@@ -293,9 +293,9 @@ fn convert_256_to_rgb(color_256: u32) u32 {
         // divide by 1 gets the height of the cube (divide 1 for clarity for what we are doing)
         // each channel can be 6 levels of brightness hence remander operation of 6
         // finally bitshift to correct rgb channel (16 for red, 8 for green, 0 for blue)
-        rgb_color |= sixcube_to_channel(((color_256 - 16) / 36) % 6) << 16;
-        rgb_color |= sixcube_to_channel(((color_256 - 16) / 6) % 6) << 8;
-        rgb_color |= sixcube_to_channel(((color_256 - 16) / 1) % 6);
+        rgb_color |= sixCubeToChannel(((color_256 - 16) / 36) % 6) << 16;
+        rgb_color |= sixCubeToChannel(((color_256 - 16) / 6) % 6) << 8;
+        rgb_color |= sixCubeToChannel(((color_256 - 16) / 1) % 6);
     }
     // 232 - 255 is the grayscale range
     else {
@@ -353,7 +353,7 @@ fn center(v: i64) i64 {
     return @intCast(@divTrunc(v, 2) + @mod(v, 2));
 }
 
-fn calc_start_position(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat, offset_alignment: DurOffsetAlignment, offset: IVec2) IVec2 {
+fn calculateStartPos(terminal_buffer: *TerminalBuffer, dur_movie: *DurFormat, offset_alignment: DurOffsetAlignment, offset: IVec2) IVec2 {
     const buf_width: i64 = @intCast(terminal_buffer.width);
     const buf_height: i64 = @intCast(terminal_buffer.height);
 
@@ -392,7 +392,7 @@ pub fn init(
     var dur_movie_raw: DurFormatRaw = .init(allocator);
     defer dur_movie_raw.deinit();
 
-    dur_movie_raw.create_from_file(allocator, io, file_path) catch |err| switch (err) {
+    dur_movie_raw.createFromFile(allocator, io, file_path) catch |err| switch (err) {
         error.FileNotFound => {
             try log_file.err(io, "tui", "dur_file was not found at: {s}", .{file_path});
             return err;
@@ -464,7 +464,7 @@ pub fn init(
 
     const offset: IVec2 = .{ x_offset, y_offset };
 
-    const start_pos = calc_start_position(terminal_buffer, &dur_movie, offset_alignment, offset);
+    const start_pos = calculateStartPos(terminal_buffer, &dur_movie, offset_alignment, offset);
 
     // Convert dur fps to frames per ms
     const frame_time: u32 = @trunc(1000 / dur_movie.framerate);
@@ -512,7 +512,7 @@ fn deinit(self: *DurFile) void {
 
 fn realloc(self: *DurFile) !void {
     // when terminal size changes, we need to recalculate the start_pos based on the new size
-    self.start_pos = calc_start_position(self.terminal_buffer, &self.dur_movie, self.offset_alignment, self.offset);
+    self.start_pos = calculateStartPos(self.terminal_buffer, &self.dur_movie, self.offset_alignment, self.offset);
 }
 
 fn draw(self: *DurFile) void {
@@ -540,8 +540,8 @@ fn draw(self: *DurFile) void {
                 color_map_1 = durcolor_table_to_color16[color_map_1 + 1]; // Add 1, dur source stores it like this for some reason
             }
 
-            const fg_color = if (self.full_color) convert_256_to_rgb(color_map_0) else tb_color_16[color_map_0];
-            const bg_color = if (self.full_color) convert_256_to_rgb(color_map_1) else tb_color_16[color_map_1];
+            const fg_color = if (self.full_color) convert256ToRgb(color_map_0) else tb_color_16[color_map_0];
+            const bg_color = if (self.full_color) convert256ToRgb(color_map_1) else tb_color_16[color_map_1];
 
             const cell = Cell{ .ch = @intCast(codepoint), .fg = fg_color, .bg = bg_color };
 
