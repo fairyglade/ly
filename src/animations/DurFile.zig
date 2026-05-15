@@ -19,25 +19,6 @@ const LogFile = ly_core.LogFile;
 const enums = @import("../enums.zig");
 const DurOffsetAlignment = enums.DurOffsetAlignment;
 
-fn readDecompressFile(allocator: Allocator, io: std.Io, file_path: []const u8) ![]u8 {
-    const file_buffer = std.Io.Dir.cwd().openFile(io, file_path, .{}) catch {
-        return error.FileNotFound;
-    };
-    defer file_buffer.close(io);
-
-    var file_reader_buffer: [4096]u8 = undefined;
-    var decompress_buffer: [flate.max_window_len]u8 = undefined;
-
-    var file_reader = file_buffer.reader(io, &file_reader_buffer);
-    var decompress: flate.Decompress = .init(&file_reader.interface, .gzip, &decompress_buffer);
-
-    const file_decompressed = decompress.reader.allocRemaining(allocator, .unlimited) catch {
-        return error.NotValidFile;
-    };
-
-    return file_decompressed;
-}
-
 const Frame = struct {
     frameNumber: i32,
     delay: f32,
@@ -161,13 +142,22 @@ const DurFormatRaw = struct {
     }
 
     pub fn createFromFile(self: *DurFormatRaw, allocator: Allocator, io: std.Io, file_path: []const u8) !void {
-        const file_decompressed = try readDecompressFile(allocator, io, file_path);
-        defer allocator.free(file_decompressed);
+        const file = try std.Io.Dir.cwd().openFile(io, file_path, .{});
+        defer file.close(io);
 
-        const parsed = try Json.parseFromSlice(Json.Value, allocator, file_decompressed, .{});
-        defer parsed.deinit();
+        var reader_buffer: [4096]u8 = undefined;
+        var decompress_buffer: [flate.max_window_len]u8 = undefined;
 
-        try parseFromJson(self, allocator, parsed.value);
+        var file_reader = file.reader(io, &reader_buffer);
+        var decompress: flate.Decompress = .init(&file_reader.interface, .gzip, &decompress_buffer);
+
+        var json_reader = Json.Reader.init(allocator, &decompress.reader);
+        defer json_reader.deinit();
+
+        const json = try Json.parseFromTokenSource(Json.Value, allocator, &json_reader, .{});
+        defer json.deinit();
+
+        try parseFromJson(self, allocator, json.value);
     }
 
     pub fn init(allocator: Allocator) DurFormatRaw {
