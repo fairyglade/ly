@@ -16,7 +16,6 @@ pub fn build(b: *std.Build) void {
 
     const translate_c = b.dependency("translate_c", .{
         .target = target,
-        .optimize = optimize,
     });
 
     addCImport(b, mod, translate_c, target, optimize, "pam", "#include <security/pam_appl.h>");

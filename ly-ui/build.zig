@@ -25,7 +25,6 @@ pub fn build(b: *std.Build) void {
 
     const translate_c_dep = b.dependency("translate_c", .{
         .target = target,
-        .optimize = optimize,
     });
 
     const termbox2: Translator = .init(translate_c_dep, .{
