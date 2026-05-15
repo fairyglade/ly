@@ -69,7 +69,6 @@ pub fn build(b: *std.Build) !void {
             .optimize = optimize,
             .link_libc = true,
         }),
-        .use_llvm = true,
     });
 
     const ly_ui = b.dependency("ly_ui", .{

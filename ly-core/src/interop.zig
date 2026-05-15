@@ -235,7 +235,6 @@ fn PlatformStruct() type {
 
 const platform_struct = PlatformStruct();
 
-// TODO 0.16.0: Can we get away with this?
 pub fn isError(result: anytype) bool {
     if (@typeInfo(@TypeOf(result)).int.signedness == .signed) {
         return result < 0;
