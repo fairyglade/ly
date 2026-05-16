@@ -1788,7 +1788,7 @@ fn updateNumlock(self: *Label, ptr: *anyopaque) !void {
         try state.log_file.err(
             state.io,
             "sys",
-            "failed to get lock state: {s}",
+            "failed to get lock state for numlock: {s}",
             .{@errorName(err)},
         );
         return;
@@ -1802,8 +1802,17 @@ fn updateCapslock(self: *Label, ptr: *anyopaque) !void {
 
     const lock_state = interop.getLockState() catch |err| {
         self.update_fn = null;
-        try state.info_line.addMessage(state.lang.err_lock_state, state.config.error_bg, state.config.error_fg);
-        try state.log_file.err(state.io, "sys", "failed to get lock state: {s}", .{@errorName(err)});
+        try state.info_line.addMessage(
+            state.lang.err_lock_state,
+            state.config.error_bg,
+            state.config.error_fg,
+        );
+        try state.log_file.err(
+            state.io,
+            "sys",
+            "failed to get lock state for capslock: {s}",
+            .{@errorName(err)},
+        );
         return;
     };
 
