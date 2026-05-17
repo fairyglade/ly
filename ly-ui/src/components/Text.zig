@@ -131,14 +131,14 @@ pub fn handle(self: *Text, maybe_key: ?keyboard.Key) !void {
     }
 
     if (self.masked and self.maybe_mask == null) {
-        TerminalBuffer.setCursor(
+        try TerminalBuffer.setCursor(
             self.component_pos.x,
             self.component_pos.y,
         );
         return;
     }
 
-    TerminalBuffer.setCursor(
+    try TerminalBuffer.setCursor(
         self.component_pos.x + (self.cursor - self.visible_start),
         self.component_pos.y,
     );
@@ -159,7 +159,7 @@ fn draw(self: *Text) void {
                 length,
                 self.fg,
                 self.bg,
-            );
+            ) catch {};
         }
         return;
     }
@@ -182,7 +182,7 @@ fn draw(self: *Text) void {
         self.component_pos.y,
         self.fg,
         self.bg,
-    );
+    ) catch {};
 }
 
 fn goLeft(ptr: *anyopaque) !bool {

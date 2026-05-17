@@ -146,7 +146,7 @@ fn draw(self: *GameOfLife) void {
         const row_offset = y * self.width;
         for (0..self.width) |x| {
             const cell = if (self.current_grid[row_offset + x]) alive_cell else self.dead_cell;
-            cell.put(x, y);
+            cell.put(x, y) catch {};
         }
     }
 }

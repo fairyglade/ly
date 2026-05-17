@@ -118,7 +118,7 @@ fn draw(self: *UserList) void {
 }
 
 fn handle(self: *UserList, maybe_key: ?keyboard.Key) !void {
-    self.label.handle(maybe_key);
+    try self.label.handle(maybe_key);
 }
 
 fn usernameChanged(user: User, maybe_session: ?*Session) void {
@@ -143,5 +143,5 @@ fn drawItem(label: *UserLabel, user: User, x: usize, y: usize, width: usize) voi
         width,
         label.fg,
         label.bg,
-    );
+    ) catch {};
 }

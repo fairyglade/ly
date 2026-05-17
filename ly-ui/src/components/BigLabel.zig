@@ -207,7 +207,7 @@ fn alphaBlit(x: usize, y: usize, tb_width: usize, tb_height: usize, cells: [CHAR
     for (0..CHAR_HEIGHT) |yy| {
         for (0..CHAR_WIDTH) |xx| {
             const cell = cells[yy * CHAR_WIDTH + xx];
-            cell.put(x + xx, y + yy);
+            cell.put(x + xx, y + yy) catch {};
         }
     }
 }

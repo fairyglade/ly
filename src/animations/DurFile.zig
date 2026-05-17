@@ -535,7 +535,7 @@ fn draw(self: *DurFile) void {
 
             const cell = Cell{ .ch = @intCast(codepoint), .fg = fg_color, .bg = bg_color };
 
-            self.terminal_buffer.setCellBoundsChecked(cell_x, cell_y, cell);
+            self.terminal_buffer.setCellBoundsChecked(cell_x, cell_y, cell) catch {};
         }
     }
 

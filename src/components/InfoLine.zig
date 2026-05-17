@@ -84,7 +84,7 @@ pub fn clearRendered(self: InfoLine, allocator: Allocator) !void {
 
     @memset(spaces, ' ');
 
-    TerminalBuffer.drawText(
+    try TerminalBuffer.drawText(
         spaces,
         self.label.component_pos.x + 2,
         self.label.component_pos.y,
@@ -98,7 +98,7 @@ fn draw(self: *InfoLine) void {
 }
 
 fn handle(self: *InfoLine, maybe_key: ?keyboard.Key) !void {
-    self.label.handle(maybe_key);
+    try self.label.handle(maybe_key);
 }
 
 fn drawItem(label: *MessageLabel, message: Message, x: usize, y: usize, width: usize) void {
@@ -114,5 +114,5 @@ fn drawItem(label: *MessageLabel, message: Message, x: usize, y: usize, width: u
         width,
         message.fg,
         message.bg,
-    );
+    ) catch {};
 }

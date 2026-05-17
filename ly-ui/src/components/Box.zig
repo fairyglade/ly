@@ -129,29 +129,29 @@ fn draw(self: *Box) void {
             self.bg,
         );
 
-        left_up.put(self.left_pos.x - 1, self.left_pos.y - 1);
-        right_up.put(self.right_pos.x, self.left_pos.y - 1);
-        left_down.put(self.left_pos.x - 1, self.right_pos.y);
-        right_down.put(self.right_pos.x, self.right_pos.y);
+        left_up.put(self.left_pos.x - 1, self.left_pos.y - 1) catch {};
+        right_up.put(self.right_pos.x, self.left_pos.y - 1) catch {};
+        left_down.put(self.left_pos.x - 1, self.right_pos.y) catch {};
+        right_down.put(self.right_pos.x, self.right_pos.y) catch {};
 
         for (0..self.width) |i| {
-            top.put(self.left_pos.x + i, self.left_pos.y - 1);
-            bottom.put(self.left_pos.x + i, self.right_pos.y);
+            top.put(self.left_pos.x + i, self.left_pos.y - 1) catch {};
+            bottom.put(self.left_pos.x + i, self.right_pos.y) catch {};
         }
 
         top.ch = self.buffer.box_chars.left;
         bottom.ch = self.buffer.box_chars.right;
 
         for (0..self.height) |i| {
-            top.put(self.left_pos.x - 1, self.left_pos.y + i);
-            bottom.put(self.right_pos.x, self.left_pos.y + i);
+            top.put(self.left_pos.x - 1, self.left_pos.y + i) catch {};
+            bottom.put(self.right_pos.x, self.left_pos.y + i) catch {};
         }
     }
 
     if (self.blank_box) {
         for (0..self.height) |y| {
             for (0..self.width) |x| {
-                self.buffer.blank_cell.put(self.left_pos.x + x, self.left_pos.y + y);
+                self.buffer.blank_cell.put(self.left_pos.x + x, self.left_pos.y + y) catch {};
             }
         }
     }
@@ -164,7 +164,7 @@ fn draw(self: *Box) void {
             self.width,
             self.title_fg,
             self.bg,
-        );
+        ) catch {};
     }
 
     if (self.bottom_title) |title| {
@@ -175,7 +175,7 @@ fn draw(self: *Box) void {
             self.width,
             self.title_fg,
             self.bg,
-        );
+        ) catch {};
     }
 }
 

@@ -129,13 +129,13 @@ fn draw(self: *Doom) void {
             // Send known fire levels to terminal buffer
             const from_cell = self.fire[level_buf_from];
             const to_cell = self.fire[level_buf_to];
-            from_cell.put(x, y);
-            to_cell.put(to_x, to_y);
+            from_cell.put(x, y) catch {};
+            to_cell.put(to_x, to_y) catch {};
         }
 
         // Draw bottom line (fire source)
         const src_cell = self.fire[STEPS];
-        src_cell.put(x, self.terminal_buffer.height - 1);
+        src_cell.put(x, self.terminal_buffer.height - 1) catch {};
     }
 }
 

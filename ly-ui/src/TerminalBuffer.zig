@@ -103,24 +103,39 @@ pub fn init(
     random: Random,
 ) !TerminalBuffer {
     // Initialize termbox
-    _ = termbox.tb_init();
+    if (termbox.tb_init() != 0) return error.TermboxInitFailed;
 
     if (options.full_color) {
-        _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
-        try log_file.info(io, "tui", "termbox2 set to 24-bit color output mode", .{});
+        if (termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR) != 0) {
+            return error.TermboxSetOutputModeFailed;
+        }
+        try log_file.info(
+            io,
+            "tui",
+            "termbox2 set to 24-bit color output mode",
+            .{},
+        );
     } else {
-        try log_file.info(io, "tui", "termbox2 set to eight-color output mode", .{});
+        try log_file.info(
+            io,
+            "tui",
+            "termbox2 set to eight-color output mode",
+            .{},
+        );
     }
 
-    _ = termbox.tb_clear();
-
     // Let's take some precautions here and clear the back buffer as well
-    try clearBackBuffer();
+    try clearScreen(true);
 
-    const width: usize = @intCast(termbox.tb_width());
-    const height: usize = @intCast(termbox.tb_height());
+    const width = getWidth();
+    const height = getHeight();
 
-    try log_file.info(io, "tui", "screen resolution is {d}x{d}", .{ width, height });
+    try log_file.info(
+        io,
+        "tui",
+        "screen resolution is {d}x{d}",
+        .{ width, height },
+    );
 
     return .{
         .log_file = log_file,
@@ -163,7 +178,7 @@ pub fn init(
 
 pub fn deinit(self: *TerminalBuffer) void {
     self.keybinds.deinit();
-    TerminalBuffer.shutdown();
+    TerminalBuffer.shutdown() catch {};
 }
 
 pub fn runEventLoop(
@@ -238,7 +253,7 @@ pub fn runEventLoop(
                 }
             }
 
-            TerminalBuffer.presentBuffer();
+            try TerminalBuffer.presentBuffer();
         }
 
         if (inactivity_event_fn) |inactivity_fn| {
@@ -338,31 +353,35 @@ pub fn getHeight() usize {
     return @intCast(termbox.tb_height());
 }
 
-pub fn setCursor(x: usize, y: usize) void {
-    _ = termbox.tb_set_cursor(@intCast(x), @intCast(y));
+pub fn setCursor(x: usize, y: usize) !void {
+    if (termbox.tb_set_cursor(@intCast(x), @intCast(y)) != 0) {
+        return error.TermboxSetCursorFailed;
+    }
 }
 
 pub fn clearScreen(clear_back_buffer: bool) !void {
-    _ = termbox.tb_clear();
+    if (termbox.tb_clear() != 0) return error.TermboxClearFailed;
     if (clear_back_buffer) try clearBackBuffer();
 }
 
-pub fn shutdown() void {
-    _ = termbox.tb_shutdown();
+pub fn shutdown() !void {
+    if (termbox.tb_shutdown() != 0) return error.TermboxShutdownFailed;
 }
 
-pub fn presentBuffer() void {
-    _ = termbox.tb_present();
+pub fn presentBuffer() !void {
+    if (termbox.tb_present() != 0) return error.TermboxPresentFailed;
 }
 
 pub fn getCell(x: usize, y: usize) ?Cell {
     var maybe_cell: ?*termbox.tb_cell = undefined;
-    _ = termbox.tb_get_cell(
+    if (termbox.tb_get_cell(
         @intCast(x),
         @intCast(y),
         1,
         &maybe_cell,
-    );
+    ) != 0) {
+        return null;
+    }
 
     if (maybe_cell) |cell| {
         return Cell.init(cell.ch, cell.fg, cell.bg);
@@ -371,29 +390,31 @@ pub fn getCell(x: usize, y: usize) ?Cell {
     return null;
 }
 
-pub fn setCell(x: usize, y: usize, cell: Cell) void {
-    _ = termbox.tb_set_cell(
+pub fn setCell(x: usize, y: usize, cell: Cell) !void {
+    if (termbox.tb_set_cell(
         @intCast(x),
         @intCast(y),
         cell.ch,
         cell.fg,
         cell.bg,
-    );
+    ) != 0) {
+        return error.TermboxSetCellFailed;
+    }
 }
 
-pub fn setCellBoundsChecked(self: *TerminalBuffer, x: isize, y: isize, cell: Cell) void {
+pub fn setCellBoundsChecked(self: *TerminalBuffer, x: isize, y: isize, cell: Cell) !void {
     if (0 <= x and x < self.width and 0 <= y and y < self.height) {
-        cell.put(@intCast(x), @intCast(y));
+        try cell.put(@intCast(x), @intCast(y));
     }
 }
 
 pub fn reclaim(self: TerminalBuffer) !void {
     if (self.termios) |termios| {
         // Take back control of the TTY
-        _ = termbox.tb_init();
+        if (termbox.tb_init() != 0) return error.TermboxReinitFailed;
 
-        if (self.full_color) {
-            _ = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
+        if (self.full_color and termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR) != 0) {
+            return error.TermboxSetOutputModeFailed;
         }
 
         try std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, termios);
@@ -464,14 +485,14 @@ pub fn drawText(
     y: usize,
     fg: u32,
     bg: u32,
-) void {
-    const yc: c_int = @intCast(y);
+) !void {
     const utf8view = std.unicode.Utf8View.init(text) catch return;
     var utf8 = utf8view.iterator();
 
-    var i: c_int = @intCast(x);
-    while (utf8.nextCodepoint()) |codepoint| : (i += termbox.tb_wcwidth(codepoint)) {
-        _ = termbox.tb_set_cell(i, yc, codepoint, fg, bg);
+    var i = x;
+    while (utf8.nextCodepoint()) |codepoint| : (i += @intCast(termbox.tb_wcwidth(codepoint))) {
+        const cell = Cell.init(codepoint, fg, bg);
+        try cell.put(i, y);
     }
 }
 
@@ -482,15 +503,16 @@ pub fn drawConfinedText(
     max_length: usize,
     fg: u32,
     bg: u32,
-) void {
-    const yc: c_int = @intCast(y);
+) !void {
     const utf8view = std.unicode.Utf8View.init(text) catch return;
     var utf8 = utf8view.iterator();
 
-    var i: c_int = @intCast(x);
-    while (utf8.nextCodepoint()) |codepoint| : (i += termbox.tb_wcwidth(codepoint)) {
-        if (i - @as(c_int, @intCast(x)) >= max_length) break;
-        _ = termbox.tb_set_cell(i, yc, codepoint, fg, bg);
+    var i = x;
+    while (utf8.nextCodepoint()) |codepoint| : (i += @intCast(termbox.tb_wcwidth(codepoint))) {
+        if (i - x >= max_length) break;
+
+        const cell = Cell.init(codepoint, fg, bg);
+        try cell.put(i, y);
     }
 }
 
@@ -501,9 +523,9 @@ pub fn drawCharMultiple(
     length: usize,
     fg: u32,
     bg: u32,
-) void {
+) !void {
     const cell = Cell.init(char, fg, bg);
-    for (0..length) |xx| cell.put(x + xx, y);
+    for (0..length) |xx| try cell.put(x + xx, y);
 }
 
 // Every codepoint is assumed to have a width of 1.
@@ -521,6 +543,8 @@ pub fn strWidth(str: []const u8) usize {
 }
 
 fn clearBackBuffer() !void {
+    if (termbox.global.initialized == 0) return;
+
     // Clear the TTY because termbox2 doesn't seem to do it properly
     const capability = termbox.global.caps[termbox.TB_CAP_CLEAR_SCREEN];
     const capability_slice = std.mem.span(capability);

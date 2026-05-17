@@ -87,7 +87,7 @@ fn draw(self: *Session) void {
 }
 
 fn handle(self: *Session, maybe_key: ?keyboard.Key) !void {
-    self.label.handle(maybe_key);
+    try self.label.handle(maybe_key);
 }
 
 fn addedSession(env: Env, user_list: *UserList) void {
@@ -119,5 +119,5 @@ fn drawItem(label: *EnvironmentLabel, env: Env, x: usize, y: usize, width: usize
         width,
         label.fg,
         label.bg,
-    );
+    ) catch {};
 }

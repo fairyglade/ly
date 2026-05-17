@@ -105,8 +105,8 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
             self.current = self.list.items.len - 1;
         }
 
-        pub fn handle(self: *Self, _: ?keyboard.Key) void {
-            TerminalBuffer.setCursor(
+        pub fn handle(self: *Self, _: ?keyboard.Key) !void {
+            try TerminalBuffer.setCursor(
                 self.component_pos.x + self.cursor + 2,
                 self.component_pos.y,
             );
@@ -119,11 +119,11 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
             var left_arrow = Cell.init('<', self.fg, self.bg);
             var right_arrow = Cell.init('>', self.fg, self.bg);
 
-            left_arrow.put(self.component_pos.x, self.component_pos.y);
+            left_arrow.put(self.component_pos.x, self.component_pos.y) catch {};
             right_arrow.put(
                 self.component_pos.x + self.width - 1,
                 self.component_pos.y,
-            );
+            ) catch {};
 
             const current_item = self.list.items[self.current];
             const x = self.component_pos.x + 2;

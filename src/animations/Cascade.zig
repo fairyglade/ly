@@ -71,14 +71,14 @@ fn draw(self: *Cascade) void {
 
                 if ((self.buffer.random.int(u16) % 10) > 7) continue;
 
-                cell.?.put(x, y);
+                cell.?.put(x, y) catch {};
 
                 var space = Cell.init(
                     ' ',
                     cell_under.?.fg,
                     cell_under.?.bg,
                 );
-                space.put(x, y - 1);
+                space.put(x, y - 1) catch {};
             }
         }
 
@@ -87,6 +87,6 @@ fn draw(self: *Cascade) void {
             self.current_auth_fails.* = 0;
         }
 
-        TerminalBuffer.presentBuffer();
+        TerminalBuffer.presentBuffer() catch {};
     }
 }

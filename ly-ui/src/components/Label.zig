@@ -117,7 +117,7 @@ fn draw(self: *Label) void {
             width,
             self.fg,
             self.bg,
-        );
+        ) catch {};
         return;
     }
 
@@ -127,7 +127,7 @@ fn draw(self: *Label) void {
         self.component_pos.y,
         self.fg,
         self.bg,
-    );
+    ) catch {};
 }
 
 fn update(self: *Label, ctx: *anyopaque) !void {

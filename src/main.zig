@@ -56,12 +56,12 @@ fn signalHandler(sig: std.posix.SIG) callconv(.c) void {
         _ = std.c.waitpid(session_pid, &status, 0);
     }
 
-    TerminalBuffer.shutdown();
+    TerminalBuffer.shutdown() catch {};
     std.c.exit(@intCast(@intFromEnum(sig)));
 }
 
 fn ttyControlTransferSignalHandler(_: std.posix.SIG) callconv(.c) void {
-    TerminalBuffer.shutdown();
+    TerminalBuffer.shutdown() catch {};
 }
 
 const CustomBindLabel = struct {
@@ -1484,7 +1484,7 @@ fn authenticate(ptr: *anyopaque) !bool {
             );
         };
         state.info_line.label.draw();
-        TerminalBuffer.presentBuffer();
+        try TerminalBuffer.presentBuffer();
         return false;
     }
 
@@ -1507,7 +1507,7 @@ fn authenticate(ptr: *anyopaque) !bool {
         );
     };
     state.info_line.label.draw();
-    TerminalBuffer.presentBuffer();
+    try TerminalBuffer.presentBuffer();
 
     if (state.config.save) save_last_settings: {
         // It isn't worth cluttering the code with precise error
@@ -1660,8 +1660,8 @@ fn authenticate(ptr: *anyopaque) !bool {
     }
 
     // Restore the cursor
-    TerminalBuffer.setCursor(0, 0);
-    TerminalBuffer.presentBuffer();
+    try TerminalBuffer.setCursor(0, 0);
+    try TerminalBuffer.presentBuffer();
     return false;
 }
 

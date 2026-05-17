@@ -200,9 +200,9 @@ fn draw(self: *Matrix) void {
                 .bg = self.terminal_buffer.bg,
             };
 
-            cell.put(x, y - 1);
+            cell.put(x, y - 1) catch {};
             // Fill background in between columns
-            self.default_cell.put(x + 1, y - 1);
+            self.default_cell.put(x + 1, y - 1) catch {};
         }
     }
 }

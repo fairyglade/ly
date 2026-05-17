@@ -114,7 +114,7 @@ fn draw(self: *ColorMix) void {
             }
 
             const cell = self.palette[@as(usize, @trunc(math.floor(length(uv) * 5.0))) % palette_len];
-            cell.put(x, y);
+            cell.put(x, y) catch {};
         }
     }
 }
