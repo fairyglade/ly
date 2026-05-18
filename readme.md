@@ -95,6 +95,9 @@ $ zig build run
 > [!IMPORTANT]
 > While you can run Ly in a terminal emulator as root, it is **not** recommended. If you want to test Ly, please enable its service (as described below) and reboot your machine.
 
+> [!NOTE]
+> You can, however, test your configuration file changes like that. Note that you must do Ctrl+C in order to exit Ly.
+
 The next sections will explain how to use Ly with a variety of init systems. Detailed explanation is only given for systemd, but should be applicable for all.
 
 > [!NOTE]
