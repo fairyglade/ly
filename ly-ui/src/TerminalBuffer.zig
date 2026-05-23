@@ -411,7 +411,8 @@ pub fn setCellBoundsChecked(self: *TerminalBuffer, x: isize, y: isize, cell: Cel
 pub fn reclaim(self: TerminalBuffer) !void {
     if (self.termios) |termios| {
         // Take back control of the TTY
-        if (termbox.tb_init() != 0) return error.TermboxReinitFailed;
+        const err = termbox.tb_init();
+        if (err != 0 and err != termbox.TB_ERR_INIT_ALREADY) return error.TermboxReinitFailed;
 
         if (self.full_color and termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR) != 0) {
             return error.TermboxSetOutputModeFailed;
