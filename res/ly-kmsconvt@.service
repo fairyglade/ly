@@ -5,7 +5,7 @@ After=kmsconvt@%i.service
 Conflicts=kmsconvt@%i.service
 
 [Service]
-ExecStart=$PREFIX_DIRECTORY/bin/kmscon --font-engine unifont --vt=%I --login -- $PREFIX_DIRECTORY/bin/$EXECUTABLE_NAME --use-kmscon-vt
+ExecStart=$PREFIX_DIRECTORY/bin/kmscon --term=linux --font-engine unifont --vt=%I --login -- $PREFIX_DIRECTORY/bin/$EXECUTABLE_NAME --use-kmscon-vt
 StandardInput=tty
 UtmpIdentifier=%I
 TTYPath=/dev/%I
