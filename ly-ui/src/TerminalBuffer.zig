@@ -103,10 +103,26 @@ pub fn init(
     random: Random,
 ) !TerminalBuffer {
     // Initialize termbox
-    if (termbox.tb_init() != 0) return error.TermboxInitFailed;
+    var err = termbox.tb_init();
+    if (err != 0) {
+        try log_file.err(
+            io,
+            "tui",
+            "failed to initialise termbox2: {s}, term: {s}",
+            .{ termbox.tb_strerror(err), std.c.getenv("TERM").? },
+        );
+        return error.TermboxInitFailed;
+    }
 
     if (options.full_color) {
-        if (termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR) != 0) {
+        err = termbox.tb_set_output_mode(termbox.TB_OUTPUT_TRUECOLOR);
+        if (err != 0) {
+            try log_file.err(
+                io,
+                "tui",
+                "failed to set termbox2 output mode to 24-bit color: {s}",
+                .{termbox.tb_strerror(err)},
+            );
             return error.TermboxSetOutputModeFailed;
         }
         try log_file.info(
