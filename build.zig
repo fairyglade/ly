@@ -203,14 +203,17 @@ fn install_ly(allocator: std.mem.Allocator, io: std.Io, patch_map: PatchMap, ins
 
         const languages = [_][]const u8{
             "ar.ini",
+            "bg.ini",
             "cat.ini",
             "cs.ini",
             "de.ini",
             "en.ini",
+            "eo.ini",
             "es.ini",
             "fr.ini",
             "it.ini",
             "ja_JP.ini",
+            "ku.ini",
             "lv.ini",
             "pl.ini",
             "pt.ini",
@@ -218,10 +221,12 @@ fn install_ly(allocator: std.mem.Allocator, io: std.Io, patch_map: PatchMap, ins
             "ro.ini",
             "ru.ini",
             "sr.ini",
+            "sr_Cyrl.ini",
             "sv.ini",
             "tr.ini",
             "uk.ini",
             "zh_CN.ini",
+            "zh_TW.ini",
         };
 
         inline for (languages) |language| {
