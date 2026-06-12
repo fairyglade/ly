@@ -11,6 +11,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const fallback_uid_min = b.option(std.posix.uid_t, "fallback_uid_min", "Set the fallback minimum UID (default is 1000). This value gets embedded into the binary").?;
+    const fallback_uid_max = b.option(std.posix.uid_t, "fallback_uid_max", "Set the fallback maximum UID (default is 60000). This value gets embedded into the binary").?;
+    const build_options = b.addOptions();
+    build_options.addOption(std.posix.uid_t, "fallback_uid_min", fallback_uid_min);
+    build_options.addOption(std.posix.uid_t, "fallback_uid_max", fallback_uid_max);
+    mod.addOptions("build_options", build_options);
+
     const zigini = b.dependency("zigini", .{ .target = target, .optimize = optimize });
     mod.addImport("zigini", zigini.module("zigini"));
 

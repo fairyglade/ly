@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 const UidRange = @import("UidRange.zig");
 const pwd = @import("pwd");
 const stdlib = @import("stdlib");
@@ -145,21 +146,32 @@ fn PlatformStruct() type {
 
                 var iterator = std.mem.splitScalar(u8, login_defs_buffer, '\n');
                 var uid_range = UidRange{};
-                var nameFound = false;
+                var uid_min_Found = false;
+                var uid_max_Found = false;
 
                 while (iterator.next()) |line| {
                     const trimmed_line = std.mem.trim(u8, line, " \n\r\t");
 
                     if (std.mem.startsWith(u8, trimmed_line, "UID_MIN")) {
                         uid_range.uid_min = try parseValue(std.posix.uid_t, "UID_MIN", trimmed_line);
-                        nameFound = true;
+                        uid_min_Found = true;
                     } else if (std.mem.startsWith(u8, trimmed_line, "UID_MAX")) {
                         uid_range.uid_max = try parseValue(std.posix.uid_t, "UID_MAX", trimmed_line);
-                        nameFound = true;
+                        uid_max_Found = true;
                     }
                 }
 
-                if (!nameFound) return error.UidNameNotFound;
+                if (!(uid_min_Found or uid_max_Found)) {
+                    return error.UidNameNotFound;
+                }
+
+                if (!uid_min_Found) {
+                    uid_range.uid_min = build_options.fallback_uid_min;
+                }
+
+                if (!uid_max_Found) {
+                    uid_range.uid_max = build_options.fallback_uid_max;
+                }
 
                 return uid_range;
             }

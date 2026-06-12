@@ -11,10 +11,15 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const fallback_uid_min = b.option(std.posix.uid_t, "fallback_uid_min", "Set the fallback minimum UID (default is 1000). This value gets embedded into the binary");
+    const fallback_uid_max = b.option(std.posix.uid_t, "fallback_uid_max", "Set the fallback maximum UID (default is 60000). This value gets embedded into the binary");
+
     const ly_core = b.dependency("ly_core", .{
         .target = target,
         .optimize = optimize,
         .enable_x11_support = enable_x11_support,
+        .fallback_uid_min = fallback_uid_min,
+        .fallback_uid_max = fallback_uid_max
     });
     mod.addImport("ly-core", ly_core.module("ly-core"));
 

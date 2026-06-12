@@ -75,6 +75,8 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
         .enable_x11_support = enable_x11_support,
+        .fallback_uid_min = fallback_uid_min,
+        .fallback_uid_max = fallback_uid_max
     });
     exe.root_module.addImport("ly-ui", ly_ui.module("ly-ui"));
 
