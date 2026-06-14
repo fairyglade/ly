@@ -217,7 +217,7 @@ ttyv1 "/usr/libexec/getty Ly" xterm on secure
 
 ### Updating
 
-You can also install Ly without overrding the current configuration file. This is called **updating**. To update, simply run:
+You can also install Ly without overriding the current configuration file. This is called **updating**. To update, simply run:
 
 ```
 # zig build installnoconf
@@ -241,7 +241,7 @@ Use the Up/Down arrow keys to change the current field, and the Left/Right arrow
 
 ## A note on .xinitrc
 
-If your `.xinitrc` file doesn't work ,make sure it is executable and includes a shebang. This file is supposed to be a shell script! Quoting from `xinit`'s man page:
+If your `.xinitrc` file doesn't work, make sure it is executable and includes a shebang. This file is supposed to be a shell script! Quoting from `xinit`'s man page:
 
 > If no specific client program is given on the command line, xinit will look for a file in the user's home directory called .xinitrc to run as a shell script to start up client programs.
 
@@ -253,7 +253,7 @@ A typical shebang for a shell script looks like this:
 
 ## Tips
 
-- The numlock and capslock state is printed in the top-right corner.
+- The numlock and capslock states are printed in the top-right corner.
 
 - Use the F1 and F2 keys to respectively shutdown and reboot.
 
