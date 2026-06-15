@@ -1,6 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const StringList = std.ArrayListUnmanaged([]const u8);
+const StringList = std.ArrayList([]const u8);
 const temporary_allocator = std.heap.page_allocator;
 const builtin = @import("builtin");
 const build_options = @import("build_options");

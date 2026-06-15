@@ -8,7 +8,7 @@ const Position = @import("../Position.zig");
 pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) type {
     return struct {
         const Allocator = std.mem.Allocator;
-        const ItemList = std.ArrayListUnmanaged(ItemType);
+        const ItemList = std.ArrayList(ItemType);
         const DrawItemFn = *const fn (*Self, ItemType, usize, usize, usize) void;
         const ChangeItemFn = *const fn (ItemType, ?ChangeItemType) void;
 

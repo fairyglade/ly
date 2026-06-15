@@ -6,7 +6,7 @@ const TerminalBuffer = @import("../TerminalBuffer.zig");
 const Position = @import("../Position.zig");
 const Widget = @import("../Widget.zig");
 
-const DynamicString = std.ArrayListUnmanaged(u8);
+const DynamicString = std.ArrayList(u8);
 
 const Text = @This();
 

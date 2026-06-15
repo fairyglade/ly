@@ -10,7 +10,7 @@ const CyclableLabel = ly_ui.CyclableLabel;
 const Session = @import("Session.zig");
 const SavedUsers = @import("../config/SavedUsers.zig");
 
-const StringList = std.ArrayListUnmanaged([]const u8);
+const StringList = std.ArrayList([]const u8);
 pub const User = struct {
     name: []const u8,
     session_index: *usize,
