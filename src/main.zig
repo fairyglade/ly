@@ -235,11 +235,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     // Load configuration file
-    var save_path_alloc = false;
-
-    state.save_path = build_options.config_directory ++ "/ly/save.txt";
-    state.old_save_path = build_options.config_directory ++ "/ly/save.ini";
-    defer if (save_path_alloc) {
+    defer if (state.config.save) {
         state.allocator.free(state.save_path);
         state.allocator.free(state.old_save_path);
     };
@@ -284,7 +280,6 @@ pub fn main(init: std.process.Init) !void {
     if (state.config.save) {
         state.save_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "save.txt" });
         state.old_save_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "save.ini" });
-        save_path_alloc = true;
     }
 
     if (config_parser.maybe_load_error == null) {
