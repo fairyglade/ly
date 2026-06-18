@@ -14,7 +14,7 @@ Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.
 ## Dependencies
 
 - Compile-time:
-  - zig 0.16.x (you must use a __release version__ of zig; check that `zig version` does not have a `-dev*` suffix)
+  - zig 0.16.x (you must use a **release version** of zig; check that `zig version` does not have a `-dev*` suffix)
 
   - libc
 
@@ -151,7 +151,7 @@ On non-systemd systems, you can change the TTY Ly will run on by editing the cor
 ```
 
 > [!NOTE]
-> On Gentoo specifically, you also **must** comment out the appropriate line for the TTY in /etc/inittab.
+> On Gentoo, Alpine and potentially others, you also **must** comment out the appropriate line for the TTY in /etc/inittab.
 
 ### runit
 
