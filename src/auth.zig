@@ -179,7 +179,7 @@ fn startSession(
     // Reset the XDG environment variables
     try log_file.info(io, "auth/env", "resetting xdg environment variables", .{});
     try setXdgEnv(allocator, tty_str, current_environment);
-    try setXdgRuntimeDir(allocator);
+    try setXdgRuntimeDir(allocator, io);
 
     // Set the PAM variables
     const pam_env_vars: ?[*:null]?[*:0]u8 = interop.pam.pam_getenvlist(handle);
@@ -247,18 +247,20 @@ fn setXdgEnv(allocator: std.mem.Allocator, tty_str: []u8, environment: Environme
     try interop.setEnvironmentVariable(allocator, "XDG_VTNR", tty_str, false);
 }
 
-fn setXdgRuntimeDir(allocator: std.mem.Allocator) !void {
-    // The "/run/user/%d" directory is not available on FreeBSD. It is much
-    // better to stick to the defaults and let applications using
-    // XDG_RUNTIME_DIR to fall back to directories inside user's home
-    // directory.
-    if (builtin.os.tag != .freebsd) {
-        const uid = std.posix.system.getuid();
-        var uid_buffer: [32]u8 = undefined; // No UID can be larger than this
-        const uid_str = try std.fmt.bufPrint(&uid_buffer, "/run/user/{d}", .{uid});
+fn setXdgRuntimeDir(allocator: std.mem.Allocator, io: std.Io) !void {
+    // The "/run/user/%d" directory is not available on some operating systems,
+    // like FreeBSD and Alpine
+    const uid = std.posix.system.getuid();
+    var uid_buffer: [32]u8 = undefined; // No UID can be larger than this
+    const uid_str = try std.fmt.bufPrint(&uid_buffer, "/run/user/{d}", .{uid});
 
-        try interop.setEnvironmentVariable(allocator, "XDG_RUNTIME_DIR", uid_str, false);
-    }
+    var xdg_dir = std.Io.Dir.openDirAbsolute(io, uid_str, .{}) catch |err| {
+        if (err == error.FileNotFound) return;
+        return err;
+    };
+    xdg_dir.close(io);
+
+    try interop.setEnvironmentVariable(allocator, "XDG_RUNTIME_DIR", uid_str, false);
 }
 
 fn loginConv(
@@ -390,7 +392,7 @@ fn createXauthFile(log_file: *LogFile, io: std.Io, pwd: []const u8, buffer: []u8
 
     const xauthority: []u8 = try std.fmt.bufPrint(buffer, "{s}/{s}", .{ trimmed_xauth_dir, xauth_file });
 
-    std.Io.Dir.cwd().createDirPath(io, trimmed_xauth_dir) catch {};
+    try std.Io.Dir.cwd().createDirPath(io, trimmed_xauth_dir);
 
     try log_file.info(io, "auth/x11", "creating xauth file: {s}", .{xauthority});
 
