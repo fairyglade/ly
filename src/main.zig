@@ -29,6 +29,7 @@ const Doom = @import("animations/Doom.zig");
 const DurFile = @import("animations/DurFile.zig");
 const GameOfLife = @import("animations/GameOfLife.zig");
 const Matrix = @import("animations/Matrix.zig");
+const Lua = @import("animations/Lua.zig");
 const auth = @import("auth.zig");
 const InfoLine = @import("components/InfoLine.zig");
 const Session = @import("components/Session.zig");
@@ -1092,6 +1093,23 @@ pub fn main(init: std.process.Init) !void {
                 state.config.animation_frame_delay,
             );
             animation = dur.widget();
+        },
+        .lua => {
+            var lua = try Lua.init(
+                state.io,
+                state.allocator,
+                &state.log_file,
+                &state.buffer,
+                state.config.lua_animation_file,
+                state.config.edge_margin,
+                state.config.animation_frame_delay,
+                &state.info_line,
+                state.config.error_fg,
+                state.config.error_bg,
+                state.lang,
+                state.config.full_color,
+            );
+            animation = lua.widget();
         },
     }
     defer if (animation) |a| a.deinit();

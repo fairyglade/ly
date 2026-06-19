@@ -7,6 +7,7 @@ pub const Animation = enum {
     colormix,
     gameoflife,
     dur_file,
+    lua,
 };
 
 pub const DisplayServer = enum {

@@ -71,12 +71,19 @@ pub fn build(b: *std.Build) !void {
         }),
     });
 
+    const zlua = b.dependency("zlua", .{
+        .target = target,
+        .optimize = optimize,
+        .lang = .luajit,
+    });
+    exe.root_module.addImport("zlua", zlua.module("zlua"));
+
     const ly_ui = b.dependency("ly_ui", .{
         .target = target,
         .optimize = optimize,
         .enable_x11_support = enable_x11_support,
         .fallback_uid_min = fallback_uid_min,
-        .fallback_uid_max = fallback_uid_max
+        .fallback_uid_max = fallback_uid_max,
     });
     exe.root_module.addImport("ly-ui", ly_ui.module("ly-ui"));
 
@@ -189,6 +196,8 @@ fn install_ly(allocator: std.mem.Allocator, io: std.Io, patch_map: PatchMap, ins
         try installText(io, patched_setup, config_dir, ly_config_directory, "setup.sh", .{ .permissions = .fromMode(0o755) });
 
         try installFile(io, "res/example.dur", config_dir, ly_config_directory, "example.dur", .{ .permissions = .fromMode(0o755) });
+
+        try installFile(io, "res/example.lua", config_dir, ly_config_directory, "example.lua", .{ .permissions = .fromMode(0o755) });
     }
 
     {
