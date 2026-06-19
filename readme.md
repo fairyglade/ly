@@ -56,6 +56,10 @@ Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/ly-display-manager.svg?exclude_unsupported=1)](https://repology.org/project/ly-display-manager/versions)
 
+## Custom animations & user scripts
+
+If you want to pimp your Ly installation even further than what the traditional configuration file allows you to, a [community repository](https://codeberg.org/fairyglade/ly-community) exists containing custom animations & scripts, so go check it out!
+
 ## Support
 
 Every environment that works on other login managers also should work on Ly.
