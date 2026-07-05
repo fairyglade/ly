@@ -2340,19 +2340,34 @@ fn adjustBrightness(io: std.Io, cmd: []const u8) !void {
 }
 
 fn getBatteryPercentage(io: std.Io, battery_id: []const u8) !u8 {
-    const path = try std.fmt.allocPrint(temporary_allocator, "/sys/class/power_supply/{s}/capacity", .{battery_id});
-    defer temporary_allocator.free(path);
+    if (builtin.os.tag == .freebsd) {
+        // battery_id is unused on FreeBSD; sysctl exposes a single aggregate value.
+        // For multi-battery systems the MIB would be hw.acpi.battery.N.life,
+        // but hw.acpi.battery.life is the standard single-battery interface.
+        var capacity: c_int = -1;
+        var size: usize = @sizeOf(c_int);
 
-    const battery_file = try std.Io.Dir.cwd().openFile(io, path, .{});
-    defer battery_file.close(io);
+        const ret = interop.sysctl.sysctlbyname("hw.acpi.battery.life", &capacity, &size, null, 0);
 
-    var buffer: [8]u8 = undefined;
-    const bytes_read = try battery_file.readStreaming(io, &.{&buffer});
-    const capacity_str = buffer[0..bytes_read];
+        if (ret != 0) return error.SysctlFailed;
+        if (capacity < 0 or capacity > 100) return error.InvalidBatteryCapacity;
 
-    const trimmed = std.mem.trimEnd(u8, capacity_str, "\n\r");
+        return @intCast(capacity);
+    } else {
+        const path = try std.fmt.allocPrint(temporary_allocator, "/sys/class/power_supply/{s}/capacity", .{battery_id});
+        defer temporary_allocator.free(path);
 
-    return try std.fmt.parseInt(u8, trimmed, 10);
+        const battery_file = try std.Io.Dir.cwd().openFile(io, path, .{});
+        defer battery_file.close(io);
+
+        var buffer: [8]u8 = undefined;
+        const bytes_read = try battery_file.readStreaming(io, &.{&buffer});
+        const capacity_str = buffer[0..bytes_read];
+
+        const trimmed = std.mem.trimEnd(u8, capacity_str, "\n\r");
+
+        return try std.fmt.parseInt(u8, trimmed, 10);
+    }
 }
 
 fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {

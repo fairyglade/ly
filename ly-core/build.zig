@@ -51,6 +51,7 @@ pub fn build(b: *std.Build) void {
     } else if (target.result.os.tag == .freebsd) {
         addCImport(b, mod, translate_c, target, optimize, "kbio", "#include <sys/kbio.h>");
         addCImport(b, mod, translate_c, target, optimize, "consio", "#include <sys/consio.h>");
+        addCImport(b, mod, translate_c, target, optimize, "sysctl", "#include <sys/sysctl.h>");
     }
 
     const mod_tests = b.addTest(.{

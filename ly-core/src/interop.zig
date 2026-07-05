@@ -14,6 +14,9 @@ pub const utmp = @import("utmp");
 // Exists for X11 support only
 pub const xcb = @import("xcb");
 
+// FreeBSD only
+pub const sysctl = @import("sysctl");
+
 pub const TimeOfDay = struct {
     seconds: i64,
     microseconds: i64,
