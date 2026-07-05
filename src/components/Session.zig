@@ -14,19 +14,19 @@ const Env = struct {
     environment: Environment,
     index: usize,
 };
-const EnvironmentLabel = CyclableLabel(Env, *UserList);
+const EnvironmentLabel = CyclableLabel(Env, *?UserList);
 
 const Session = @This();
 
 instance: ?Widget = null,
 label: *EnvironmentLabel,
-user_list: *UserList,
+user_list: *?UserList,
 
 pub fn init(
     allocator: Allocator,
     io: std.Io,
     buffer: *TerminalBuffer,
-    user_list: *UserList,
+    user_list: *?UserList,
     width: usize,
     text_in_center: bool,
     fg: u32,
@@ -79,7 +79,7 @@ pub fn addEnvironment(self: *Session, environment: Environment) !void {
     const env = Env{ .environment = environment, .index = self.label.list.items.len };
 
     try self.label.addItem(env);
-    addedSession(env, self.user_list);
+    if (self.user_list.*) |w| addedSession(env, w);
 }
 
 fn draw(self: *Session) void {
@@ -90,16 +90,16 @@ fn handle(self: *Session, maybe_key: ?keyboard.Key) !void {
     try self.label.handle(maybe_key);
 }
 
-fn addedSession(env: Env, user_list: *UserList) void {
+fn addedSession(env: Env, user_list: UserList) void {
     const user = user_list.label.list.items[user_list.label.current];
     if (!user.first_run) return;
 
     user.session_index.* = env.index;
 }
 
-fn sessionChanged(env: Env, maybe_user_list: ?*UserList) void {
+fn sessionChanged(env: Env, maybe_user_list: ?*?UserList) void {
     if (maybe_user_list) |user_list| {
-        user_list.label.list.items[user_list.label.current].session_index.* = env.index;
+        if (user_list.*) |w| w.label.list.items[w.label.current].session_index.* = env.index;
     }
 }
 

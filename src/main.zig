@@ -107,8 +107,10 @@ const UiState = struct {
     info_line: InfoLine,
     animate: bool,
     session: Session,
+    saved_username: ?[]const u8,
     saved_users: SavedUsers,
-    login: UserList,
+    login: ?UserList,
+    login_text: ?*Text,
     password: *Text,
     password_widget: *Widget,
     insert_mode: bool,
@@ -295,6 +297,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     state.has_old_save = false;
+    state.saved_username = null;
 
     if (state.config.save) read_save_file: {
         old_save_parser = migrator.tryMigrateIniSaveFile(state.allocator, state.io, state.old_save_path, &state.saved_users, usernames.items) catch break :read_save_file;
@@ -312,8 +315,19 @@ pub fn main(init: std.process.Init) !void {
         var file_reader = save_file.reader(state.io, &file_buffer);
         var reader = &file_reader.interface;
 
-        const last_username_index_str = reader.takeDelimiterInclusive('\n') catch break :read_save_file;
-        state.saved_users.last_username_index = std.fmt.parseInt(usize, last_username_index_str[0..(last_username_index_str.len - 1)], 10) catch break :read_save_file;
+        const username_line = reader.takeDelimiterInclusive('\n') catch break :read_save_file;
+
+        if (std.mem.containsAtLeastScalar2(u8, username_line, '-', 1)) read_username: {
+            var iterator = std.mem.splitScalar(u8, username_line[0..(username_line.len - 1)], '-');
+            if (iterator.next() == null) break :read_username; // Would be index
+
+            const maybe_username = iterator.next();
+            if (maybe_username) |username| {
+                state.saved_username = try state.allocator.dupe(u8, username);
+            }
+        } else if (!state.config.type_username) {
+            state.saved_users.last_username_index = std.fmt.parseInt(usize, username_line[0..(username_line.len - 1)], 10) catch break :read_save_file;
+        }
 
         while (reader.seek < reader.buffer.len) {
             const line = reader.takeDelimiterInclusive('\n') catch break;
@@ -763,22 +777,25 @@ pub fn main(init: std.process.Init) !void {
     );
     defer state.login_label.deinit();
 
-    state.login = try UserList.init(
-        state.allocator,
-        state.io,
-        &state.buffer,
-        usernames,
-        &state.saved_users,
-        &state.session,
-        state.box.width - 2 * state.box.horizontal_margin - state.labels_max_length - 1,
-        state.config.text_in_center,
-        state.buffer.fg,
-        state.buffer.bg,
-    );
-    defer state.login.deinit();
+    state.login = null;
+    if (!state.config.type_username) {
+        state.login = try UserList.init(
+            state.allocator,
+            state.io,
+            &state.buffer,
+            usernames,
+            &state.saved_users,
+            &state.session,
+            state.box.width - 2 * state.box.horizontal_margin - state.labels_max_length - 1,
+            state.config.text_in_center,
+            state.buffer.fg,
+            state.buffer.bg,
+        );
 
-    try state.buffer.registerKeybind(state.io, &state.login.label.keybinds, "H", &viGoLeft, &state);
-    try state.buffer.registerKeybind(state.io, &state.login.label.keybinds, "L", &viGoRight, &state);
+        try state.buffer.registerKeybind(state.io, &state.login.?.label.keybinds, "H", &viGoLeft, &state);
+        try state.buffer.registerKeybind(state.io, &state.login.?.label.keybinds, "L", &viGoRight, &state);
+    }
+    defer if (state.login) |*w| w.deinit();
 
     if (state.config.shell) {
         addOtherEnvironment(&state.session, state.lang, .shell, null) catch |err| {
@@ -887,7 +904,7 @@ pub fn main(init: std.process.Init) !void {
         // This effectively means you can't login, since there would be no local
         // accounts *and* no root account...but at this point, if that's the
         // case, you have bigger problems to deal with in the first place. :D
-        try state.info_line.addMessage(state.lang.err_no_users, state.config.error_bg, state.config.error_fg);
+        if (!state.config.type_username) try state.info_line.addMessage(state.lang.err_no_users, state.config.error_bg, state.config.error_fg);
         try state.log_file.err(state.io, "sys", "no users found", .{});
     }
 
@@ -920,6 +937,22 @@ pub fn main(init: std.process.Init) !void {
     try state.buffer.registerKeybind(state.io, &state.password.keybinds, "L", &viGoRight, &state);
 
     state.password_widget = state.password.widget();
+    state.login_text = null;
+
+    if (state.config.type_username) {
+        state.login_text = try Text.init(
+            state.allocator,
+            state.io,
+            &state.buffer,
+            state.insert_mode,
+            false,
+            null,
+            state.box.width - 2 * state.box.horizontal_margin - state.labels_max_length - 1,
+            state.buffer.fg,
+            state.buffer.bg,
+        );
+    }
+    defer if (state.login_text) |lt| lt.deinit();
 
     state.version_label = Label.init(
         ly_version_str,
@@ -974,13 +1007,18 @@ pub fn main(init: std.process.Init) !void {
         );
 
         state.session.label.current = session_index;
-        for (state.login.label.list.items, 0..) |username, i| {
-            if (std.mem.eql(u8, username.name, auto_user)) {
-                state.login.label.current = i;
-                break;
+        state.is_autologin = true;
+
+        if (state.login_text) |box| {
+            try box.writeText(auto_user);
+        } else {
+            for (state.login.?.label.list.items, 0..) |username, i| {
+                if (std.mem.eql(u8, username.name, auto_user)) {
+                    state.login.?.label.current = i;
+                    break;
+                }
             }
         }
-        state.is_autologin = true;
     }
 
     // Switch to selected TTY
@@ -1133,7 +1171,22 @@ pub fn main(init: std.process.Init) !void {
     var default_input = state.config.default_input;
 
     if (state.config.save and !state.is_autologin) {
-        if (state.saved_users.last_username_index) |index| load_last_user: {
+        if (state.login_text) |box| {
+            if (state.saved_username) |username| {
+                defer state.allocator.free(username);
+
+                try box.writeText(username);
+
+                default_input = .password;
+
+                for (state.saved_users.user_list.items) |user| {
+                    if (std.mem.eql(u8, username, user.username)) {
+                        state.session.label.current = @min(user.session_index, state.session.label.list.items.len - 1);
+                        break;
+                    }
+                }
+            }
+        } else if (state.saved_users.last_username_index) |index| load_last_user: {
             // If the saved index isn't valid, bail out
             if (index >= state.saved_users.user_list.items.len) break :load_last_user;
 
@@ -1143,7 +1196,7 @@ pub fn main(init: std.process.Init) !void {
             // If it doesn't exist (anymore), we don't change the value
             for (usernames.items, 0..) |username, i| {
                 if (std.mem.eql(u8, username, user.username)) {
-                    state.login.label.current = i;
+                    state.login.?.label.current = i;
                     break;
                 }
             }
@@ -1156,7 +1209,7 @@ pub fn main(init: std.process.Init) !void {
 
     const info_line_widget = state.info_line.widget();
     const session_widget = state.session.widget();
-    const login_widget = state.login.widget();
+    const login_widget = if (state.config.type_username) state.login_text.?.widget() else state.login.?.widget();
 
     var widgets: std.ArrayList([]*Widget) = .empty;
     defer widgets.deinit(state.allocator);
@@ -1400,6 +1453,7 @@ fn disableInsertMode(ptr: *anyopaque) !bool {
     if (state.config.vi_mode and state.insert_mode) {
         state.insert_mode = false;
         state.password.should_insert = false;
+        if (state.login_text) |lt| lt.should_insert = false;
         state.buffer.drawNextFrame(true);
     }
     return false;
@@ -1411,6 +1465,7 @@ fn enableInsertMode(ptr: *anyopaque) !bool {
 
     state.insert_mode = true;
     state.password.should_insert = true;
+    if (state.login_text) |lt| lt.should_insert = true;
     state.buffer.drawNextFrame(true);
     return false;
 }
@@ -1552,7 +1607,11 @@ fn authenticate(ptr: *anyopaque) !bool {
         var file_writer = file.writer(state.io, &file_buffer);
         var writer = &file_writer.interface;
 
-        try writer.print("{d}\n", .{state.login.label.current});
+        if (state.login_text) |box| {
+            try writer.print("0-{s}\n", .{box.text.items});
+        } else {
+            try writer.print("{d}\n", .{state.login.?.label.current});
+        }
         for (state.saved_users.user_list.items) |user| {
             try writer.print("{s}:{d}\n", .{ user.username, user.session_index });
         }
@@ -1610,7 +1669,7 @@ fn authenticate(ptr: *anyopaque) !bool {
                 &state.log_file,
                 auth_options,
                 current_environment,
-                state.login.getCurrentUsername(),
+                if (state.login_text) |box| box.text.items else state.login.?.getCurrentUsername(),
                 password_text,
             ) catch |err| {
                 shared_err.writeError(err);
@@ -2135,12 +2194,22 @@ fn positionWidgets(ptr: *anyopaque) !void {
         .childrenPosition()
         .resetXFrom(state.info_line.label.childrenPosition())
         .addY(1));
-    state.login.label.positionY(state.login_label
-        .childrenPosition()
-        .addX(state.labels_max_length - TerminalBuffer.strWidth(state.login_label.text) + 1));
+    if (state.login_text) |box| {
+        box.positionY(state.login_label
+            .childrenPosition()
+            .addX(state.labels_max_length - TerminalBuffer.strWidth(state.login_label.text) + 1));
+    } else {
+        state.login.?.label.positionY(state.login_label
+            .childrenPosition()
+            .addX(state.labels_max_length - TerminalBuffer.strWidth(state.login_label.text) + 1));
+    }
 
-    state.password_label.positionX(state.login.label
-        .childrenPosition()
+    const login_children_pos = if (state.login_text) |box|
+        box.childrenPosition()
+    else
+        state.login.?.label.childrenPosition();
+
+    state.password_label.positionX(login_children_pos
         .resetXFrom(state.info_line.label.childrenPosition())
         .addY(1));
     state.password.positionY(state.password_label

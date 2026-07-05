@@ -144,6 +144,10 @@ pub fn handle(self: *Text, maybe_key: ?keyboard.Key) !void {
     );
 }
 
+pub fn writeText(self: *Text, str: []const u8) !void {
+    for (str) |c| try self.write(c);
+}
+
 fn draw(self: *Text) void {
     if (self.masked) {
         if (self.maybe_mask) |mask| {
