@@ -2062,93 +2062,300 @@ fn updateSessionSpecifier(self: *Label, ptr: *anyopaque) !void {
     self.setText(env.environment.specifier);
 }
 
-fn positionWidgets(ptr: *anyopaque) !void {
-    var state: *UiState = @ptrCast(@alignCast(ptr));
+const Corner = enum {
+    bottomLeft,
+    bottomRight,
+    topLeft,
+    topRight,
+};
 
-    // Offsets for custom bind placement. Declared here instead of the
-    // below if stmt as we need these for `battery_label` positioning.
-    var x_offset: usize = 0;
-    // To account for the first row of built-in key hints
-    var y_offset: usize = 1;
-    if (!state.config.hide_key_hints) {
-        state.shutdown_label.positionX(state.edge_margin
-            .add(TerminalBuffer.START_POSITION));
-        var last_label = state.shutdown_label;
-        state.restart_label.positionX(last_label
-            .childrenPosition()
-            .addX(1));
-        last_label = state.restart_label;
-        state.sleep_label.positionX(last_label
-            .childrenPosition()
-            .addX(1));
-        if (state.config.sleep_cmd != null) {
-            last_label = state.sleep_label;
+const PositionedWidgets = struct {
+    binds: []bool,
+    labels: []bool,
+};
+
+fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, current_y: usize, is_left: bool, is_top: bool, positioned: *PositionedWidgets) !bool {
+    const base_x = state.edge_margin.x;
+
+    if (std.mem.eql(u8, item, "keys")) {
+        if (state.config.hide_key_hints) return false;
+
+        var local_x = current_x.*;
+        var local_y = current_y;
+
+        const labels = [_]?*Label{
+            &state.shutdown_label,
+            &state.restart_label,
+            if (state.config.sleep_cmd != null) &state.sleep_label else null,
+            if (state.config.hibernate_cmd != null) &state.hibernate_label else null,
+            &state.toggle_password_label,
+            if (state.config.brightness_down_key != null) &state.brightness_down_label else null,
+            if (state.config.brightness_up_key != null) &state.brightness_up_label else null,
+        };
+
+        for (labels) |maybe_label| {
+            const label = maybe_label orelse continue;
+            const width = TerminalBuffer.strWidth(label.text);
+
+            if (is_left) {
+                if (local_x + width > state.buffer.width - state.edge_margin.x) {
+                    local_x = base_x;
+                    if (is_top) local_y += 1 else local_y -= 1;
+                }
+                label.positionXY(Position.init(local_x, local_y));
+                local_x += width + 1;
+            } else {
+                if (width + state.edge_margin.x > local_x) {
+                    local_x = state.buffer.width - state.edge_margin.x;
+                    if (is_top) local_y += 1 else local_y -= 1;
+                }
+                label.positionXY(Position.init(local_x - width, local_y));
+                local_x -= width + 1;
+            }
         }
-        state.hibernate_label.positionX(last_label
-            .childrenPosition()
-            .addX(1));
-        if (state.config.hibernate_cmd != null) {
-            last_label = state.hibernate_label;
+        current_x.* = local_x;
+        return true;
+    } else if (std.mem.eql(u8, item, "clock") or std.mem.eql(u8, item, "time")) {
+        if (state.config.clock == null) return false;
+        const width = TerminalBuffer.strWidth(state.clock_label.text);
+        if (is_left) {
+            state.clock_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.clock_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
         }
-        state.toggle_password_label.positionX(last_label
-            .childrenPosition()
-            .addX(1));
-        last_label = state.toggle_password_label;
-        state.brightness_down_label.positionX(last_label
-            .childrenPosition()
-            .addX(1));
-        if (state.config.brightness_down_key != null) {
-            last_label = state.brightness_down_label;
+        return true;
+    } else if (std.mem.eql(u8, item, "tty")) {
+        if (!state.config.show_tty) return false;
+        const width = TerminalBuffer.strWidth(state.tty_label.text);
+        if (is_left) {
+            state.tty_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.tty_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
         }
-        state.brightness_up_label.positionXY(last_label
-            .childrenPosition()
-            .addX(1));
-        for (state.custom_binds.items) |*item| {
-            item.lbl.positionXY(state.edge_margin
-                .addY(y_offset)
-                .addX(x_offset));
-            x_offset += item.lbl.text.len + 1;
-            if (x_offset + item.lbl.text.len > state.config.custom_bind_width orelse state.buffer.width) {
-                x_offset = 0;
-                y_offset += 1;
+        return true;
+    } else if (std.mem.eql(u8, item, "battery")) {
+        if (state.config.battery_id == null) return false;
+        const width = TerminalBuffer.strWidth(state.battery_label.text);
+        if (is_left) {
+            state.battery_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.battery_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
+        }
+        return true;
+    } else if (std.mem.eql(u8, item, "version")) {
+        if (state.config.hide_version_string) return false;
+        const width = TerminalBuffer.strWidth(state.version_label.text);
+        if (is_left) {
+            state.version_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.version_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
+        }
+        return true;
+    } else if (std.mem.eql(u8, item, "numlock")) {
+        if (state.config.hide_keyboard_locks) return false;
+        const width = TerminalBuffer.strWidth(state.lang.numlock);
+        if (is_left) {
+            state.numlock_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.numlock_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
+        }
+        return true;
+    } else if (std.mem.eql(u8, item, "capslock")) {
+        if (state.config.hide_keyboard_locks) return false;
+        const width = TerminalBuffer.strWidth(state.lang.capslock);
+        if (is_left) {
+            state.capslock_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.capslock_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
+        }
+        return true;
+    } else if (std.mem.eql(u8, item, "labels")) {
+        for (state.custom_info.items, 0..) |*info, i| {
+            if (positioned.labels[i]) continue;
+            const width = TerminalBuffer.strWidth(info.lbl.text);
+            if (is_left) {
+                info.lbl.positionXY(Position.init(current_x.*, current_y));
+                current_x.* += width + 1;
+            } else {
+                info.lbl.positionXY(Position.init(current_x.* - width, current_y));
+                current_x.* -= width + 1;
+            }
+            positioned.labels[i] = true;
+        }
+        return true;
+    } else if (std.mem.eql(u8, item, "binds")) {
+        var local_x = current_x.*;
+        var local_y = current_y;
+
+        for (state.custom_binds.items, 0..) |*bind, i| {
+            if (positioned.binds[i]) continue;
+            const width = TerminalBuffer.strWidth(bind.lbl.text);
+
+            if (is_left) {
+                if (local_x + width > (state.config.custom_bind_width orelse state.buffer.width) - state.edge_margin.x) {
+                    local_x = base_x;
+                    if (is_top) local_y += 1 else local_y -= 1;
+                }
+                bind.lbl.positionXY(Position.init(local_x, local_y));
+                local_x += width + 1;
+            } else {
+                if (width + state.edge_margin.x > local_x) {
+                    local_x = state.buffer.width - state.edge_margin.x;
+                    if (is_top) local_y += 1 else local_y -= 1;
+                }
+                bind.lbl.positionXY(Position.init(local_x - width, local_y));
+                local_x -= width + 1;
+            }
+            positioned.binds[i] = true;
+        }
+        current_x.* = local_x;
+        return true;
+    } else if (std.mem.startsWith(u8, item, "lbl:")) {
+        const name = item["lbl:".len..];
+        for (state.custom_info.items, 0..) |*info, i| {
+            if (std.mem.eql(u8, info.info.name, name)) {
+                if (positioned.labels[i]) return false;
+                const width = TerminalBuffer.strWidth(info.lbl.text);
+                if (is_left) {
+                    info.lbl.positionXY(Position.init(current_x.*, current_y));
+                    current_x.* += width + 1;
+                } else {
+                    info.lbl.positionXY(Position.init(current_x.* - width, current_y));
+                    current_x.* -= width + 1;
+                }
+                positioned.labels[i] = true;
+                return true;
+            }
+        }
+    } else if (std.mem.startsWith(u8, item, "cmd:")) {
+        const key = item["cmd:".len..];
+        for (state.custom_binds.items, 0..) |*bind, i| {
+            if (std.mem.eql(u8, bind.key, key)) {
+                if (positioned.binds[i]) return false;
+                const width = TerminalBuffer.strWidth(bind.lbl.text);
+                if (is_left) {
+                    bind.lbl.positionXY(Position.init(current_x.*, current_y));
+                    current_x.* += width + 1;
+                } else {
+                    bind.lbl.positionXY(Position.init(current_x.* - width, current_y));
+                    current_x.* -= width + 1;
+                }
+                positioned.binds[i] = true;
+                return true;
             }
         }
     }
-    for (state.custom_info.items, 0..) |*item, i| {
-        item.lbl.positionXY(state.edge_margin
-            .invertX(state.buffer.width)
-            .removeX(item.lbl.text.len)
-            .invertY(state.buffer.height)
-            .removeY(state.custom_info.items.len)
-            .addY(i));
+    return false;
+}
+
+fn positionItem(state: *UiState, item: []const u8, current_x: usize, current_y: usize, is_left: bool, is_top: bool, positioned: *PositionedWidgets) !bool {
+    // Check if item contains a comma for compound widgets
+    if (std.mem.indexOf(u8, item, ",") == null) {
+        var line_x = current_x;
+        return positionSingleWidget(state, item, &line_x, current_y, is_left, is_top, positioned);
     }
 
-    state.battery_label.positionXY(state.edge_margin
-        .add(TerminalBuffer.START_POSITION)
-        .addYFromIf(state.brightness_up_label.childrenPosition(), !state.config.hide_key_hints)
-        .addYIf(y_offset, !state.config.hide_key_hints)
-        .removeYFromIf(state.edge_margin, !state.config.hide_key_hints));
+    var it = std.mem.tokenizeAny(u8, item, ",");
+    var success = false;
 
-    const tty_label_width = if (state.config.show_tty) TerminalBuffer.strWidth(state.tty_label.text) else 0;
-    const tty_label_gap = if (state.config.show_tty and state.config.clock != null) @as(usize, 1) else 0;
-    state.tty_label.positionXY(state.edge_margin
-        .add(TerminalBuffer.START_POSITION)
-        .invertX(state.buffer.width)
-        .removeXIf(tty_label_width, state.buffer.width > tty_label_width + state.edge_margin.x));
-    state.clock_label.positionXY(state.edge_margin
-        .add(TerminalBuffer.START_POSITION)
-        .invertX(state.buffer.width)
-        .removeXIf(TerminalBuffer.strWidth(state.clock_label.text) + tty_label_width + tty_label_gap, state.buffer.width > TerminalBuffer.strWidth(state.clock_label.text) + tty_label_width + tty_label_gap + state.edge_margin.x));
+    // Check if we need to wrap to next line
+    var line_x = current_x;
 
-    state.numlock_label.positionX(state.edge_margin
-        .add(TerminalBuffer.START_POSITION)
-        .addYFromIf(state.clock_label.childrenPosition(), state.config.clock != null)
-        .removeYFromIf(state.edge_margin, state.config.clock != null)
-        .invertX(state.buffer.width)
-        .removeXIf(TerminalBuffer.strWidth(state.lang.numlock), state.buffer.width > TerminalBuffer.strWidth(state.lang.numlock) + state.edge_margin.x));
-    state.capslock_label.positionX(state.numlock_label
-        .childrenPosition()
-        .removeX(TerminalBuffer.strWidth(state.lang.numlock) + TerminalBuffer.strWidth(state.lang.capslock) + 1));
+    // Now position each subitem
+    while (it.next()) |subitem| {
+        const trimmed = std.mem.trim(u8, subitem, " ");
+
+        if (try positionSingleWidget(state, trimmed, &line_x, current_y, is_left, is_top, positioned)) {
+            success = true;
+        }
+    }
+
+    return success;
+}
+
+fn positionCorner(state: *UiState, config_str: []const u8, corner: Corner, positioned: *PositionedWidgets) !void {
+    const is_left = corner == .topLeft or corner == .bottomLeft;
+    const is_top = corner == .topLeft or corner == .topRight;
+
+    var y_offset: usize = 0;
+    var i: usize = 0;
+    const len = config_str.len;
+
+    while (i < len) {
+        // Skip whitespace and brackets
+        while (i < len and (config_str[i] == ' ' or config_str[i] == '\t' or config_str[i] == '[' or config_str[i] == ']')) {
+            i += 1;
+        }
+        if (i >= len) break;
+
+        const start = i;
+        while (i < len and config_str[i] != ' ' and config_str[i] != '\t' and config_str[i] != '[' and config_str[i] != ']') {
+            i += 1;
+        }
+        const token = config_str[start..i];
+
+        const current_x = if (is_left) state.edge_margin.x else state.buffer.width - state.edge_margin.x;
+        const current_y = if (is_top) state.edge_margin.y + y_offset else state.buffer.height - 1 - state.edge_margin.y - y_offset;
+
+        if (try positionItem(state, token, current_x, current_y, is_left, is_top, positioned)) {
+            y_offset += 1;
+        }
+    }
+}
+
+fn positionWidgets(ptr: *anyopaque) !void {
+    var state: *UiState = @ptrCast(@alignCast(ptr));
+
+    const offscreen = Position.init(state.buffer.width + 1, state.buffer.height + 1);
+
+    // Reset all potential corner widgets to offscreen
+    state.shutdown_label.positionXY(offscreen);
+    state.restart_label.positionXY(offscreen);
+    state.sleep_label.positionXY(offscreen);
+    state.hibernate_label.positionXY(offscreen);
+    state.toggle_password_label.positionXY(offscreen);
+    state.brightness_down_label.positionXY(offscreen);
+    state.brightness_up_label.positionXY(offscreen);
+    state.clock_label.positionXY(offscreen);
+    state.tty_label.positionXY(offscreen);
+    state.battery_label.positionXY(offscreen);
+    state.version_label.positionXY(offscreen);
+    state.numlock_label.positionXY(offscreen);
+    state.capslock_label.positionXY(offscreen);
+
+    for (state.custom_binds.items) |*bind| {
+        bind.lbl.positionXY(offscreen);
+    }
+    for (state.custom_info.items) |*info| {
+        info.lbl.positionXY(offscreen);
+    }
+
+    var positioned = PositionedWidgets{
+        .binds = try state.allocator.alloc(bool, state.custom_binds.items.len),
+        .labels = try state.allocator.alloc(bool, state.custom_info.items.len),
+    };
+    defer state.allocator.free(positioned.binds);
+    defer state.allocator.free(positioned.labels);
+
+    @memset(positioned.binds, false);
+    @memset(positioned.labels, false);
+
+    try positionCorner(state, state.config.corner_top_left, .topLeft, &positioned);
+    try positionCorner(state, state.config.corner_top_right, .topRight, &positioned);
+    try positionCorner(state, state.config.corner_bottom_left, .bottomLeft, &positioned);
+    try positionCorner(state, state.config.corner_bottom_right, .bottomRight, &positioned);
 
     var bb_height = state.box.height;
     var bb_width = state.box.width;
@@ -2215,10 +2422,6 @@ fn positionWidgets(ptr: *anyopaque) !void {
     state.password.positionY(state.password_label
         .childrenPosition()
         .addX(state.labels_max_length - TerminalBuffer.strWidth(state.password_label.text) + 1));
-
-    state.version_label.positionXY(state.edge_margin
-        .add(TerminalBuffer.START_POSITION)
-        .invertY(state.buffer.height - 1));
 }
 
 fn handleInactivity(ptr: *anyopaque) !void {
