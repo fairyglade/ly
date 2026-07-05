@@ -167,6 +167,12 @@ pub fn getKeyList(allocator: Allocator, tb_event: termbox.tb_event) !KeyList {
             21 => key.right = true,
             else => {},
         }
+
+        if (code >= 18 and code <= 21) {
+            // https://github.com/termbox/termbox2/blob/605398fa79108412976191e062ea14bd4bd30213/termbox2.h#L446
+            key.ctrl = false;
+            key.shift = false;
+        }
     } else if (tb_event.ch < 128) {
         const code = if (tb_event.ch == 0 and tb_event.key < 128) tb_event.key else tb_event.ch;
 
