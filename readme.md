@@ -45,31 +45,31 @@ Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.
 
 > [!WARNING]
 > Distributions using SELinux such as Fedora and openSUSE Tumbleweed may encounter issues. If you encounter such issues, such as session launch failures, proceed with the following steps:
-> 
+>
 > ```
 > # ausearch -m avc -ts recent
 > ```
 >
 > If SELinux is denying process context transition, you will see this output:
-> 
+>
 > ```
 > denied { transition } for pid=XXXX comm="ly" path="/usr/bin/bash"
 > scontext=system_u:system_r:unconfined_service_t:s0
 > tcontext=unconfined_u:unconfined_r:unconfined_t:s0
 > tclass=process permissive=0
 > ```
-> 
+>
 > Pipe this output into `audit2allow` to generate a security module package. This will persist regardless of changes to filesystem permissions:
-> 
+>
 > ```
 > # ausearch -m avc -ts recent | audit2allow -M ly-local
 > ```
-> 
+>
 > ```
 > # semodule -i ly-local.pp
 > ```
-> 
-> *This fix has been confirmed on Fedora 39 and 44 and openSUSE Tumbleweed. (#494)*
+>
+> _This fix has been confirmed on Fedora 39 and 44 and openSUSE Tumbleweed. (#494)_
 
 ### FreeBSD
 
