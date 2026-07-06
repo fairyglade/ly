@@ -260,13 +260,13 @@ fn PlatformStruct() type {
             }
 
             pub fn shutdownSystemImpl() !void {
-                if (isError(reboot.reboot(reboot.RB_POWEROFF))) {
+                if (isError(unistd.reboot(reboot.RB_POWEROFF))) {
                     return error.CouldntShutdown;
                 }
             }
 
             pub fn rebootSystemImpl() !void {
-                if (isError(reboot.reboot(reboot.RB_AUTOBOOT))) {
+                if (isError(unistd.reboot(reboot.RB_AUTOBOOT))) {
                     return error.CouldntReboot;
                 }
             }
