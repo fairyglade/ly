@@ -289,8 +289,6 @@ pub fn tryMigrateIniSaveFile(allocator: std.mem.Allocator, io: std.Io, path: []c
 
 fn tryMigrateFirstSaveFile(io: std.Io, user_buf: *[32]u8) ?OldSave {
     if (maybe_save_file) |path| {
-        defer temporary_allocator.free(path);
-
         var save = OldSave{};
         var file = std.Io.Dir.openFileAbsolute(io, path, .{}) catch return null;
         defer file.close(io);

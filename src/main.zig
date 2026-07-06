@@ -1648,6 +1648,7 @@ fn authenticate(ptr: *anyopaque) !bool {
 
         // Delete previous save file if it exists
         if (migrator.maybe_save_file) |path| {
+            defer temporary_allocator.free(path);
             std.Io.Dir.cwd().deleteFile(state.io, path) catch {};
         } else if (state.has_old_save) {
             std.Io.Dir.cwd().deleteFile(state.io, state.old_save_path) catch {};
