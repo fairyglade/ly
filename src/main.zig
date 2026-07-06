@@ -101,12 +101,6 @@ const UiState = struct {
     password_label: Label,
     version_label: Label,
     bigclock_label: BigLabel,
-    show_tty: bool,
-    hide_numlock: bool,
-    hide_capslock: bool,
-    hide_version_string: bool,
-    hide_labels: bool,
-    hide_binds: bool,
     box: Box,
     info_line: InfoLine,
     animate: bool,
@@ -418,13 +412,6 @@ pub fn main(init: std.process.Init) !void {
         .flags = 0,
     };
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
-
-    state.show_tty = cornersContain(state, "tty");
-    state.hide_numlock = !cornersContain(state, "numlock");
-    state.hide_capslock = !cornersContain(state, "capslock");
-    state.hide_version_string = !cornersContain(state, "version");
-    state.hide_labels = !cornersContain(state, "labels") and !cornersContain(state, "lbl:");
-    state.hide_binds = !cornersContain(state, "binds") and !cornersContain(state, "cmd:");
 
     // Initialize components
     state.shutdown_label = Label.init(
@@ -1197,81 +1184,55 @@ pub fn main(init: std.process.Init) !void {
         item.lbl.deinit();
     };
 
-    if (!state.hide_labels) {
-        var lblIter = custom.labels.iterator();
-        // NOTE: Because widgets have a pointer to the underlying Label, we have to ensure
-        // that the ArrayList doesn't allocate more memory than what we ensured. Otherwise
-        // the pointer to the Label becomes invalid.
-        try state.custom_info.ensureTotalCapacity(state.allocator, @intCast(custom.labels.count()));
-        while (lblIter.next()) |i| {
-            try state.custom_info.append(state.allocator, .{
-                .info = i.value_ptr.*,
-                .lbl = .init("", null, state.buffer.fg, state.buffer.bg, updateCustomInfo, null),
-            });
-            var latest = &state.custom_info.items[state.custom_info.items.len - 1];
-            latest.info.id = latest.lbl.widget().id;
-            latest.info.counter = 1;
-        }
+    var lblIter = custom.labels.iterator();
+    // NOTE: Because widgets have a pointer to the underlying Label, we have to ensure
+    // that the ArrayList doesn't allocate more memory than what we ensured. Otherwise
+    // the pointer to the Label becomes invalid.
+    try state.custom_info.ensureTotalCapacity(state.allocator, @intCast(custom.labels.count()));
+    while (lblIter.next()) |i| {
+        try state.custom_info.append(state.allocator, .{
+            .info = i.value_ptr.*,
+            .lbl = .init("", null, state.buffer.fg, state.buffer.bg, updateCustomInfo, null),
+        });
+        var latest = &state.custom_info.items[state.custom_info.items.len - 1];
+        latest.info.id = latest.lbl.widget().id;
+        latest.info.counter = 1;
     }
 
-    if (!state.hide_binds) {
-        var iter = custom.binds.iterator();
-        while (iter.next()) |i| {
-            var concat = try std.mem.concat(state.allocator, u8, &[_][]const u8{ i.key_ptr.*, " ", i.value_ptr.name });
-            inline for (@typeInfo(Lang).@"struct".fields) |lang_key| {
-                const new = try std.mem.replaceOwned(u8, state.allocator, concat, "$" ++ lang_key.name, @field(state.lang, lang_key.name));
-                state.allocator.free(concat);
-                concat = new;
-            }
-            try state.custom_binds.append(state.allocator, .{
-                .lbl = .init(
-                    concat,
-                    null,
-                    state.buffer.fg,
-                    state.buffer.bg,
-                    null,
-                    null,
-                ),
-                .cmd = i.value_ptr.*,
-                .key = i.key_ptr.*,
-                .io = state.io,
-            });
-            state.custom_binds.items[state.custom_binds.items.len - 1].lbl.allocator = state.allocator;
+    var iter = custom.binds.iterator();
+    while (iter.next()) |i| {
+        var concat = try std.mem.concat(state.allocator, u8, &[_][]const u8{ i.key_ptr.*, " ", i.value_ptr.name });
+        inline for (@typeInfo(Lang).@"struct".fields) |lang_key| {
+            const new = try std.mem.replaceOwned(u8, state.allocator, concat, "$" ++ lang_key.name, @field(state.lang, lang_key.name));
+            state.allocator.free(concat);
+            concat = new;
         }
+        try state.custom_binds.append(state.allocator, .{
+            .lbl = .init(
+                concat,
+                null,
+                state.buffer.fg,
+                state.buffer.bg,
+                null,
+                null,
+            ),
+            .cmd = i.value_ptr.*,
+            .key = i.key_ptr.*,
+            .io = state.io,
+        });
+        state.custom_binds.items[state.custom_binds.items.len - 1].lbl.allocator = state.allocator;
     }
-    if (state.config.shutdown_key != null) {
-        try layer2.append(state.allocator, state.shutdown_label.widget());
-    }
-    if (state.config.restart_key != null) {
-        try layer2.append(state.allocator, state.restart_label.widget());
-    }
-    if (state.config.show_password_key != null) {
-        try layer2.append(state.allocator, state.toggle_password_label.widget());
-    }
-    if (state.config.brightness_down_key != null) {
-        try layer2.append(state.allocator, state.brightness_down_label.widget());
-    }
-    if (state.config.brightness_up_key != null) {
-        try layer2.append(state.allocator, state.brightness_up_label.widget());
-    }
-    if (state.config.battery_id != null) {
-        try layer2.append(state.allocator, state.battery_label.widget());
-    }
-    if (state.config.clock != null) {
-        try layer2.append(state.allocator, state.clock_label.widget());
-    }
-    if (state.show_tty) {
-        try layer2.append(state.allocator, state.tty_label.widget());
-    }
-    if (state.config.bigclock != .none) {
-        try layer2.append(state.allocator, state.bigclock_label.widget());
-    }
-    if (!state.hide_numlock) {
-        try layer2.append(state.allocator, state.numlock_label.widget());
-    }
-    if (!state.hide_capslock) {
-        try layer2.append(state.allocator, state.capslock_label.widget());
-    }
+    try layer2.append(state.allocator, state.shutdown_label.widget());
+    try layer2.append(state.allocator, state.restart_label.widget());
+    try layer2.append(state.allocator, state.toggle_password_label.widget());
+    try layer2.append(state.allocator, state.brightness_down_label.widget());
+    try layer2.append(state.allocator, state.brightness_up_label.widget());
+    try layer2.append(state.allocator, state.battery_label.widget());
+    try layer2.append(state.allocator, state.clock_label.widget());
+    try layer2.append(state.allocator, state.tty_label.widget());
+    try layer2.append(state.allocator, state.bigclock_label.widget());
+    try layer2.append(state.allocator, state.numlock_label.widget());
+    try layer2.append(state.allocator, state.capslock_label.widget());
     try layer2.append(state.allocator, state.box.widget());
     try layer2.append(state.allocator, info_line_widget);
     try layer2.append(state.allocator, state.session_specifier_label.widget());
@@ -1280,9 +1241,7 @@ pub fn main(init: std.process.Init) !void {
     try layer2.append(state.allocator, login_widget);
     try layer2.append(state.allocator, state.password_label.widget());
     try layer2.append(state.allocator, state.password_widget);
-    if (!state.hide_version_string) {
-        try layer2.append(state.allocator, state.version_label.widget());
-    }
+    try layer2.append(state.allocator, state.version_label.widget());
 
     for (state.custom_binds.items) |*item| {
         try layer2.append(state.allocator, item.lbl.widget());
@@ -1368,15 +1327,6 @@ pub fn main(init: std.process.Init) !void {
         handleInactivity,
         &state,
     );
-}
-
-fn cornersContain(state: UiState, text: []const u8) bool {
-    const top_left = std.mem.containsAtLeast(u8, state.config.corner_top_left, 1, text);
-    const top_right = std.mem.containsAtLeast(u8, state.config.corner_top_right, 1, text);
-    const bottom_left = std.mem.containsAtLeast(u8, state.config.corner_bottom_left, 1, text);
-    const bottom_right = std.mem.containsAtLeast(u8, state.config.corner_bottom_right, 1, text);
-
-    return top_left or top_right or bottom_left or bottom_right;
 }
 
 fn maxWidths(labels: [][]const u8) usize {
@@ -2256,6 +2206,7 @@ fn positionWidgets(ptr: *anyopaque) !void {
     state.brightness_down_label.positionXY(offscreen);
     state.brightness_up_label.positionXY(offscreen);
     state.clock_label.positionXY(offscreen);
+    state.bigclock_label.positionXY(offscreen);
     state.tty_label.positionXY(offscreen);
     state.battery_label.positionXY(offscreen);
     state.version_label.positionXY(offscreen);
