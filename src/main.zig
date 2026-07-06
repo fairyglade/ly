@@ -102,7 +102,9 @@ const UiState = struct {
     version_label: Label,
     bigclock_label: BigLabel,
     show_tty: bool,
-    hide_key_hints: bool,
+    hide_shutdown: bool,
+    hide_restart: bool,
+    hide_toggle_password: bool,
     hide_numlock: bool,
     hide_capslock: bool,
     hide_version_string: bool,
@@ -421,7 +423,9 @@ pub fn main(init: std.process.Init) !void {
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     state.show_tty = cornersContain(state, "tty");
-    state.hide_key_hints = !cornersContain(state, "keys");
+    state.hide_shutdown = !cornersContain(state, "shutdown");
+    state.hide_restart = !cornersContain(state, "restart");
+    state.hide_toggle_password = !cornersContain(state, "password");
     state.hide_numlock = !cornersContain(state, "numlock");
     state.hide_capslock = !cornersContain(state, "capslock");
     state.hide_version_string = !cornersContain(state, "version");
@@ -479,22 +483,28 @@ pub fn main(init: std.process.Init) !void {
     );
     defer state.brightness_up_label.deinit();
 
-    if (!state.hide_key_hints) {
+    if (!state.hide_shutdown) {
         try state.shutdown_label.setTextAlloc(
             state.allocator,
             "{s} {s}",
             .{ state.config.shutdown_key, state.lang.shutdown },
         );
+    }
+    if (!state.hide_restart) {
         try state.restart_label.setTextAlloc(
             state.allocator,
             "{s} {s}",
             .{ state.config.restart_key, state.lang.restart },
         );
+    }
+    if (!state.hide_toggle_password) {
         try state.toggle_password_label.setTextAlloc(
             state.allocator,
             "{s} {s}",
             .{ state.config.show_password_key, state.lang.toggle_password },
         );
+    }
+    if (state.config.brightness_down_key != null) {
         if (state.config.brightness_down_key) |key| {
             try state.brightness_down_label.setTextAlloc(
                 state.allocator,
@@ -502,6 +512,8 @@ pub fn main(init: std.process.Init) !void {
                 .{ key, state.lang.brightness_down },
             );
         }
+    }
+    if (state.config.brightness_up_key != null) {
         if (state.config.brightness_up_key) |key| {
             try state.brightness_up_label.setTextAlloc(
                 state.allocator,
@@ -1239,16 +1251,26 @@ pub fn main(init: std.process.Init) !void {
             state.custom_binds.items[state.custom_binds.items.len - 1].lbl.allocator = state.allocator;
         }
     }
-    if (!state.hide_key_hints) {
+    if (!state.hide_shutdown) {
         try layer2.append(state.allocator, state.shutdown_label.widget());
+    }
+    if (!state.hide_restart) {
         try layer2.append(state.allocator, state.restart_label.widget());
+    }
+    if (!state.hide_shutdown) {
+        try layer2.append(state.allocator, state.shutdown_label.widget());
+    }
+    if (!state.hide_restart) {
+        try layer2.append(state.allocator, state.restart_label.widget());
+    }
+    if (!state.hide_toggle_password) {
         try layer2.append(state.allocator, state.toggle_password_label.widget());
-        if (state.config.brightness_down_key != null) {
-            try layer2.append(state.allocator, state.brightness_down_label.widget());
-        }
-        if (state.config.brightness_up_key != null) {
-            try layer2.append(state.allocator, state.brightness_up_label.widget());
-        }
+    }
+    if (state.config.brightness_down_key != null) {
+        try layer2.append(state.allocator, state.brightness_down_label.widget());
+    }
+    if (state.config.brightness_up_key != null) {
+        try layer2.append(state.allocator, state.brightness_up_label.widget());
     }
     if (state.config.battery_id != null) {
         try layer2.append(state.allocator, state.battery_label.widget());
@@ -1989,39 +2011,57 @@ const PositionedWidgets = struct {
 fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, current_y: usize, is_left: bool, is_top: bool, positioned: *PositionedWidgets) !bool {
     const base_x = state.edge_margin.x;
 
-    if (std.mem.eql(u8, item, "keys")) {
-        var local_x = current_x.*;
-        var local_y = current_y;
-
-        const labels = [_]?*Label{
-            &state.shutdown_label,
-            &state.restart_label,
-            &state.toggle_password_label,
-            if (state.config.brightness_down_key != null) &state.brightness_down_label else null,
-            if (state.config.brightness_up_key != null) &state.brightness_up_label else null,
-        };
-
-        for (labels) |maybe_label| {
-            const label = maybe_label orelse continue;
-            const width = TerminalBuffer.strWidth(label.text);
-
-            if (is_left) {
-                if (local_x + width > state.buffer.width - state.edge_margin.x) {
-                    local_x = base_x;
-                    if (is_top) local_y += 1 else local_y -= 1;
-                }
-                label.positionXY(Position.init(local_x, local_y));
-                local_x += width + 1;
-            } else {
-                if (width + state.edge_margin.x > local_x) {
-                    local_x = state.buffer.width - state.edge_margin.x;
-                    if (is_top) local_y += 1 else local_y -= 1;
-                }
-                label.positionXY(Position.init(local_x - width, local_y));
-                local_x -= width + 1;
-            }
+    if (std.mem.eql(u8, item, "shutdown")) {
+        const width = TerminalBuffer.strWidth(state.shutdown_label.text);
+        if (is_left) {
+            state.shutdown_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.shutdown_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
         }
-        current_x.* = local_x;
+        return true;
+    } else if (std.mem.eql(u8, item, "restart")) {
+        const width = TerminalBuffer.strWidth(state.restart_label.text);
+        if (is_left) {
+            state.restart_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.restart_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
+        }
+        return true;
+    } else if (std.mem.eql(u8, item, "britup")) {
+        if (state.config.brightness_up_key == null) return false;
+        const width = TerminalBuffer.strWidth(state.brightness_up_label.text);
+        if (is_left) {
+            state.brightness_up_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.brightness_up_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
+        }
+        return true;
+    } else if (std.mem.eql(u8, item, "britdown")) {
+        if (state.config.brightness_down_key == null) return false;
+        const width = TerminalBuffer.strWidth(state.brightness_down_label.text);
+        if (is_left) {
+            state.brightness_down_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.brightness_down_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
+        }
+        return true;
+    } else if (std.mem.eql(u8, item, "password")) {
+        const width = TerminalBuffer.strWidth(state.toggle_password_label.text);
+        if (is_left) {
+            state.toggle_password_label.positionXY(Position.init(current_x.*, current_y));
+            current_x.* += width + 1;
+        } else {
+            state.toggle_password_label.positionXY(Position.init(current_x.* - width, current_y));
+            current_x.* -= width + 1;
+        }
         return true;
     } else if (std.mem.eql(u8, item, "clock") or std.mem.eql(u8, item, "time")) {
         if (state.config.clock == null) return false;
