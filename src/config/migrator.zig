@@ -2,6 +2,7 @@
 // Properties removed or changed since 0.6.0
 // Color codes interpreted differently since 1.1.0
 
+const build_options = @import("build_options");
 const std = @import("std");
 var temporary_allocator = std.heap.page_allocator;
 
@@ -192,6 +193,19 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
     if (std.mem.eql(u8, field.key, "hibernate_cmd")) {
         maybe_hibernate_cmd = temporary_allocator.dupe(u8, field.value) catch return null;
         return null;
+    }
+
+    if (std.mem.eql(u8, field.key, "save")) {
+        // The option now uses a string for the file's parent directory
+        var mapped_field = field;
+
+        if (std.mem.eql(u8, field.value, "true")) {
+            mapped_field.value = build_options.config_directory ++ "/ly";
+        } else if (std.mem.eql(u8, field.value, "false")) {
+            mapped_field.value = "null";
+        }
+
+        return mapped_field;
     }
 
     // TODO: Dearest Melpert,

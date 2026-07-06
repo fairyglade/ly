@@ -224,7 +224,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     // Load configuration file
-    defer if (state.config.save) {
+    defer if (state.config.save_file_dir != null) {
         state.allocator.free(state.save_path);
         state.allocator.free(state.old_save_path);
     };
@@ -266,8 +266,8 @@ pub fn main(init: std.process.Init) !void {
 
     state.lang = lang_parser.structure;
 
-    if (state.config.save) {
-        state.save_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "save.txt" });
+    if (state.config.save_file_dir) |dir| {
+        state.save_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ dir, "save.txt" });
         state.old_save_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "save.ini" });
     }
 
@@ -285,7 +285,7 @@ pub fn main(init: std.process.Init) !void {
     state.has_old_save = false;
     state.saved_username = null;
 
-    if (state.config.save) read_save_file: {
+    if (state.config.save_file_dir != null) read_save_file: {
         old_save_parser = migrator.tryMigrateIniSaveFile(state.allocator, state.io, state.old_save_path, &state.saved_users, usernames.items) catch break :read_save_file;
 
         // Don't read the new save file if the old one still exists
@@ -335,7 +335,7 @@ pub fn main(init: std.process.Init) !void {
 
     // If no save file previously existed, fill it up with all usernames
     // TODO: Add new username with existing save file
-    if (state.config.save and state.saved_users.user_list.items.len == 0) {
+    if (state.config.save_file_dir != null and state.saved_users.user_list.items.len == 0) {
         for (usernames.items) |user| {
             try state.saved_users.user_list.append(state.allocator, .{
                 .username = user,
@@ -1118,7 +1118,7 @@ pub fn main(init: std.process.Init) !void {
     // Skip if autologin is active to prevent overriding autologin session
     var default_input = state.config.default_input;
 
-    if (state.config.save and !state.is_autologin) {
+    if (state.config.save_file_dir != null and !state.is_autologin) {
         if (state.login_text) |box| {
             if (state.saved_username) |username| {
                 defer state.allocator.free(username);
@@ -1502,7 +1502,7 @@ fn authenticate(ptr: *anyopaque) !bool {
         try TerminalBuffer.presentBuffer();
     }
 
-    if (state.config.save) save_last_settings: {
+    if (state.config.save_file_dir != null) save_last_settings: {
         // It isn't worth cluttering the code with precise error
         // handling, so let's just report a generic error message,
         // that should be good enough for debugging anyway.
