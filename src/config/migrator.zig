@@ -45,6 +45,11 @@ const removed_properties = [_][]const u8{
     "wayland_cmd",
     "console_dev",
     "load",
+    // Migrating these isn't worth the effort so just say we removed them
+    "hide_key_hints",
+    "hide_keyboard_locks",
+    "hide_version_string",
+    "show_tty",
 };
 
 pub var auto_eight_colors: bool = true;

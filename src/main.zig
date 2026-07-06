@@ -103,6 +103,13 @@ const UiState = struct {
     password_label: Label,
     version_label: Label,
     bigclock_label: BigLabel,
+    show_tty: bool,
+    hide_key_hints: bool,
+    hide_numlock: bool,
+    hide_capslock: bool,
+    hide_version_string: bool,
+    hide_labels: bool,
+    hide_binds: bool,
     box: Box,
     info_line: InfoLine,
     animate: bool,
@@ -433,6 +440,14 @@ pub fn main(init: std.process.Init) !void {
     };
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
+    state.show_tty = cornersContain(state, "tty");
+    state.hide_key_hints = !cornersContain(state, "keys");
+    state.hide_numlock = !cornersContain(state, "numlock");
+    state.hide_capslock = !cornersContain(state, "capslock");
+    state.hide_version_string = !cornersContain(state, "version");
+    state.hide_labels = !cornersContain(state, "labels") and !cornersContain(state, "lbl:");
+    state.hide_binds = !cornersContain(state, "binds") and !cornersContain(state, "cmd:");
+
     // Initialize components
     state.shutdown_label = Label.init(
         "",
@@ -504,7 +519,7 @@ pub fn main(init: std.process.Init) !void {
     );
     defer state.brightness_up_label.deinit();
 
-    if (!state.config.hide_key_hints) {
+    if (!state.hide_key_hints) {
         try state.shutdown_label.setTextAlloc(
             state.allocator,
             "{s} {s}",
@@ -1052,7 +1067,7 @@ pub fn main(init: std.process.Init) !void {
         };
     }
 
-    if (state.config.show_tty) {
+    if (state.show_tty) {
         try state.tty_label.setTextBuf(&state.tty_buf, "tty{d}", .{state.active_tty});
     }
 
@@ -1226,34 +1241,35 @@ pub fn main(init: std.process.Init) !void {
 
     state.custom_binds = .empty;
     defer state.custom_binds.deinit(state.allocator);
-
-    state.custom_info = .empty;
-    defer state.custom_info.deinit(state.allocator);
-
-    var lblIter = custom.labels.iterator();
-    // NOTE: Because widgets have a pointer to the underlying Label, we have to ensure
-    // that the ArrayList doesn't allocate more memory than what we ensured. Otherwise
-    // the pointer to the Label becomes invalid.
-    try state.custom_info.ensureTotalCapacity(state.allocator, @intCast(custom.labels.count()));
-    while (lblIter.next()) |i| {
-        try state.custom_info.append(state.allocator, .{
-            .info = i.value_ptr.*,
-            .lbl = .init("", null, state.buffer.fg, state.buffer.bg, updateCustomInfo, null),
-        });
-        var latest = &state.custom_info.items[state.custom_info.items.len - 1];
-        latest.info.id = latest.lbl.widget().id;
-        latest.info.counter = 1;
-    }
-    defer for (state.custom_info.items) |*item| {
-        item.lbl.deinit();
-    };
-
-    var iter = custom.binds.iterator();
     defer for (state.custom_binds.items) |*i| {
         i.lbl.deinit();
     };
 
-    if (!state.config.hide_key_hints) {
+    state.custom_info = .empty;
+    defer state.custom_info.deinit(state.allocator);
+    defer for (state.custom_info.items) |*item| {
+        item.lbl.deinit();
+    };
+
+    if (!state.hide_labels) {
+        var lblIter = custom.labels.iterator();
+        // NOTE: Because widgets have a pointer to the underlying Label, we have to ensure
+        // that the ArrayList doesn't allocate more memory than what we ensured. Otherwise
+        // the pointer to the Label becomes invalid.
+        try state.custom_info.ensureTotalCapacity(state.allocator, @intCast(custom.labels.count()));
+        while (lblIter.next()) |i| {
+            try state.custom_info.append(state.allocator, .{
+                .info = i.value_ptr.*,
+                .lbl = .init("", null, state.buffer.fg, state.buffer.bg, updateCustomInfo, null),
+            });
+            var latest = &state.custom_info.items[state.custom_info.items.len - 1];
+            latest.info.id = latest.lbl.widget().id;
+            latest.info.counter = 1;
+        }
+    }
+
+    if (!state.hide_binds) {
+        var iter = custom.binds.iterator();
         while (iter.next()) |i| {
             var concat = try std.mem.concat(state.allocator, u8, &[_][]const u8{ i.key_ptr.*, " ", i.value_ptr.name });
             inline for (@typeInfo(Lang).@"struct".fields) |lang_key| {
@@ -1276,6 +1292,8 @@ pub fn main(init: std.process.Init) !void {
             });
             state.custom_binds.items[state.custom_binds.items.len - 1].lbl.allocator = state.allocator;
         }
+    }
+    if (!state.hide_key_hints) {
         try layer2.append(state.allocator, state.shutdown_label.widget());
         try layer2.append(state.allocator, state.restart_label.widget());
         if (state.config.sleep_cmd != null) {
@@ -1298,14 +1316,16 @@ pub fn main(init: std.process.Init) !void {
     if (state.config.clock != null) {
         try layer2.append(state.allocator, state.clock_label.widget());
     }
-    if (state.config.show_tty) {
+    if (state.show_tty) {
         try layer2.append(state.allocator, state.tty_label.widget());
     }
     if (state.config.bigclock != .none) {
         try layer2.append(state.allocator, state.bigclock_label.widget());
     }
-    if (!state.config.hide_keyboard_locks) {
+    if (!state.hide_numlock) {
         try layer2.append(state.allocator, state.numlock_label.widget());
+    }
+    if (!state.hide_capslock) {
         try layer2.append(state.allocator, state.capslock_label.widget());
     }
     try layer2.append(state.allocator, state.box.widget());
@@ -1316,7 +1336,7 @@ pub fn main(init: std.process.Init) !void {
     try layer2.append(state.allocator, login_widget);
     try layer2.append(state.allocator, state.password_label.widget());
     try layer2.append(state.allocator, state.password_widget);
-    if (!state.config.hide_version_string) {
+    if (!state.hide_version_string) {
         try layer2.append(state.allocator, state.version_label.widget());
     }
 
@@ -1406,6 +1426,15 @@ pub fn main(init: std.process.Init) !void {
         handleInactivity,
         &state,
     );
+}
+
+fn cornersContain(state: UiState, text: []const u8) bool {
+    const top_left = std.mem.containsAtLeast(u8, state.config.corner_top_left, 1, text);
+    const top_right = std.mem.containsAtLeast(u8, state.config.corner_top_right, 1, text);
+    const bottom_left = std.mem.containsAtLeast(u8, state.config.corner_bottom_left, 1, text);
+    const bottom_right = std.mem.containsAtLeast(u8, state.config.corner_bottom_right, 1, text);
+
+    return top_left or top_right or bottom_left or bottom_right;
 }
 
 fn maxWidths(labels: [][]const u8) usize {
@@ -2078,8 +2107,6 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
     const base_x = state.edge_margin.x;
 
     if (std.mem.eql(u8, item, "keys")) {
-        if (state.config.hide_key_hints) return false;
-
         var local_x = current_x.*;
         var local_y = current_y;
 
@@ -2127,7 +2154,6 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
         }
         return true;
     } else if (std.mem.eql(u8, item, "tty")) {
-        if (!state.config.show_tty) return false;
         const width = TerminalBuffer.strWidth(state.tty_label.text);
         if (is_left) {
             state.tty_label.positionXY(Position.init(current_x.*, current_y));
@@ -2149,7 +2175,6 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
         }
         return true;
     } else if (std.mem.eql(u8, item, "version")) {
-        if (state.config.hide_version_string) return false;
         const width = TerminalBuffer.strWidth(state.version_label.text);
         if (is_left) {
             state.version_label.positionXY(Position.init(current_x.*, current_y));
@@ -2160,7 +2185,6 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
         }
         return true;
     } else if (std.mem.eql(u8, item, "numlock")) {
-        if (state.config.hide_keyboard_locks) return false;
         const width = TerminalBuffer.strWidth(state.lang.numlock);
         if (is_left) {
             state.numlock_label.positionXY(Position.init(current_x.*, current_y));
@@ -2171,7 +2195,6 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
         }
         return true;
     } else if (std.mem.eql(u8, item, "capslock")) {
-        if (state.config.hide_keyboard_locks) return false;
         const width = TerminalBuffer.strWidth(state.lang.capslock);
         if (is_left) {
             state.capslock_label.positionXY(Position.init(current_x.*, current_y));
