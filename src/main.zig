@@ -504,23 +504,19 @@ pub fn main(init: std.process.Init) !void {
             .{ state.config.show_password_key, state.lang.toggle_password },
         );
     }
-    if (state.config.brightness_down_key != null) {
-        if (state.config.brightness_down_key) |key| {
-            try state.brightness_down_label.setTextAlloc(
-                state.allocator,
-                "{s} {s}",
-                .{ key, state.lang.brightness_down },
-            );
-        }
+    if (state.config.brightness_down_key) |key| {
+        try state.brightness_down_label.setTextAlloc(
+            state.allocator,
+            "{s} {s}",
+            .{ key, state.lang.brightness_down },
+        );
     }
-    if (state.config.brightness_up_key != null) {
-        if (state.config.brightness_up_key) |key| {
-            try state.brightness_up_label.setTextAlloc(
-                state.allocator,
-                "{s} {s}",
-                .{ key, state.lang.brightness_up },
-            );
-        }
+    if (state.config.brightness_up_key) |key| {
+        try state.brightness_up_label.setTextAlloc(
+            state.allocator,
+            "{s} {s}",
+            .{ key, state.lang.brightness_up },
+        );
     }
 
     state.numlock_label = Label.init(
