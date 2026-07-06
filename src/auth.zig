@@ -105,6 +105,11 @@ pub fn authenticate(allocator: std.mem.Allocator, io: std.Io, log_file: *LogFile
     try log_file.info(io, "auth/passwd", "setting user shell", .{});
     if (user_entry.shell == null) interop.setUserShell(&user_entry);
 
+    // chown & chmod stdin (which is the TTY)
+    // https://github.com/mirror/busybox/blob/371fe9f71d445d18be28c82a2a6d82115c8af19d/loginutils/login.c#L558
+    if (interop.isError(std.posix.system.fchown(std.posix.STDIN_FILENO, user_entry.uid, user_entry.gid))) return error.TtyChownFailed;
+    if (interop.isError(std.posix.system.fchmod(std.posix.STDIN_FILENO, 0o600))) return error.TtyChmodFailed;
+
     var shared_err = try SharedError.init(null, null);
     defer shared_err.deinit();
 
