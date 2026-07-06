@@ -88,8 +88,6 @@ const UiState = struct {
     labels_max_length: usize,
     shutdown_label: Label,
     restart_label: Label,
-    sleep_label: Label,
-    hibernate_label: Label,
     toggle_password_label: Label,
     brightness_down_label: Label,
     brightness_up_label: Label,
@@ -141,9 +139,6 @@ var shutdown = false;
 var restart = false;
 
 pub fn main(init: std.process.Init) !void {
-    var shutdown_cmd: []const u8 = undefined;
-    var restart_cmd: []const u8 = undefined;
-    var commands_allocated = false;
     var state: UiState = undefined;
 
     state.io = init.io;
@@ -152,21 +147,12 @@ pub fn main(init: std.process.Init) !void {
     var stderr_writer = std.Io.File.stderr().writer(state.io, &stderr_buffer);
     var stderr = &stderr_writer.interface;
 
+    // If we can't shutdown or restart due to an error, we print it to standard error. If that fails, just bail out
     defer {
-        // If we can't shutdown or restart due to an error, we print it to standard error. If that fails, just bail out
         if (shutdown) {
-            const shutdown_error = std.process.replace(state.io, .{ .argv = &[_][]const u8{ "/bin/sh", "-c", shutdown_cmd } });
-            std.log.err("couldn't shutdown: {s}", .{@errorName(shutdown_error)});
+            interop.shutdownSystem() catch std.log.err("whoopsie doodle, couldn't shutdown system!", .{});
         } else if (restart) {
-            const restart_error = std.process.replace(state.io, .{ .argv = &[_][]const u8{ "/bin/sh", "-c", restart_cmd } });
-            std.log.err("couldn't restart: {s}", .{@errorName(restart_error)});
-        } else {
-            // The user has quit Ly using Ctrl+C
-            if (commands_allocated) {
-                // Necessary if we error out before allocating
-                temporary_allocator.free(shutdown_cmd);
-                temporary_allocator.free(restart_cmd);
-            }
+            interop.rebootSystem() catch std.log.err("whoopsie doodle, couldn't restart system!", .{});
         }
     }
 
@@ -293,7 +279,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     if (config_parser.maybe_load_error == null) {
-        migrator.lateConfigFieldHandler(&state.config);
+        migrator.lateConfigFieldHandler(&state.config, state.lang);
     }
 
     var maybe_uid_range_error: ?anyerror = null;
@@ -373,12 +359,6 @@ pub fn main(init: std.process.Init) !void {
     defer state.log_file.deinit(state.io);
 
     try state.log_file.info(state.io, "tui", "using {s} vt", .{if (state.use_kmscon_vt) "kmscon" else "default"});
-
-    // These strings only end up getting freed if the user quits Ly using Ctrl+C, which is fine since in the other cases
-    // we end up shutting down or restarting the system
-    shutdown_cmd = try temporary_allocator.dupe(u8, state.config.shutdown_cmd);
-    restart_cmd = try temporary_allocator.dupe(u8, state.config.restart_cmd);
-    commands_allocated = true;
 
     if (state.config.start_cmd) |start_cmd| handle_start_cmd: {
         var process = std.process.spawn(state.io, .{
@@ -469,26 +449,6 @@ pub fn main(init: std.process.Init) !void {
     );
     defer state.restart_label.deinit();
 
-    state.sleep_label = Label.init(
-        "",
-        null,
-        state.buffer.fg,
-        state.buffer.bg,
-        null,
-        null,
-    );
-    defer state.sleep_label.deinit();
-
-    state.hibernate_label = Label.init(
-        "",
-        null,
-        state.buffer.fg,
-        state.buffer.bg,
-        null,
-        null,
-    );
-    defer state.hibernate_label.deinit();
-
     state.toggle_password_label = Label.init(
         "",
         null,
@@ -535,20 +495,6 @@ pub fn main(init: std.process.Init) !void {
             "{s} {s}",
             .{ state.config.show_password_key, state.lang.toggle_password },
         );
-        if (state.config.sleep_cmd != null) {
-            try state.sleep_label.setTextAlloc(
-                state.allocator,
-                "{s} {s}",
-                .{ state.config.sleep_key, state.lang.sleep },
-            );
-        }
-        if (state.config.hibernate_cmd != null) {
-            try state.hibernate_label.setTextAlloc(
-                state.allocator,
-                "{s} {s}",
-                .{ state.config.hibernate_key, state.lang.hibernate },
-            );
-        }
         if (state.config.brightness_down_key) |key| {
             try state.brightness_down_label.setTextAlloc(
                 state.allocator,
@@ -1296,12 +1242,6 @@ pub fn main(init: std.process.Init) !void {
     if (!state.hide_key_hints) {
         try layer2.append(state.allocator, state.shutdown_label.widget());
         try layer2.append(state.allocator, state.restart_label.widget());
-        if (state.config.sleep_cmd != null) {
-            try layer2.append(state.allocator, state.sleep_label.widget());
-        }
-        if (state.config.hibernate_cmd != null) {
-            try layer2.append(state.allocator, state.hibernate_label.widget());
-        }
         try layer2.append(state.allocator, state.toggle_password_label.widget());
         if (state.config.brightness_down_key != null) {
             try layer2.append(state.allocator, state.brightness_down_label.widget());
@@ -1372,8 +1312,6 @@ pub fn main(init: std.process.Init) !void {
     try state.buffer.registerGlobalKeybind(state.io, state.config.shutdown_key, &shutdownCmd, &state);
     try state.buffer.registerGlobalKeybind(state.io, state.config.restart_key, &restartCmd, &state);
     try state.buffer.registerGlobalKeybind(state.io, state.config.show_password_key, &togglePasswordMask, &state);
-    if (state.config.sleep_cmd != null) try state.buffer.registerGlobalKeybind(state.io, state.config.sleep_key, &sleepCmd, &state);
-    if (state.config.hibernate_cmd != null) try state.buffer.registerGlobalKeybind(state.io, state.config.hibernate_key, &hibernateCmd, &state);
     if (state.config.brightness_down_key) |key| try state.buffer.registerGlobalKeybind(state.io, key, &decreaseBrightnessCmd, &state);
     if (state.config.brightness_up_key) |key| try state.buffer.registerGlobalKeybind(state.io, key, &increaseBrightnessCmd, &state);
 
@@ -1787,62 +1725,6 @@ fn restartCmd(ptr: *anyopaque) !bool {
     return false;
 }
 
-fn sleepCmd(ptr: *anyopaque) !bool {
-    var state: *UiState = @ptrCast(@alignCast(ptr));
-
-    if (state.config.sleep_cmd) |sleep_cmd| {
-        var process = std.process.spawn(state.io, .{
-            .argv = &[_][]const u8{ "/bin/sh", "-c", sleep_cmd },
-            .stdout = .ignore,
-            .stderr = .ignore,
-        }) catch return false;
-
-        const process_result = process.wait(state.io) catch return false;
-        if (process_result.exited != 0) {
-            try state.info_line.addMessage(
-                state.lang.err_sleep,
-                state.config.error_bg,
-                state.config.error_fg,
-            );
-            try state.log_file.err(
-                state.io,
-                "sys",
-                "failed to execute sleep command: exit code {d}",
-                .{process_result.exited},
-            );
-        }
-    }
-    return false;
-}
-
-fn hibernateCmd(ptr: *anyopaque) !bool {
-    var state: *UiState = @ptrCast(@alignCast(ptr));
-
-    if (state.config.hibernate_cmd) |hibernate_cmd| {
-        var process = std.process.spawn(state.io, .{
-            .argv = &[_][]const u8{ "/bin/sh", "-c", hibernate_cmd },
-            .stdout = .ignore,
-            .stderr = .ignore,
-        }) catch return false;
-
-        const process_result = process.wait(state.io) catch return false;
-        if (process_result.exited != 0) {
-            try state.info_line.addMessage(
-                state.lang.err_hibernate,
-                state.config.error_bg,
-                state.config.error_fg,
-            );
-            try state.log_file.err(
-                state.io,
-                "sys",
-                "failed to execute hibernate command: exit code {d}",
-                .{process_result.exited},
-            );
-        }
-    }
-    return false;
-}
-
 fn decreaseBrightnessCmd(ptr: *anyopaque) !bool {
     var state: *UiState = @ptrCast(@alignCast(ptr));
 
@@ -2114,8 +1996,6 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
         const labels = [_]?*Label{
             &state.shutdown_label,
             &state.restart_label,
-            if (state.config.sleep_cmd != null) &state.sleep_label else null,
-            if (state.config.hibernate_cmd != null) &state.hibernate_label else null,
             &state.toggle_password_label,
             if (state.config.brightness_down_key != null) &state.brightness_down_label else null,
             if (state.config.brightness_up_key != null) &state.brightness_up_label else null,
@@ -2347,8 +2227,6 @@ fn positionWidgets(ptr: *anyopaque) !void {
     // Reset all potential corner widgets to offscreen
     state.shutdown_label.positionXY(offscreen);
     state.restart_label.positionXY(offscreen);
-    state.sleep_label.positionXY(offscreen);
-    state.hibernate_label.positionXY(offscreen);
     state.toggle_password_label.positionXY(offscreen);
     state.brightness_down_label.positionXY(offscreen);
     state.brightness_up_label.positionXY(offscreen);

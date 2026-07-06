@@ -136,10 +136,6 @@ pub fn Installer(install_config: bool) type {
             try patch_map.put("$PREFIX_DIRECTORY", prefix_directory);
             try patch_map.put("$EXECUTABLE_NAME", executable_name);
 
-            // The "-a" argument doesn't exist on FreeBSD, so we use "-p"
-            // instead to shutdown the system.
-            try patch_map.put("$PLATFORM_SHUTDOWN_ARG", if (init_system == .freebsd) "-p" else "-a");
-
             try install_ly(allocator, io, patch_map, install_config);
             try install_service(allocator, io, patch_map);
         }

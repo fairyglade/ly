@@ -179,6 +179,20 @@ fn PlatformStruct() type {
                 return uid_range;
             }
 
+            pub fn shutdownSystemImpl() !void {
+                std.posix.system.sync();
+                if (isError(std.os.linux.reboot(.MAGIC1, .MAGIC2, .POWER_OFF, null))) {
+                    return error.CouldntShutdown;
+                }
+            }
+
+            pub fn rebootSystemImpl() !void {
+                std.posix.system.sync();
+                if (isError(std.os.linux.reboot(.MAGIC1, .MAGIC2, .RESTART, null))) {
+                    return error.CouldntShutdown;
+                }
+            }
+
             fn parseValue(comptime T: type, name: []const u8, buffer: []const u8) !T {
                 var iterator = std.mem.splitAny(u8, buffer, " \t");
                 var maybe_value: ?T = null;
@@ -209,6 +223,7 @@ fn PlatformStruct() type {
         .freebsd => struct {
             pub const kbio = @import("kbio");
             pub const consio = @import("consio");
+            pub const reboot = @import("reboot");
 
             pub const LedState = c_int;
             pub const get_led_state = kbio.KDGETLED;
@@ -242,6 +257,18 @@ fn PlatformStruct() type {
                     .uid_min = FREEBSD_UID_MIN,
                     .uid_max = FREEBSD_UID_MAX,
                 };
+            }
+
+            pub fn shutdownSystemImpl() !void {
+                if (isError(reboot.reboot(reboot.RB_POWEROFF))) {
+                    return error.CouldntShutdown;
+                }
+            }
+
+            pub fn rebootSystemImpl() !void {
+                if (isError(reboot.reboot(reboot.RB_AUTOBOOT))) {
+                    return error.CouldntReboot;
+                }
             }
         },
         else => @compileError("Unsupported target: " ++ builtin.os.tag),
@@ -395,4 +422,12 @@ pub fn closePasswordDatabase() void {
 // of the file doesn't seem to be standard? So this should be fine...
 pub fn getUserIdRange(allocator: std.mem.Allocator, io: std.Io, file_path: []const u8) !UidRange {
     return platform_struct.getUserIdRange(allocator, io, file_path);
+}
+
+pub fn shutdownSystem() !void {
+    try platform_struct.shutdownSystemImpl();
+}
+
+pub fn rebootSystem() !void {
+    try platform_struct.rebootSystemImpl();
 }

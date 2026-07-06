@@ -14,6 +14,7 @@ const IniParser = ly_core.IniParser;
 const ini = ly_core.ini;
 
 const Config = @import("Config.zig");
+const Lang = @import("Lang.zig");
 const OldSave = @import("OldSave.zig");
 const SavedUsers = @import("SavedUsers.zig");
 const custom = @import("custom.zig");
@@ -45,6 +46,8 @@ const removed_properties = [_][]const u8{
     "wayland_cmd",
     "console_dev",
     "load",
+    "shutdown_cmd",
+    "restart_cmd",
     // Migrating these isn't worth the effort so just say we removed them
     "hide_key_hints",
     "hide_keyboard_locks",
@@ -56,6 +59,10 @@ pub var auto_eight_colors: bool = true;
 
 pub var maybe_animate: ?bool = null;
 pub var maybe_save_file: ?[]const u8 = null;
+pub var maybe_sleep_key: ?[]const u8 = null;
+pub var maybe_sleep_cmd: ?[]const u8 = null;
+pub var maybe_hibernate_key: ?[]const u8 = null;
+pub var maybe_hibernate_cmd: ?[]const u8 = null;
 
 pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniField {
     if (std.mem.eql(u8, field.key, "animate")) {
@@ -129,7 +136,6 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
     if (std.mem.eql(u8, field.key, "save_file")) {
         // The option doesn't exist anymore, but we save its value for migration later on
         maybe_save_file = temporary_allocator.dupe(u8, field.value) catch return null;
-
         return null;
     }
 
@@ -166,6 +172,26 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
         mapped_field.key = "animation_frame_delay";
 
         return mapped_field;
+    }
+
+    if (std.mem.eql(u8, field.key, "sleep_key")) {
+        maybe_sleep_key = temporary_allocator.dupe(u8, field.value) catch return null;
+        return null;
+    }
+
+    if (std.mem.eql(u8, field.key, "sleep_cmd")) {
+        maybe_sleep_cmd = temporary_allocator.dupe(u8, field.value) catch return null;
+        return null;
+    }
+
+    if (std.mem.eql(u8, field.key, "hibernate_key")) {
+        maybe_hibernate_key = temporary_allocator.dupe(u8, field.value) catch return null;
+        return null;
+    }
+
+    if (std.mem.eql(u8, field.key, "hibernate_cmd")) {
+        maybe_hibernate_cmd = temporary_allocator.dupe(u8, field.value) catch return null;
+        return null;
     }
 
     // TODO: Dearest Melpert,
@@ -228,7 +254,7 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
 
 // This is the stuff we only handle after reading the config.
 // For example, the "animate" field could come after "animation"
-pub fn lateConfigFieldHandler(config: *Config) void {
+pub fn lateConfigFieldHandler(config: *Config, lang: Lang) void {
     if (maybe_animate) |animate| {
         if (!animate) config.*.animation = .none;
     }
@@ -256,6 +282,24 @@ pub fn lateConfigFieldHandler(config: *Config) void {
         if (!set_color_properties[6]) config.error_bg = Color.DEFAULT;
         if (!set_color_properties[7]) config.error_fg = Styling.BOLD | Color.ECOL_RED;
         if (!set_color_properties[8]) config.fg = Color.ECOL_WHITE;
+    }
+
+    if (maybe_sleep_key) |key| {
+        if (maybe_sleep_cmd) |cmd| {
+            custom.binds.put(temporary_allocator, key, .{
+                .name = temporary_allocator.dupe(u8, lang.sleep) catch "",
+                .cmd = cmd,
+            }) catch {};
+        }
+    }
+
+    if (maybe_hibernate_key) |key| {
+        if (maybe_hibernate_cmd) |cmd| {
+            custom.binds.put(temporary_allocator, key, .{
+                .name = temporary_allocator.dupe(u8, lang.hibernate) catch "",
+                .cmd = cmd,
+            }) catch {};
+        }
     }
 }
 
