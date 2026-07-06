@@ -1,16 +1,46 @@
+#  SPDX-License-Identifier: LGPL-2.1-or-later
+#
+#  This file is part of systemd.
+#
+#  systemd is free software; you can redistribute it and/or modify it
+#  under the terms of the GNU Lesser General Public License as published by
+#  the Free Software Foundation; either version 2.1 of the License, or
+#  (at your option) any later version.
+#
+#  Modified for Ly by AnErrupTion <anerruption@disroot.org>
+
 [Unit]
-Description=TUI display manager
-After=systemd-user-sessions.service plymouth-quit-wait.service
-After=getty@%i.service
+Description=TUI display manager on %I
+After=systemd-user-sessions.service plymouth-quit-wait.service getty@%i.service
 Conflicts=getty@%i.service
 
 [Service]
+ExecStart=$PREFIX_DIRECTORY/bin/agetty -nl $PREFIX_DIRECTORY/bin/$EXECUTABLE_NAME %I ${TERM}
 Type=idle
-ExecStart=$PREFIX_DIRECTORY/bin/$EXECUTABLE_NAME
+Restart=always
+RestartSec=0
+UtmpIdentifier=%I
 StandardInput=tty
+StandardOutput=tty
 TTYPath=/dev/%I
 TTYReset=yes
 TTYVHangup=yes
+TTYVTDisallocate=yes
+IgnoreSIGPIPE=no
+SendSIGHUP=yes
+
+ImportCredential=tty.virtual.%I.agetty.*:agetty.
+ImportCredential=tty.virtual.%I.login.*:login.
+ImportCredential=agetty.*
+ImportCredential=login.*
+ImportCredential=shell.*
+
+# Unset locale for the console getty since the console has problems
+# displaying some internationalized messages.
+UnsetEnvironment=LANG LANGUAGE LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT LC_IDENTIFICATION
 
 [Install]
+Alias=autovt@.service
+
 WantedBy=multi-user.target
+DefaultInstance=tty2
