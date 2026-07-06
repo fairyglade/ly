@@ -2,7 +2,7 @@
 
 ![Ly screenshot](.github/screenshot.png "Ly screenshot")
 
-_Note: the above animation can be found [here](https://codeberg.org/attachments/f336d6ac-8331-4323-91fc-0e4619803401)!_
+_Note: the above animation can be found [here](https://codeberg.org/fairyglade/ly-community/src/branch/main/animations/dur/blackhole-smooth-240x67.dur)!_
 
 Ly is a lightweight TUI (ncurses-like) display manager for Linux and BSD, designed with portability in mind and doesn't require systemd to run.
 
