@@ -1,17 +1,28 @@
+#  Default kmsconvt@.service
+#  Modified for Ly by AnErrupTion <anerruption@disroot.org>
+
 [Unit]
-Description=TUI display manager using KMSCON
-After=systemd-user-sessions.service plymouth-quit-wait.service
-After=kmsconvt@%i.service
-Conflicts=kmsconvt@%i.service
+Description=TUI display manager on %I using KMSCON
+After=systemd-user-sessions.service plymouth-quit-wait.service rc-local.service kmsconvt@%i.service
+Conflicts=getty@%i.service kmsconvt@%i.service ly@%i.service
+OnFailure=ly@%i.service
 
 [Service]
 ExecStart=$PREFIX_DIRECTORY/bin/kmscon --term=linux --font-engine unifont --vt=%I --login -- $PREFIX_DIRECTORY/bin/$EXECUTABLE_NAME --use-kmscon-vt
-StandardInput=tty
+Type=idle
+Restart=always
+RestartSec=0
 UtmpIdentifier=%I
+StandardInput=tty
+StandardOutput=tty
 TTYPath=/dev/%I
 TTYReset=yes
 TTYVHangup=yes
 TTYVTDisallocate=yes
+IgnoreSIGPIPE=no
+SendSIGHUP=yes
 
 [Install]
+Alias=autovt@.service
 WantedBy=multi-user.target
+DefaultInstance=tty2
