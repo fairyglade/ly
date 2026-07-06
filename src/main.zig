@@ -102,9 +102,6 @@ const UiState = struct {
     version_label: Label,
     bigclock_label: BigLabel,
     show_tty: bool,
-    hide_shutdown: bool,
-    hide_restart: bool,
-    hide_toggle_password: bool,
     hide_numlock: bool,
     hide_capslock: bool,
     hide_version_string: bool,
@@ -423,9 +420,6 @@ pub fn main(init: std.process.Init) !void {
     std.posix.sigaction(std.posix.SIG.TERM, &act, null);
 
     state.show_tty = cornersContain(state, "tty");
-    state.hide_shutdown = !cornersContain(state, "shutdown");
-    state.hide_restart = !cornersContain(state, "restart");
-    state.hide_toggle_password = !cornersContain(state, "password");
     state.hide_numlock = !cornersContain(state, "numlock");
     state.hide_capslock = !cornersContain(state, "capslock");
     state.hide_version_string = !cornersContain(state, "version");
@@ -483,25 +477,25 @@ pub fn main(init: std.process.Init) !void {
     );
     defer state.brightness_up_label.deinit();
 
-    if (!state.hide_shutdown) {
+    if (state.config.shutdown_key) |key| {
         try state.shutdown_label.setTextAlloc(
             state.allocator,
             "{s} {s}",
-            .{ state.config.shutdown_key, state.lang.shutdown },
+            .{ key, state.lang.shutdown },
         );
     }
-    if (!state.hide_restart) {
+    if (state.config.restart_key) |key| {
         try state.restart_label.setTextAlloc(
             state.allocator,
             "{s} {s}",
-            .{ state.config.restart_key, state.lang.restart },
+            .{ key, state.lang.restart },
         );
     }
-    if (!state.hide_toggle_password) {
+    if (state.config.show_password_key) |key| {
         try state.toggle_password_label.setTextAlloc(
             state.allocator,
             "{s} {s}",
-            .{ state.config.show_password_key, state.lang.toggle_password },
+            .{ key, state.lang.toggle_password },
         );
     }
     if (state.config.brightness_down_key) |key| {
@@ -1021,9 +1015,7 @@ pub fn main(init: std.process.Init) !void {
         };
     }
 
-    if (state.show_tty) {
-        try state.tty_label.setTextBuf(&state.tty_buf, "tty{d}", .{state.active_tty});
-    }
+    try state.tty_label.setTextBuf(&state.tty_buf, "tty{d}", .{state.active_tty});
 
     // Initialize the animation, if any
     var animation: ?*Widget = null;
@@ -1247,19 +1239,13 @@ pub fn main(init: std.process.Init) !void {
             state.custom_binds.items[state.custom_binds.items.len - 1].lbl.allocator = state.allocator;
         }
     }
-    if (!state.hide_shutdown) {
+    if (state.config.shutdown_key != null) {
         try layer2.append(state.allocator, state.shutdown_label.widget());
     }
-    if (!state.hide_restart) {
+    if (state.config.restart_key != null) {
         try layer2.append(state.allocator, state.restart_label.widget());
     }
-    if (!state.hide_shutdown) {
-        try layer2.append(state.allocator, state.shutdown_label.widget());
-    }
-    if (!state.hide_restart) {
-        try layer2.append(state.allocator, state.restart_label.widget());
-    }
-    if (!state.hide_toggle_password) {
+    if (state.config.show_password_key != null) {
         try layer2.append(state.allocator, state.toggle_password_label.widget());
     }
     if (state.config.brightness_down_key != null) {
@@ -1327,9 +1313,9 @@ pub fn main(init: std.process.Init) !void {
 
     try state.buffer.registerGlobalKeybind(state.io, "Enter", &authenticate, &state);
 
-    try state.buffer.registerGlobalKeybind(state.io, state.config.shutdown_key, &shutdownCmd, &state);
-    try state.buffer.registerGlobalKeybind(state.io, state.config.restart_key, &restartCmd, &state);
-    try state.buffer.registerGlobalKeybind(state.io, state.config.show_password_key, &togglePasswordMask, &state);
+    if (state.config.shutdown_key) |key| try state.buffer.registerGlobalKeybind(state.io, key, &shutdownCmd, &state);
+    if (state.config.restart_key) |key| try state.buffer.registerGlobalKeybind(state.io, key, &restartCmd, &state);
+    if (state.config.show_password_key) |key| try state.buffer.registerGlobalKeybind(state.io, key, &togglePasswordMask, &state);
     if (state.config.brightness_down_key) |key| try state.buffer.registerGlobalKeybind(state.io, key, &decreaseBrightnessCmd, &state);
     if (state.config.brightness_up_key) |key| try state.buffer.registerGlobalKeybind(state.io, key, &increaseBrightnessCmd, &state);
 
@@ -2008,6 +1994,7 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
     const base_x = state.edge_margin.x;
 
     if (std.mem.eql(u8, item, "shutdown")) {
+        if (state.config.shutdown_key == null) return false;
         const width = TerminalBuffer.strWidth(state.shutdown_label.text);
         if (is_left) {
             state.shutdown_label.positionXY(Position.init(current_x.*, current_y));
@@ -2018,6 +2005,7 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
         }
         return true;
     } else if (std.mem.eql(u8, item, "restart")) {
+        if (state.config.restart_key == null) return false;
         const width = TerminalBuffer.strWidth(state.restart_label.text);
         if (is_left) {
             state.restart_label.positionXY(Position.init(current_x.*, current_y));
@@ -2050,6 +2038,7 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
         }
         return true;
     } else if (std.mem.eql(u8, item, "password")) {
+        if (state.config.show_password_key == null) return false;
         const width = TerminalBuffer.strWidth(state.toggle_password_label.text);
         if (is_left) {
             state.toggle_password_label.positionXY(Position.init(current_x.*, current_y));
