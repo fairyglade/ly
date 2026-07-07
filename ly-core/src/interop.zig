@@ -28,7 +28,7 @@ pub const UsernameEntry = struct {
     gid: std.posix.gid_t,
     home: ?[]const u8,
     shell: ?[]const u8,
-    passwd_struct: [*c]pwd.passwd,
+    passwd_struct: [*]pwd.passwd,
 };
 
 // Contains the platform-specific code
@@ -381,8 +381,8 @@ pub fn setEnvironmentVariable(allocator: std.mem.Allocator, name: []const u8, va
     if (status != 0) return error.SetEnvironmentVariableFailed;
 }
 
-pub fn putEnvironmentVariable(name_and_value: [*c]u8) !void {
-    const status = stdlib.putenv(name_and_value);
+pub fn putEnvironmentVariable(name_and_value: []u8) !void {
+    const status = stdlib.putenv(name_and_value.ptr);
     if (status != 0) return error.PutEnvironmentVariableFailed;
 }
 

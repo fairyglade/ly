@@ -191,10 +191,12 @@ fn startSession(
     if (pam_env_vars == null) return error.GetEnvListFailed;
 
     const env_list = std.mem.span(pam_env_vars.?);
-    for (env_list) |env_var| {
-        if (env_var == null) continue;
-        try log_file.info(io, "auth/env", "setting pam environment variable: {s}", .{std.mem.span(env_var.?)});
-        try interop.putEnvironmentVariable(env_var);
+    for (env_list) |maybe_env_var| {
+        if (maybe_env_var) |env_var| {
+            const env_var_slice = std.mem.span(env_var);
+            try log_file.info(io, "auth/env", "setting pam environment variable: {s}", .{env_var_slice});
+            try interop.putEnvironmentVariable(env_var_slice);
+        }
     }
 
     const home_z = try allocator.dupeZ(u8, user_entry.home.?);
