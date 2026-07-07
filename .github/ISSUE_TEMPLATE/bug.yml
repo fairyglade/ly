@@ -11,15 +11,19 @@ body:
       options:
         - label: I have looked for any other duplicate issues
           required: true
-        - label: I have reproduced the issue on a fresh install of my OS & Ly with default settings, except ones I will mention
+        - label: I have reproduced the issue with the default config of Ly
+          required: true
+        - label: I have reproduced the issue on a fresh install of Ly **as well as** my OS and my desktop environment/window manager, all with **default settings**, except ones I will mention
           required: false
         - label: I have confirmed this issue also occurs on the latest development version (found in the `master` branch)
+          required: true
+        - label: I understand that this issue **will** be closed if requirements are not or not properly met
           required: true
   - type: input
     id: version
     attributes:
       label: Ly version
-      description: The output of `ly --version`. Please note that only Ly v1.2.0 and above are supported.
+      description: The output of `ly --version`. Please note that only the latest release and the current version in development are supported.
       placeholder: 1.1.0-dev.12+2b0301c
     validations:
       required: true
@@ -41,9 +45,16 @@ body:
     id: desktop
     attributes:
       label: OS + Desktop environment/Window manager
-      description: Which OS and DE (or WM) did you use when observing the problem?
+      description: Which operating system and DE (or WM) did you use when observing the problem?
     validations:
       required: true
+  - type: input
+    id: osimage
+    attributes:
+      label: OS version/snapshot used to reproduce
+      description: Which version (or snapshot if rolling release) of the OS did you use to reproduce the issue? This is only required if you have reproduced the issue on a fresh copy of the OS.
+    validations:
+      required: false
   - type: textarea
     id: reproduction
     attributes:

@@ -20,3 +20,10 @@ body:
       description: What do you want to be added? Describe the behavior clearly.
     validations:
       required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Are there any alternatives to the new behavior you wish to see being added?
+    validations:
+      required: true

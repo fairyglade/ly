@@ -2,9 +2,9 @@
 
 _Replace this with a brief description of your changes_
 
-## What existing issue does this resolve?
+## What existing issue(s) does this resolve?
 
-_Replace this with a reference to an existing issue, or N/A if there is none_
+_Replace this with a reference to (an) existing issue(s), or N/A if there is none_
 
 ## Pre-requisites
 
