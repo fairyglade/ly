@@ -578,9 +578,9 @@ fn parseKeybind(self: *TerminalBuffer, io: std.Io, keybind: []const u8) !keyboar
     while (iterator.next()) |item| {
         var found = false;
 
-        inline for (std.meta.fields(keyboard.Key)) |field| {
-            if (std.ascii.eqlIgnoreCase(field.name, item)) {
-                @field(key, field.name) = true;
+        inline for (comptime std.meta.fieldNames(keyboard.Key)) |name| {
+            if (std.ascii.eqlIgnoreCase(name, item)) {
+                @field(key, name) = true;
                 found = true;
                 break;
             }

@@ -113,14 +113,14 @@ pub const Key = packed struct {
     pub fn getEnabledPrintableAscii(self: Key) ?u8 {
         if (self.ctrl or self.alt) return null;
 
-        inline for (std.meta.fields(Key)) |field| {
-            if (field.name.len == 1 and std.ascii.isPrint(field.name[0]) and @field(self, field.name)) {
+        inline for (comptime std.meta.fieldNames(Key)) |name| {
+            if (name.len == 1 and std.ascii.isPrint(name[0]) and @field(self, name)) {
                 if (self.shift) {
-                    if (!std.ascii.isAlphanumeric(field.name[0])) return null;
-                    return std.ascii.toUpper(field.name[0]);
+                    if (!std.ascii.isAlphanumeric(name[0])) return null;
+                    return std.ascii.toUpper(name[0]);
                 }
 
-                return field.name[0];
+                return name[0];
             }
         }
 

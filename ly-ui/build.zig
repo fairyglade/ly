@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .enable_x11_support = enable_x11_support,
         .fallback_uid_min = fallback_uid_min,
-        .fallback_uid_max = fallback_uid_max
+        .fallback_uid_max = fallback_uid_max,
     });
     mod.addImport("ly-core", ly_core.module("ly-core"));
 
