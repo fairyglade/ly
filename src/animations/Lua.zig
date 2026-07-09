@@ -129,8 +129,10 @@ fn draw(self: *Lua) void {
                 cell.put(x, y) catch {};
         if (self.lua_str) |str|
             for (str, 0..) |c, i| {
+                const dwidth = @divFloor(self.width, 2);
+                const dlen = @divFloor(str.len, 2);
                 Cell.init(c, 0x00FFFFFF, 0).put(
-                    @divFloor(self.width, 2) - @divFloor(str.len, 2) + i,
+                    (if (dlen > dwidth) 0 else dwidth - dlen) + i,
                     self.margin + 5,
                 ) catch {};
             };
