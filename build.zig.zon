@@ -8,12 +8,12 @@
             .path = "ly-ui",
         },
         .clap = .{
-            .url = "git+https://github.com/Hejsil/zig-clap#fc1e5cc3f6d9d3001112385ee6256d694e959d2f",
-            .hash = "clap-0.11.0-oBajB7foAQC3Iyn4IVCkUdYaOVVng5IZkSncySTjNig1",
+            .url = "git+https://github.com/Hejsil/zig-clap?ref=master#e91d66b1abba2024cd2e816426f14d233d3dad9a",
+            .hash = "clap-0.12.0-oBajB2LpAQD1BQpAukHcuwhIUoHWYNy2DzU6lDW2v2N8",
         },
         .zlua = .{
-            .url = "git+https://github.com/natecraddock/ziglua?ref=zig-0.16#8f271c82baa5fc43aa02a72f6da020c2025d9436",
-            .hash = "zlua-0.1.0-hGRpC2aABQD4D9PBVH3wAW8k32-I4969MRQ0CpOwoley",
+            .url = "git+https://github.com/AnErrupTion/ziglua?ref=zig-0.17#134fd6110e860672c32703d9c76588a1d5f6a3fa",
+            .hash = "zlua-0.1.0-hGRpC1mUBQDugHDyWzXaCjnAwr9wKKArY06QpVOFTFUM",
         },
     },
     .paths = .{

@@ -12,8 +12,8 @@
             .hash = "N-V-__8AAAUXBQD6Fwpi9m0MBqWXFFaqW5l1lVrJC2Ynj7a-",
         },
         .translate_c = .{
-            .url = "git+https://codeberg.org/ziglang/translate-c?ref=zig-0.16.x#6fe0ffc4549f15c5f2d9432c2b4460ba90ff85ac",
-            .hash = "translate_c-1.0.0-Q_BUWo_5BgD4flHdUhA31zOz0XvZk9k7lQv1ouzyNXj2",
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=master#ba4288f6c0e8054d7894266949d4fa08bfc0212a",
+            .hash = "translate_c-0.0.0-Q_BUWvI3BwAFZWG2aNKspzHT7uv3yKuNMC5sP4C0hoYl",
         },
     },
     .paths = .{

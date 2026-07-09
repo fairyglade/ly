@@ -130,7 +130,7 @@ pub fn build(b: *std.Build) !void {
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
+    run_cmd.addPassthruArgs();
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
@@ -195,7 +195,7 @@ fn getVersionStr(b: *std.Build, name: []const u8, version: std.SemanticVersion) 
     const git_describe_raw = b.runAllowFail(&[_][]const u8{
         "git",
         "-C",
-        b.build_root.path orelse ".",
+        try b.root.toString(b.allocator),
         "describe",
         "--match",
         "*.*.*",
