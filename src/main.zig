@@ -1950,8 +1950,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.shutdown_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.shutdown_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.shutdown_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "restart")) {
@@ -1961,8 +1962,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.restart_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.restart_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.restart_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "britup")) {
@@ -1972,8 +1974,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.brightness_up_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.brightness_up_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.brightness_up_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "britdown")) {
@@ -1983,8 +1986,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.brightness_down_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.brightness_down_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.brightness_down_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "password")) {
@@ -1994,8 +1998,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.toggle_password_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.toggle_password_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.toggle_password_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "clock") or std.mem.eql(u8, item, "time")) {
@@ -2005,8 +2010,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.clock_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.clock_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.clock_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "tty")) {
@@ -2015,8 +2021,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.tty_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.tty_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.tty_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "battery")) {
@@ -2026,8 +2033,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.battery_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.battery_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.battery_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "version")) {
@@ -2036,8 +2044,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.version_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.version_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.version_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "numlock")) {
@@ -2046,8 +2055,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.numlock_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.numlock_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.numlock_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "capslock")) {
@@ -2056,8 +2066,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
             state.capslock_label.positionXY(Position.init(current_x.*, current_y));
             current_x.* += width + 1;
         } else {
-            state.capslock_label.positionXY(Position.init(current_x.* - width, current_y));
-            current_x.* -= width + 1;
+            const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+            state.capslock_label.positionXY(Position.init(dwidth, current_y));
+            if (width + 1 <= current_x.*) current_x.* -= width + 1;
         }
         return true;
     } else if (std.mem.eql(u8, item, "labels")) {
@@ -2068,8 +2079,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
                 info.lbl.positionXY(Position.init(current_x.*, current_y));
                 current_x.* += width + 1;
             } else {
-                info.lbl.positionXY(Position.init(current_x.* - width, current_y));
-                current_x.* -= width + 1;
+                const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+                info.lbl.positionXY(Position.init(dwidth, current_y));
+                if (width + 1 <= current_x.*) current_x.* -= width + 1;
             }
             positioned.labels[i] = true;
         }
@@ -2094,8 +2106,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
                     local_x = state.buffer.width - state.edge_margin.x;
                     if (is_top) local_y += 1 else local_y -= 1;
                 }
-                bind.lbl.positionXY(Position.init(local_x - width, local_y));
-                local_x -= width + 1;
+                const dwidth = if (width > local_x) 0 else local_x - width;
+                bind.lbl.positionXY(Position.init(dwidth, current_y));
+                if (width + 1 <= local_x) local_x -= width + 1;
             }
             positioned.binds[i] = true;
         }
@@ -2111,8 +2124,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
                     info.lbl.positionXY(Position.init(current_x.*, current_y));
                     current_x.* += width + 1;
                 } else {
-                    info.lbl.positionXY(Position.init(current_x.* - width, current_y));
-                    current_x.* -= width + 1;
+                    const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+                    info.lbl.positionXY(Position.init(dwidth, current_y));
+                    if (width + 1 <= current_x.*) current_x.* -= width + 1;
                 }
                 positioned.labels[i] = true;
                 return true;
@@ -2128,8 +2142,9 @@ fn positionSingleWidget(state: *UiState, item: []const u8, current_x: *usize, cu
                     bind.lbl.positionXY(Position.init(current_x.*, current_y));
                     current_x.* += width + 1;
                 } else {
-                    bind.lbl.positionXY(Position.init(current_x.* - width, current_y));
-                    current_x.* -= width + 1;
+                    const dwidth = if (width > current_x.*) 0 else current_x.* - width;
+                    bind.lbl.positionXY(Position.init(dwidth, current_y));
+                    if (width + 1 <= current_x.*) current_x.* -= width + 1;
                 }
                 positioned.binds[i] = true;
                 return true;
