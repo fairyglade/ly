@@ -269,7 +269,8 @@ pub fn runEventLoop(
                 }
             }
 
-            try TerminalBuffer.presentBuffer();
+            // We don't care about present errors here
+            TerminalBuffer.presentBuffer() catch {};
         }
 
         if (inactivity_event_fn) |inactivity_fn| {
