@@ -8,8 +8,8 @@
             .path = "../ly-core",
         },
         .termbox2 = .{
-            .url = "git+https://github.com/AnErrupTion/termbox2?ref=master#c7f241e8888ce243e1748b05c26a42fcfaaad936",
-            .hash = "N-V-__8AAAUXBQD6Fwpi9m0MBqWXFFaqW5l1lVrJC2Ynj7a-",
+            .url = "git+https://github.com/AnErrupTion/termbox2?ref=master#496730697c662893eec43192f48ff616c2539da6",
+            .hash = "N-V-__8AAOEWBQDt5tNdIzIFY6n8DdZsCP-6MyLoNS20wgpA",
         },
         .translate_c = .{
             .url = "git+https://codeberg.org/ziglang/translate-c?ref=master#2d71d6e68dd9e9ee1da2a248a1dcb5aeba683dec",
