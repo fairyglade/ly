@@ -2,7 +2,7 @@
     .name = .ly_ui,
     .version = "1.1.0",
     .fingerprint = 0x8d11bf85a74ec803,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .ly_core = .{
             .path = "../ly-core",
@@ -12,8 +12,8 @@
             .hash = "N-V-__8AAAUXBQD6Fwpi9m0MBqWXFFaqW5l1lVrJC2Ynj7a-",
         },
         .translate_c = .{
-            .url = "git+https://codeberg.org/ziglang/translate-c?ref=master#ba4288f6c0e8054d7894266949d4fa08bfc0212a",
-            .hash = "translate_c-0.0.0-Q_BUWvI3BwAFZWG2aNKspzHT7uv3yKuNMC5sP4C0hoYl",
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=master#2d71d6e68dd9e9ee1da2a248a1dcb5aeba683dec",
+            .hash = "translate_c-0.0.0-Q_BUWtI4BwDTFS7O6WTn-3qixa_s81nw_C0FHbf2aLqj",
         },
     },
     .paths = .{

@@ -41,7 +41,7 @@ pub fn authenticate(allocator: std.mem.Allocator, io: std.Io, log_file: *LogFile
     const tty_str = try std.fmt.bufPrint(&tty_buffer, "{d}", .{options.tty});
 
     var pam_tty_buffer: [6]u8 = undefined;
-    const pam_tty_str = try std.fmt.bufPrintZ(&pam_tty_buffer, "tty{d}", .{options.tty});
+    const pam_tty_str = try std.fmt.bufPrintSentinel(&pam_tty_buffer, "tty{d}", .{options.tty}, 0);
 
     // Set the XDG environment variables
     try log_file.info(io, "auth/env", "setting xdg environment variables", .{});
@@ -49,10 +49,10 @@ pub fn authenticate(allocator: std.mem.Allocator, io: std.Io, log_file: *LogFile
 
     // Open the PAM session
     try log_file.info(io, "auth/pam", "encoding credentials", .{});
-    const login_z = try allocator.dupeZ(u8, login);
+    const login_z = try allocator.dupeSentinel(u8, login, 0);
     defer allocator.free(login_z);
 
-    const password_z = try allocator.dupeZ(u8, password);
+    const password_z = try allocator.dupeSentinel(u8, password, 0);
     defer allocator.free(password_z);
 
     var credentials = [_:null]?[*:0]const u8{ login_z, password_z };
@@ -199,7 +199,7 @@ fn startSession(
         }
     }
 
-    const home_z = try allocator.dupeZ(u8, user_entry.home.?);
+    const home_z = try allocator.dupeSentinel(u8, user_entry.home.?, 0);
     defer allocator.free(home_z);
 
     // Change to the user's home directory
@@ -294,7 +294,7 @@ fn loginConv(
         switch (messages[i].?.msg_style) {
             interop.pam.PAM_PROMPT_ECHO_ON => {
                 const data: [*][*:0]u8 = @ptrCast(@alignCast(appdata_ptr));
-                username = allocator.dupeZ(u8, std.mem.span(data[0])) catch {
+                username = allocator.dupeSentinel(u8, std.mem.span(data[0]), 0) catch {
                     status = interop.pam.PAM_BUF_ERR;
                     break :set_credentials;
                 };
@@ -302,7 +302,7 @@ fn loginConv(
             },
             interop.pam.PAM_PROMPT_ECHO_OFF => {
                 const data: [*][*:0]u8 = @ptrCast(@alignCast(appdata_ptr));
-                password = allocator.dupeZ(u8, std.mem.span(data[1])) catch {
+                password = allocator.dupeSentinel(u8, std.mem.span(data[1]), 0) catch {
                     status = interop.pam.PAM_BUF_ERR;
                     break :set_credentials;
                 };
@@ -332,7 +332,7 @@ fn getFreeDisplay() !u8 {
     var buf: [15]u8 = undefined;
     var i: u8 = 0;
     while (i < 200) : (i += 1) {
-        const xlock = try std.fmt.bufPrintZ(&buf, "/tmp/.X{d}-lock", .{i});
+        const xlock = try std.fmt.bufPrintSentinel(&buf, "/tmp/.X{d}-lock", .{i}, 0);
         if (interop.isError(std.posix.system.access(xlock.ptr, std.posix.F_OK))) break;
     }
     return i;
@@ -433,7 +433,7 @@ fn xauth(log_file: *LogFile, allocator: std.mem.Allocator, io: std.Io, display_n
         try log_file.reinit(io);
 
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} add {s} . {s}", .{ options.xauth_cmd, display_name, magic_cookie }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintSentinel(&cmd_buffer, "{s} add {s} . {s}", .{ options.xauth_cmd, display_name, magic_cookie }, 0) catch std.process.exit(1);
 
         try log_file.info(io, "auth/x11", "executing: {s} -c {s}", .{ shell, cmd_str });
         const args = [_:null]?[*:0]const u8{ shell, "-c", cmd_str };
@@ -469,7 +469,7 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, io: std.Io, s
     const display_name = try std.fmt.bufPrint(&buf, ":{d}", .{display_num});
     try log_file.info(io, "auth/x11", "got free display: {d}", .{display_num});
 
-    const shell_z = try allocator.dupeZ(u8, shell);
+    const shell_z = try allocator.dupeSentinel(u8, shell, 0);
     defer allocator.free(shell_z);
 
     try log_file.info(io, "auth/x11", "creating xauth file", .{});
@@ -479,7 +479,7 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, io: std.Io, s
     const pid = std.posix.system.fork();
     if (pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s} -auth {s}", .{ options.x_cmd, display_name, vt, xauthority }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintSentinel(&cmd_buffer, "{s} {s} {s} -auth {s}", .{ options.x_cmd, display_name, vt, xauthority }, 0) catch std.process.exit(1);
         try log_file.info(io, "auth/x11", "executing: {s} -c {s} -auth {s}", .{ shell, cmd_str, xauthority });
 
         const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
@@ -508,7 +508,7 @@ fn executeX11Cmd(log_file: *LogFile, allocator: std.mem.Allocator, io: std.Io, s
     xorg_pid = std.posix.system.fork();
     if (xorg_pid == 0) {
         var cmd_buffer: [1024]u8 = undefined;
-        const cmd_str = std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s} {s}", .{ if (options.use_kmscon_vt) "kmscon-launch-gui" else "", options.setup_cmd, options.login_cmd orelse "", desktop_cmd }) catch std.process.exit(1);
+        const cmd_str = std.fmt.bufPrintSentinel(&cmd_buffer, "{s} {s} {s} {s}", .{ if (options.use_kmscon_vt) "kmscon-launch-gui" else "", options.setup_cmd, options.login_cmd orelse "", desktop_cmd }, 0) catch std.process.exit(1);
         try log_file.info(io, "auth/x11", "executing: {s} -c {s}", .{ shell, cmd_str });
 
         const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
@@ -559,11 +559,11 @@ fn executeCmd(global_log_file: *LogFile, allocator: std.mem.Allocator, io: std.I
     }
     defer if (maybe_log_file) |log_file| log_file.close(io);
 
-    const shell_z = try allocator.dupeZ(u8, shell);
+    const shell_z = try allocator.dupeSentinel(u8, shell, 0);
     defer allocator.free(shell_z);
 
     var cmd_buffer: [1024]u8 = undefined;
-    const cmd_str = try std.fmt.bufPrintZ(&cmd_buffer, "{s} {s} {s} {s}", .{ if (!is_terminal and options.use_kmscon_vt) "kmscon-launch-gui" else "", options.setup_cmd, options.login_cmd orelse "", exec_cmd orelse shell });
+    const cmd_str = try std.fmt.bufPrintSentinel(&cmd_buffer, "{s} {s} {s} {s}", .{ if (!is_terminal and options.use_kmscon_vt) "kmscon-launch-gui" else "", options.setup_cmd, options.login_cmd orelse "", exec_cmd orelse shell }, 0);
 
     try global_log_file.info(io, "auth/sys", "executing: {s} -c {s}", .{ shell, cmd_str });
     const args = [_:null]?[*:0]const u8{ shell_z, "-c", cmd_str };
@@ -604,7 +604,7 @@ fn addUtmpEntry(io: std.Io, entry: *Utmp, username: []const u8, pid: c_int) !voi
 
     // Get the TTY name (i.e. without the /dev/ prefix)
     var ttyname_buf: [@sizeOf(@TypeOf(entry.ut_line))]u8 = undefined;
-    _ = try std.fmt.bufPrintZ(&ttyname_buf, "{s}", .{tty_path["/dev/".len..]});
+    _ = try std.fmt.bufPrintSentinel(&ttyname_buf, "{s}", .{tty_path["/dev/".len..]}, 0);
 
     entry.ut_line = ttyname_buf;
     // Get the TTY ID (i.e. without the tty prefix) and truncate it to the size
@@ -612,7 +612,7 @@ fn addUtmpEntry(io: std.Io, entry: *Utmp, username: []const u8, pid: c_int) !voi
     entry.ut_id = ttyname_buf["tty".len..(@sizeOf(@TypeOf(entry.ut_id)) + "tty".len)].*;
 
     var username_buf: [@sizeOf(@TypeOf(entry.ut_user))]u8 = undefined;
-    _ = try std.fmt.bufPrintZ(&username_buf, "{s}", .{username});
+    _ = try std.fmt.bufPrintSentinel(&username_buf, "{s}", .{username}, 0);
 
     entry.ut_user = username_buf;
 

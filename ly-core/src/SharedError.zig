@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const ErrInt = std.meta.Int(.unsigned, @bitSizeOf(anyerror));
-const PaddingInt = std.meta.Int(.unsigned, 8 - (@bitSizeOf(ErrInt) + @bitSizeOf(bool)) % 8);
+const ErrInt = @Int(.unsigned, @bitSizeOf(anyerror));
+const PaddingInt = @Int(.unsigned, 8 - (@bitSizeOf(ErrInt) + @bitSizeOf(bool)) % 8);
 
 const ErrorHandler = packed struct {
     has_error: bool = false,

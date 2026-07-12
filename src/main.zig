@@ -303,7 +303,7 @@ pub fn main(init: std.process.Init) !void {
 
         const username_line = reader.takeDelimiterInclusive('\n') catch break :read_save_file;
 
-        if (std.mem.containsAtLeastScalar2(u8, username_line, '-', 1)) read_username: {
+        if (std.mem.containsAtLeastScalar(u8, username_line, '-', 1)) read_username: {
             var iterator = std.mem.splitScalar(u8, username_line[0..(username_line.len - 1)], '-');
             if (iterator.next() == null) break :read_username; // Would be index
 
@@ -1202,8 +1202,8 @@ pub fn main(init: std.process.Init) !void {
     var iter = custom.binds.iterator();
     while (iter.next()) |i| {
         var concat = try std.mem.concat(state.allocator, u8, &[_][]const u8{ i.key_ptr.*, " ", i.value_ptr.name });
-        inline for (@typeInfo(Lang).@"struct".fields) |lang_key| {
-            const new = try std.mem.replaceOwned(u8, state.allocator, concat, "$" ++ lang_key.name, @field(state.lang, lang_key.name));
+        inline for (@typeInfo(Lang).@"struct".field_names) |lang_key| {
+            const new = try std.mem.replaceOwned(u8, state.allocator, concat, "$" ++ lang_key, @field(state.lang, lang_key));
             state.allocator.free(concat);
             concat = new;
         }
@@ -1885,7 +1885,7 @@ fn updateBigClock(self: *BigLabel, ptr: *anyopaque) !void {
     const time = try interop.getTimeOfDay();
     const animate_time = @divTrunc(time.microseconds, 500_000);
     const separator = if (state.animate and animate_time != 0) " " else ":";
-    const format = try std.fmt.bufPrintZ(
+    const format = try std.fmt.bufPrintSentinel(
         &state.bigclock_format_buf,
         "{s}{s}{s}{s}{s}{s}",
         .{
@@ -1896,6 +1896,7 @@ fn updateBigClock(self: *BigLabel, ptr: *anyopaque) !void {
             if (state.config.bigclock_seconds) "%S" else "",
             if (state.config.bigclock_12hr) "%P" else "",
         },
+        0,
     );
 
     const clock_str = interop.timeAsString(state.io, &state.bigclock_buf, format);

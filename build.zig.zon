@@ -2,7 +2,7 @@
     .name = .ly,
     .version = "1.5.0",
     .fingerprint = 0xa148ffcc5dc2cb59,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .ly_ui = .{
             .path = "ly-ui",
@@ -12,8 +12,8 @@
             .hash = "clap-0.12.0-oBajB2LpAQD1BQpAukHcuwhIUoHWYNy2DzU6lDW2v2N8",
         },
         .zlua = .{
-            .url = "git+https://github.com/AnErrupTion/ziglua?ref=zig-0.17#134fd6110e860672c32703d9c76588a1d5f6a3fa",
-            .hash = "zlua-0.1.0-hGRpC1mUBQDugHDyWzXaCjnAwr9wKKArY06QpVOFTFUM",
+            .url = "git+https://github.com/AnErrupTion/ziglua?ref=zig-0.17#4cca15ac75967115830708ca28d1d3dcde729f04",
+            .hash = "zlua-0.1.0-hGRpC-aUBQCrVgFkeX-mNintLyM1i9_4FJU4mGSw0DgC",
         },
     },
     .paths = .{

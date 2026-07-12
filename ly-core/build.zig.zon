@@ -2,15 +2,15 @@
     .name = .ly_core,
     .version = "1.1.0",
     .fingerprint = 0xddda7afda795472,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .zigini = .{
-            .url = "git+https://github.com/AnErrupTion/zigini?ref=zig-0.17#950eab7d96bb364379acca763695700670d75382",
-            .hash = "zigini-0.5.0-BSkB7eVXAADQTfcUPT8TUu79sONGQk1Xbaz4_Tu0VvQx",
+            .url = "git+https://github.com/AnErrupTion/zigini?ref=zig-0.17.0#29b30ec37efccb022a57e7acda83d63fa5832dd8",
+            .hash = "zigini-0.6.0-BSkB7UtYAAB6b6HEm3Pjj5WIy-uiuBYsNTNCUENVwL1t",
         },
         .translate_c = .{
-            .url = "git+https://codeberg.org/ziglang/translate-c?ref=master#ba4288f6c0e8054d7894266949d4fa08bfc0212a",
-            .hash = "translate_c-0.0.0-Q_BUWvI3BwAFZWG2aNKspzHT7uv3yKuNMC5sP4C0hoYl",
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=master#2d71d6e68dd9e9ee1da2a248a1dcb5aeba683dec",
+            .hash = "translate_c-0.0.0-Q_BUWtI4BwDTFS7O6WTn-3qixa_s81nw_C0FHbf2aLqj",
         },
     },
     .paths = .{
