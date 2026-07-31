@@ -574,7 +574,15 @@ fn executeCmd(global_log_file: *LogFile, allocator: std.mem.Allocator, io: std.I
 fn redirectStandardStreams(global_log_file: *LogFile, io: std.Io, session_log: []const u8, create: bool) !std.Io.File {
     create_session_log_dir: {
         const session_log_dir = std.Io.Dir.path.dirname(session_log) orelse break :create_session_log_dir;
-        std.Io.Dir.cwd().createDirPath(io, session_log_dir) catch |err| {
+
+        var buffer = std.mem.zeroes([std.Io.Dir.max_path_bytes]u8);
+        const len = std.Io.Dir.cwd().realPathFile(io, session_log_dir, &buffer) catch |err| {
+            try global_log_file.err(io, "auth/sys", "failed to resolve path for session log file directory: {s}", .{@errorName(err)});
+            return err;
+        };
+        const resolved_path = buffer[0..len];
+
+        std.Io.Dir.cwd().createDirPath(io, resolved_path) catch |err| {
             try global_log_file.err(io, "auth/sys", "failed to create session log file directory: {s}", .{@errorName(err)});
             return err;
         };
