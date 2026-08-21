@@ -180,9 +180,10 @@ On non-systemd systems, you can change the TTY Ly will run on by editing the cor
 
 ```
 # zig build installexe -Dinit_system=runit
-# rm /var/service/lightdm
+# unlink /var/service/lightdm
 # ln -s /etc/sv/ly /var/service/
-# rm /var/service/agetty-tty2
+# touch /etc/sv/agetty-tty2/down
+# unlink /var/service/agetty-tty2
 ```
 
 ### s6
