@@ -27,8 +27,6 @@ Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.
 
   - xorg-xauth
 
-  - shutdown
-
   - brightnessctl
 
 ### Debian
