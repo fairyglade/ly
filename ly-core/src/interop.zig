@@ -246,8 +246,29 @@ fn PlatformStruct() type {
                 if (result != 0) return error.SetUserUidFailed;
             }
 
+            // FreeBSD implementation using sysctlbyname
+            // https://man.freebsd.org/cgi/man.cgi?sysctlbyname
             pub fn getActiveTtyImpl(_: std.mem.Allocator, _: std.Io, _: bool) !u8 {
-                return error.FeatureUnimplemented;
+                const tty_fd = std.posix.system.open("/dev/tty", .{});
+                if (tty_fd < 0) return error.NoTtyFound;
+                defer _ = std.posix.system.close(tty_fd);
+
+                var tty_stat: std.posix.Stat = undefined;
+                if (std.posix.system.fstat(tty_fd, &tty_stat) < 0) return error.FstatTty;
+
+                var buf: ["ttyvx".len:0]u8 = undefined;
+                var len: usize = buf.len + 1;
+
+                if (std.posix.system.sysctlbyname("kern.devname", buf[0..].ptr, &len, &tty_stat.rdev, @sizeOf(u64)) < 0)
+                    return error.SysctlTty;
+
+                const dev_name = buf[0 .. len - 1];
+
+                if (std.mem.startsWith(u8, dev_name, "ttyv")) {
+                    return try std.fmt.parseInt(u8, dev_name[dev_name.len - 1 ..], 16);
+                }
+
+                return error.NoTtyFound;
             }
 
             pub fn getUserIdRange(_: std.mem.Allocator, _: std.Io, _: []const u8) !UidRange {
