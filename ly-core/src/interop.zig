@@ -421,8 +421,11 @@ pub fn getNextUsernameEntry() ?UsernameEntry {
     };
 }
 
-pub fn getUsernameEntry(username: [:0]const u8) ?UsernameEntry {
-    const entry = pwd.getpwnam(username);
+pub fn getUsernameEntry(allocator: std.mem.Allocator, username: []const u8) ?UsernameEntry {
+    const username_z = allocator.dupeZ(u8, username) catch return null;
+    defer allocator.free(username_z);
+
+    const entry = pwd.getpwnam(username_z);
     if (entry == null) return null;
 
     return .{

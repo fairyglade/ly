@@ -26,6 +26,11 @@ pub const AuthOptions = struct {
     use_kmscon_vt: bool,
 };
 
+const PamAppdata = struct {
+    username: []const u8,
+    password: []const u8,
+};
+
 var xorg_pid: std.posix.pid_t = 0;
 pub fn xorgSignalHandler(sig: std.posix.SIG) callconv(.c) void {
     if (xorg_pid > 0) _ = std.c.kill(xorg_pid, sig);
@@ -49,13 +54,11 @@ pub fn authenticate(allocator: std.mem.Allocator, io: std.Io, log_file: *LogFile
 
     // Open the PAM session
     try log_file.info(io, "auth/pam", "encoding credentials", .{});
-    const login_z = try allocator.dupeZ(u8, login);
-    defer allocator.free(login_z);
 
-    const password_z = try allocator.dupeZ(u8, password);
-    defer allocator.free(password_z);
-
-    var credentials = [_:null]?[*:0]const u8{ login_z, password_z };
+    var credentials: PamAppdata = .{
+        .username = login,
+        .password = password,
+    };
 
     const conv = interop.pam.pam_conv{
         .conv = loginConv,
@@ -98,7 +101,7 @@ pub fn authenticate(allocator: std.mem.Allocator, io: std.Io, log_file: *LogFile
         defer interop.closePasswordDatabase();
 
         // Get password structure from username
-        user_entry = interop.getUsernameEntry(login_z) orelse return error.GetPasswordNameFailed;
+        user_entry = interop.getUsernameEntry(allocator, login) orelse return error.GetPasswordNameFailed;
     }
 
     // Set user shell if it hasn't already been set
@@ -276,6 +279,7 @@ fn loginConv(
     resp: ?*?[*]interop.pam.pam_response,
     appdata_ptr: ?*anyopaque,
 ) callconv(.c) c_int {
+    const data: *PamAppdata = @ptrCast(@alignCast(appdata_ptr));
     const message_count: u32 = @intCast(num_msg);
     const messages = msg.?;
 
@@ -289,20 +293,28 @@ fn loginConv(
     var username: ?[:0]u8 = null;
     var password: ?[:0]u8 = null;
     var status: c_int = interop.pam.PAM_SUCCESS;
+    defer {
+        if (status != interop.pam.PAM_SUCCESS) {
+            // Memory is freed by pam otherwise
+            allocator.free(response);
+            if (username) |str| allocator.free(str);
+            if (password) |str| allocator.free(str);
+        } else {
+            resp.?.* = response.ptr;
+        }
+    }
 
     for (0..message_count) |i| set_credentials: {
         switch (messages[i].?.msg_style) {
             interop.pam.PAM_PROMPT_ECHO_ON => {
-                const data: [*][*:0]u8 = @ptrCast(@alignCast(appdata_ptr));
-                username = allocator.dupeZ(u8, std.mem.span(data[0])) catch {
+                username = allocator.dupeZ(u8, data.username) catch {
                     status = interop.pam.PAM_BUF_ERR;
                     break :set_credentials;
                 };
                 response[i].resp = username.?;
             },
             interop.pam.PAM_PROMPT_ECHO_OFF => {
-                const data: [*][*:0]u8 = @ptrCast(@alignCast(appdata_ptr));
-                password = allocator.dupeZ(u8, std.mem.span(data[1])) catch {
+                password = allocator.dupeZ(u8, data.password) catch {
                     status = interop.pam.PAM_BUF_ERR;
                     break :set_credentials;
                 };
@@ -314,15 +326,6 @@ fn loginConv(
             },
             else => {},
         }
-    }
-
-    if (status != interop.pam.PAM_SUCCESS) {
-        // Memory is freed by pam otherwise
-        allocator.free(response);
-        if (username) |str| allocator.free(str);
-        if (password) |str| allocator.free(str);
-    } else {
-        resp.?.* = response.ptr;
     }
 
     return status;
