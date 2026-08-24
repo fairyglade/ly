@@ -102,13 +102,6 @@ pub fn build(b: *std.Build) !void {
         }),
     });
 
-    const zlua = b.dependency("zlua", .{
-        .target = target,
-        .optimize = optimize,
-        .lang = .luajit,
-    });
-    exe.root_module.addImport("zlua", zlua.module("zlua"));
-
     const ly_ui = b.dependency("ly_ui", .{
         .target = target,
         .optimize = optimize,

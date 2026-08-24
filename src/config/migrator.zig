@@ -18,7 +18,7 @@ const Config = @import("Config.zig");
 const Lang = @import("Lang.zig");
 const OldSave = @import("OldSave.zig");
 const SavedUsers = @import("SavedUsers.zig");
-const custom = @import("custom.zig");
+const custom = ly_core.custom;
 
 const color_properties = [_][]const u8{
     "bg",

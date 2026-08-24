@@ -19,9 +19,12 @@ const interop = ly_core.interop;
 const UidRange = ly_core.UidRange;
 const LogFile = ly_core.LogFile;
 const SharedError = ly_core.SharedError;
+const Parser = ly_core.Parser;
 const IniParser = ly_core.IniParser;
+const LuaParser = ly_core.LuaParser;
 const ini = ly_core.ini;
 const Ini = ini.Ini;
+const custom = ly_core.custom;
 
 const Cascade = @import("animations/Cascade.zig");
 const ColorMix = @import("animations/ColorMix.zig");
@@ -39,7 +42,6 @@ const Lang = @import("config/Lang.zig");
 const migrator = @import("config/migrator.zig");
 const OldSave = @import("config/OldSave.zig");
 const SavedUsers = @import("config/SavedUsers.zig");
-const custom = @import("config/custom.zig");
 const DisplayServer = @import("enums.zig").DisplayServer;
 const Environment = @import("Environment.zig");
 const Entry = Environment.Entry;
@@ -203,22 +205,28 @@ pub fn main(init: std.process.Init) !void {
         if (res.args.config) |path| config_parent_path = path;
         if (res.args.@"use-kmscon-vt" != 0) state.use_kmscon_vt = true;
         if (res.args.@"validate-config") |path| {
-            var parser = try IniParser(Config).init(
-                state.allocator,
-                state.io,
-                path,
-                migrator.configFieldHandler,
-            );
+            var parser: Parser(Config) = blk: {
+                if (std.mem.endsWith(u8, path, ".ini")) {
+                    break :blk .{ .ini = try IniParser(Config).init(
+                        state.allocator,
+                        state.io,
+                        path,
+                        migrator.configFieldHandler,
+                    ) };
+                } else {
+                    break :blk .{ .lua = try LuaParser(Config).init(state.allocator, path) };
+                }
+            };
             defer parser.deinit();
 
-            for (parser.errors.items) |err| {
+            for (parser.errors().items) |err| {
                 std.log.err(
                     "failed to convert value '{s}' of option '{s}' to type '{s}': {s}",
                     .{ err.value, err.key, err.type_name, err.error_name },
                 );
             }
 
-            if (parser.maybe_load_error) |err| {
+            if (parser.maybe_load_error()) |err| {
                 std.log.err("failed to load config file: {s}", .{@errorName(err)});
                 std.process.exit(1);
             }
@@ -234,12 +242,29 @@ pub fn main(init: std.process.Init) !void {
         state.allocator.free(state.old_save_path);
     };
 
-    const config_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.ini" });
+    // Test for presence of Lua config file first
+    // If it fails, fall back to ini
+    var config_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.lua" });
+    std.Io.Dir.accessAbsolute(state.io, config_path, .{}) catch {
+        state.allocator.free(config_path);
+        config_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.ini" });
+    };
     defer state.allocator.free(config_path);
 
     custom.binds = .empty;
     custom.labels = .empty;
-    var config_parser = try IniParser(Config).init(state.allocator, state.io, config_path, migrator.configFieldHandler);
+    var config_parser: Parser(Config) = blk: {
+        if (std.mem.endsWith(u8, config_path, ".ini")) {
+            break :blk .{ .ini = try IniParser(Config).init(
+                state.allocator,
+                state.io,
+                config_path,
+                migrator.configFieldHandler,
+            ) };
+        } else {
+            break :blk .{ .lua = try LuaParser(Config).init(state.allocator, config_path) };
+        }
+    };
     defer config_parser.deinit();
     defer if (!shutdown or !restart) {
         var iter = custom.binds.iterator();
@@ -258,7 +283,7 @@ pub fn main(init: std.process.Init) !void {
         custom.labels.deinit(temporary_allocator);
     };
 
-    state.config = config_parser.structure;
+    state.config = config_parser.structure();
 
     var lang_buffer: [16]u8 = undefined;
     const lang_file = try std.fmt.bufPrint(&lang_buffer, "{s}.ini", .{state.config.lang});
@@ -276,7 +301,7 @@ pub fn main(init: std.process.Init) !void {
         state.old_save_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "save.ini" });
     }
 
-    if (config_parser.maybe_load_error == null) {
+    if (config_parser.maybe_load_error() == null and config_parser == .ini) {
         migrator.lateConfigFieldHandler(&state.config, state.lang);
     }
 
@@ -636,7 +661,7 @@ pub fn main(init: std.process.Init) !void {
         );
     }
 
-    if (config_parser.maybe_load_error) |load_error| {
+    if (config_parser.maybe_load_error()) |load_error| {
         // We can't localize this since the config failed to load so we'd fallback to the default language anyway
         try state.info_line.addMessage(
             "unable to parse config file",
@@ -650,7 +675,7 @@ pub fn main(init: std.process.Init) !void {
             .{@errorName(load_error)},
         );
 
-        for (config_parser.errors.items) |err| {
+        for (config_parser.errors().items) |err| {
             try state.log_file.err(
                 state.io,
                 "conf",

@@ -8,7 +8,7 @@ const Allocator = std.mem.Allocator;
 const InfoLine = @import("../components/InfoLine.zig");
 const Lang = @import("../config/Lang.zig");
 
-const zlua = @import("zlua");
+const zlua = ly_ui.ly_core.zlua;
 
 const ly_lua = @embedFile("ly.lua");
 

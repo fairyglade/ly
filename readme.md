@@ -249,12 +249,14 @@ You can, of course, still select the init system of your choice when using this 
 
 ## Configuration
 
-You can find all the configuration in `/etc/ly/config.ini`. The file is fully commented, and includes the default values.
+You can find all the configuration in `/etc/ly/config.lua`. The file is fully commented, and includes the default values.
+
+It uses the Lua language, which means you can make the configuration dynamic. You could, for example, choose a random animation each time Ly starts up.
 
 You may also check the validity of your configuration file (i.e. if there are any errors in it) with the following command:
 
 ```
-$ ly --validate-config /etc/ly/config.ini
+$ ly --validate-config /etc/ly/config.lua
 ```
 
 ## Controls
