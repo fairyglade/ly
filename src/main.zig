@@ -559,6 +559,7 @@ pub fn main(init: std.process.Init) !void {
         null,
         state.buffer.fg,
         state.buffer.bg,
+        state.config.bigclock_outline_fg,
         switch (state.config.bigclock) {
             .none, .en => .en,
             .fa => .fa,
@@ -2258,7 +2259,8 @@ fn positionWidgets(ptr: *anyopaque) !void {
     const clock_text_len = TerminalBuffer.strWidth(state.bigclock_label.text) * (BigLabel.CHAR_WIDTH + 1);
 
     if (state.config.bigclock != .none) {
-        bb_height += BigLabel.CHAR_HEIGHT + 2;
+        const gap: usize = if (state.config.bigclock_outline_fg != null) 3 else 2;
+        bb_height += BigLabel.CHAR_HEIGHT + gap;
         bb_width = @max(bb_width, clock_text_len);
     }
 
