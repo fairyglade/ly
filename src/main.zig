@@ -1064,6 +1064,8 @@ pub fn main(init: std.process.Init) !void {
                 &state.animate,
                 state.config.animation_timeout_sec,
                 state.config.animation_frame_delay,
+                state.config.gameoflife_param_survival,
+                state.config.gameoflife_param_birth,
             );
             animation = game_of_life.widget();
         },
