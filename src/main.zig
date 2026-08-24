@@ -126,6 +126,7 @@ const UiState = struct {
     bigclock_buf: [32:0]u8,
     custom_binds: std.ArrayList(CustomBindLabel),
     custom_info: std.ArrayList(CustomInfoLabel),
+    tty_cache: [std.math.maxInt(u8)]?u8,
 };
 
 var shutdown = false;
@@ -134,6 +135,7 @@ var restart = false;
 pub fn main(init: std.process.Init) !void {
     var state: UiState = undefined;
 
+    state.tty_cache = @splat(null);
     state.io = init.io;
 
     var stderr_buffer: [128]u8 = undefined;
@@ -319,7 +321,8 @@ pub fn main(init: std.process.Init) !void {
         }
 
         while (reader.seek < reader.buffer.len) {
-            const line = reader.takeDelimiterInclusive('\n') catch break;
+            var line = reader.takeDelimiterInclusive('\n') catch break;
+            if (std.mem.startsWith(u8, line, "ly/tty")) continue;
 
             var user = std.mem.splitScalar(u8, line[0..(line.len - 1)], ':');
             const username = user.next() orelse continue;
@@ -334,19 +337,8 @@ pub fn main(init: std.process.Init) !void {
                 .allocated_username = true,
             });
         }
-    }
 
-    // If no save file previously existed, fill it up with all usernames
-    // TODO: Add new username with existing save file
-    if (state.config.save_file_dir != null and state.saved_users.user_list.items.len == 0) {
-        for (usernames.items) |user| {
-            try state.saved_users.user_list.append(state.allocator, .{
-                .username = user,
-                .session_index = 0,
-                .first_run = true,
-                .allocated_username = false,
-            });
-        }
+        updateTtyCache(&state, .{ .usernames = usernames.items }) catch break :read_save_file;
     }
 
     var log_file_buffer: [1024]u8 = undefined;
@@ -1124,6 +1116,8 @@ pub fn main(init: std.process.Init) !void {
     // Skip if autologin is active to prevent overriding autologin session
     var default_input = state.config.default_input;
 
+    const min_session_index = state.session.label.list.items.len - 1;
+
     if (state.config.save_file_dir != null and !state.is_autologin) {
         if (state.login_text) |box| {
             if (state.saved_username) |username| {
@@ -1135,16 +1129,23 @@ pub fn main(init: std.process.Init) !void {
 
                 for (state.saved_users.user_list.items) |user| {
                     if (std.mem.eql(u8, username, user.username)) {
-                        state.session.label.current = @min(user.session_index, state.session.label.list.items.len - 1);
+                        state.session.label.current = @min(user.session_index, min_session_index);
                         break;
                     }
                 }
             }
-        } else if (state.saved_users.last_username_index) |index| load_last_user: {
-            // If the saved index isn't valid, bail out
-            if (index >= state.saved_users.user_list.items.len) break :load_last_user;
+        } else if (state.tty_cache[state.active_tty]) |user_index| {
+            const user_session_index = state.login.?.label.list.items[user_index].session_index.*;
 
-            const user = state.saved_users.user_list.items[index];
+            state.login.?.label.current = user_index;
+            state.session.label.current = @min(user_session_index, min_session_index);
+        } else if (state.saved_users.last_username_index) |last_user_index| load_last_user: {
+            const saved_users = state.saved_users.user_list.items;
+
+            // If the saved index isn't valid, bail out
+            if (last_user_index >= saved_users.len) break :load_last_user;
+
+            const user = saved_users[last_user_index];
 
             // Find user with saved name, and switch over to it
             // If it doesn't exist (anymore), we don't change the value
@@ -1157,7 +1158,7 @@ pub fn main(init: std.process.Init) !void {
 
             default_input = .password;
 
-            state.session.label.current = @min(user.session_index, state.session.label.list.items.len - 1);
+            state.session.label.current = @min(user.session_index, min_session_index);
         }
     }
 
@@ -1519,28 +1520,51 @@ fn authenticate(ptr: *anyopaque) !bool {
             .{},
         ) catch {};
 
-        var file = std.Io.Dir.cwd().createFile(state.io, state.save_path, .{}) catch |err| {
+        const current: u8 = @intCast(state.login.?.label.current);
+        const login_users = state.login.?.label.list.items;
+
+        // Try to update the local tty cache before overwriting,
+        // since multiple instances can be running
+        updateTtyCache(state, .{ .user_list = login_users }) catch |err| {
             state.log_file.err(
                 state.io,
                 "sys",
-                "failed to create save file: {s}",
+                "failed to update cache: {s}",
                 .{@errorName(err)},
+            ) catch {};
+        };
+
+        var save_file = std.Io.Dir.cwd().createFile(state.io, state.save_path, .{}) catch |err| {
+            state.log_file.err(
+                state.io,
+                "sys",
+                "failed to create save file: {s} {s}",
+                .{ @errorName(err), state.save_path },
             ) catch break :save_last_settings;
             break :save_last_settings;
         };
-        defer file.close(state.io);
+        defer save_file.close(state.io);
 
         var file_buffer: [256]u8 = undefined;
-        var file_writer = file.writer(state.io, &file_buffer);
+        var file_writer = save_file.writer(state.io, &file_buffer);
         var writer = &file_writer.interface;
 
         if (state.login_text) |box| {
             try writer.print("0-{s}\n", .{box.text.items});
         } else {
-            try writer.print("{d}\n", .{state.login.?.label.current});
+            try writer.print("{d}\n", .{current});
         }
-        for (state.saved_users.user_list.items) |user| {
-            try writer.print("{s}:{d}\n", .{ user.username, user.session_index });
+        for (login_users) |user| {
+            try writer.print("{s}:{d}\n", .{ user.name, user.session_index.* });
+        }
+
+        state.tty_cache[state.active_tty] = current;
+        for (state.tty_cache, 0..) |maybe_user_index, tty_num| {
+            if (maybe_user_index) |user_index| {
+                // Posix usernames can't contain a '/'
+                // And, well, if your username is this string...
+                try writer.print("ly/tty{d}:{s}\n", .{ tty_num, login_users[user_index].name });
+            }
         }
         try writer.flush();
 
@@ -2579,4 +2603,47 @@ fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
         error.PamAbort => lang.err_pam_abort,
         else => @errorName(err),
     };
+}
+
+// Updates the UiState's tty_cache using the save file.
+// Matched against the current truthful user list to ensure it's a valid index.
+fn updateTtyCache(state: *UiState, real_users: union(enum) { user_list: []UserList.User, usernames: [][]const u8 }) !void {
+    var save_file = try std.Io.Dir.cwd().openFile(state.io, state.save_path, .{});
+    defer save_file.close(state.io);
+
+    var file_buffer: [256]u8 = undefined;
+    var file_reader = save_file.reader(state.io, &file_buffer);
+    var reader = &file_reader.interface;
+
+    while (reader.seek < reader.buffer.len) {
+        var line = reader.takeDelimiterInclusive('\n') catch break;
+        if (!std.mem.startsWith(u8, line, "ly/tty")) continue;
+
+        line = line["ly/tty".len..];
+        var entry = std.mem.splitScalar(u8, line[0..(line.len - 1)], ':');
+        const tty_num_str = entry.next() orelse continue;
+        const saved_username = entry.next() orelse continue;
+
+        const tty_num = std.fmt.parseInt(usize, tty_num_str, 10) catch continue;
+        if (tty_num >= std.math.maxInt(u8)) continue;
+
+        switch (real_users) {
+            .usernames => |usernames| {
+                for (usernames, 0..) |username, u_index| {
+                    if (std.mem.eql(u8, username, saved_username)) {
+                        state.tty_cache[tty_num] = @intCast(u_index);
+                        break;
+                    }
+                }
+            },
+            .user_list => |user_list| {
+                for (user_list, 0..) |user, u_index| {
+                    if (std.mem.eql(u8, user.name, saved_username)) {
+                        state.tty_cache[tty_num] = @intCast(u_index);
+                        break;
+                    }
+                }
+            },
+        }
+    }
 }
