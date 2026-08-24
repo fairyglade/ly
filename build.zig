@@ -214,10 +214,47 @@ fn getVersionStr(b: *std.Build, name: []const u8, version: std.SemanticVersion) 
             }
             return version_str;
         },
+        1 => {
+            // Release candidate build (e.g. v1.5.0-rc1)
+            var it = std.mem.splitScalar(u8, git_describe, '-');
+            const tagged_ancestor = std.mem.trimStart(u8, it.first(), "v");
+
+            const ancestor_ver = try std.SemanticVersion.parse(tagged_ancestor);
+            if (version.order(ancestor_ver) != .gt) {
+                std.debug.print("{s} version '{f}' must be greater than tagged ancestor '{f}'\n", .{ name, version, ancestor_ver });
+                std.process.exit(1);
+            }
+
+            // The version is reformatted in accordance with the https://semver.org specification.
+            return version_str;
+        },
         2 => {
             // Untagged development build (e.g. 0.10.0-dev.2025+ecf0050a9).
             var it = std.mem.splitScalar(u8, git_describe, '-');
             const tagged_ancestor = std.mem.trimStart(u8, it.first(), "v");
+            const commit_height = it.next().?;
+            const commit_id = it.next().?;
+
+            const ancestor_ver = try std.SemanticVersion.parse(tagged_ancestor);
+            if (version.order(ancestor_ver) != .gt) {
+                std.debug.print("{s} version '{f}' must be greater than tagged ancestor '{f}'\n", .{ name, version, ancestor_ver });
+                std.process.exit(1);
+            }
+
+            // Check that the commit hash is prefixed with a 'g' (a Git convention).
+            if (commit_id.len < 1 or commit_id[0] != 'g') {
+                std.debug.print("Unexpected `git describe` output: {s}\n", .{git_describe});
+                return version_str;
+            }
+
+            // The version is reformatted in accordance with the https://semver.org specification.
+            return b.fmt("{s}-dev.{s}+{s}", .{ version_str, commit_height, commit_id[1..] });
+        },
+        3 => {
+            // Untagged development build (e.g. 0.10.0-dev.2025+ecf0050a9).
+            var it = std.mem.splitScalar(u8, git_describe, '-');
+            const tagged_ancestor = std.mem.trimStart(u8, it.first(), "v");
+            _ = it.next().?;
             const commit_height = it.next().?;
             const commit_id = it.next().?;
 
