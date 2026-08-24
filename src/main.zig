@@ -1086,7 +1086,7 @@ pub fn main(init: std.process.Init) !void {
             );
             animation = game_of_life.widget();
         },
-        .dur_file => {
+        .dur => {
             var dur = try DurFile.init(
                 state.allocator,
                 state.io,

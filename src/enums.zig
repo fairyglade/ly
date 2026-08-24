@@ -6,7 +6,7 @@ pub const Animation = enum {
     matrix,
     colormix,
     gameoflife,
-    dur_file,
+    dur,
     lua,
 };
 
