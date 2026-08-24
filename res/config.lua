@@ -316,6 +316,13 @@ ly = {
     -- Example: a string of "23" makes the cell survive on 2 or 3 neighbors
     gameoflife_param_survival = "23",
 
+    -- Sets the TTY on which to always grab focus on.
+    -- This is useful if you want to have deterministic behavior when starting
+    -- Ly on multiple TTYs simultaneously.
+    -- If null, Ly will always try to grab focus on the TTY it is launched on,
+    -- even if multiple instances are launched.
+    grab_focus_tty = nil,
+
     -- Remove main box borders
     hide_borders = false,
 

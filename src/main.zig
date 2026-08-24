@@ -1007,7 +1007,10 @@ pub fn main(init: std.process.Init) !void {
         );
         break :no_tty_found build_options.fallback_tty;
     };
-    if (!state.use_kmscon_vt) {
+    if (!state.use_kmscon_vt) switch_tty: {
+        if (state.config.grab_focus_tty) |tty| {
+            if (tty != state.active_tty) break :switch_tty;
+        }
         interop.switchTty(state.active_tty) catch |err| {
             try state.info_line.addMessage(
                 state.lang.err_switch_tty,
