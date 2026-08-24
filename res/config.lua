@@ -41,7 +41,7 @@ ly = {
     -- matrix   -> CMatrix
     -- colormix -> Color mixing shader
     -- gameoflife -> John Conway's Game of Life
-    -- dur_file -> .dur file format (https://github.com/cmang/durdraw/tree/master)
+    -- dur -> .dur file format (https://github.com/cmang/durdraw/tree/master)
     -- lua -> user-made animation written in LuaJIT
     animation = "none",
 
