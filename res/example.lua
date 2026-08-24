@@ -18,7 +18,7 @@
 --
 --      For arguments fg and bg: they are colors in the format
 --      0xSSRRGGBB, where SS is for styling. See your
---      config.ini for more details.
+--      config.ini or config.lua for more details.
 --
 --      For the byte argument, you may use string.byte to fill this argument.
 --

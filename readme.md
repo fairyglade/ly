@@ -97,7 +97,7 @@ Every environment that works on other login managers also should work on Ly.
 
 - If Xorg sessions don't work then check if your distro compiles Ly with Xorg.
 
-Logs are defined by `/etc/ly/config.ini`:
+Logs are defined by `/etc/ly/config.lua` or `/etc/ly/config.ini`:
 
 - The session log is located at `~/.local/state/ly-session.log` by default.
 

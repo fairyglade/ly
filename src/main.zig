@@ -195,7 +195,7 @@ pub fn main(init: std.process.Init) !void {
         if (res.args.help != 0) {
             try clap.help(stderr, clap.Help, &params, .{});
 
-            std.log.info("note: if you want to configure Ly, please check the config file, which is located at " ++ build_options.config_directory ++ "/ly/config.ini.", .{});
+            std.log.info("note: if you want to configure Ly, please check the config file, which is located at " ++ build_options.config_directory ++ "/ly/config.lua or " ++ build_options.config_directory ++ "/ly/config.ini.", .{});
             std.process.exit(0);
         }
         if (res.args.version != 0) {
