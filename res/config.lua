@@ -1,3 +1,19 @@
+-- This is an example function you can use on any option supporting colors
+-- to use a random color instead.
+function getRandomColor()
+    math.randomseed()
+
+    local r = math.random(0, 255)
+    local g = math.random(0, 255)
+    local b = math.random(0, 255)
+
+    local col = b
+    col = bit.bor(col, bit.lshift(g, 8))
+    col = bit.bor(col, bit.lshift(r, 16))
+
+    return col
+end
+
 ly = {
     -- Ly supports 24-bit true color with styling, which means each color is a 32-bit value.
     -- The format is 0xSSRRGGBB, where SS is the styling, RR is red, GG is green, and BB is blue.
@@ -10,8 +26,8 @@ ly = {
     -- TB_HI_BLACK  0x20000000
     -- TB_BRIGHT    0x40000000
     -- TB_DIM       0x80000000
-    -- Programmatically, you'd apply them using the bitwise OR operator (|), but because Ly's
-    -- configuration doesn't support using it, you have to manually compute the color value.
+    -- Programmatically, you'd apply them using the bitwise OR operator (|), and
+    -- in Lua, you can use the bit.bor(x, y) function to compute x | y.
     -- Note that, if you want to use the default color value of the terminal, you can use the
     -- special value 0x00000000. This means that, if you want to use black, you *must* use
     -- the styling option TB_HI_BLACK (the RGB values are ignored when using this option).
@@ -287,6 +303,18 @@ ly = {
     -- 0.4 -> Balanced activity (recommended)
     -- 0.7+ -> Dense, chaotic patterns
     gameoflife_initial_density = 0.4,
+
+    -- Sets the multiple amounts of neighbors needed for a cell to be born.
+    -- Each numerical digit from 0 to 8 inclusive in this string becomes
+    -- one of the targets required for this cell to be born.
+    -- Example: a string of "3" makes the cell be born on 3 neighbors
+    gameoflife_param_birth = "3",
+
+    -- Sets the multiple amounts of neighbors needed for a cell to survive.
+    -- Each numerical digit from 0 to 8 inclusive in this string becomes
+    -- one of the targets required for this cell to survive.
+    -- Example: a string of "23" makes the cell survive on 2 or 3 neighbors
+    gameoflife_param_survival = "23",
 
     -- Remove main box borders
     hide_borders = false,
