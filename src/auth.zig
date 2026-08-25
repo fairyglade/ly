@@ -29,6 +29,9 @@ pub const AuthOptions = struct {
 const PamAppdata = struct {
     username: []const u8,
     password: []const u8,
+    authreq_requested: bool,
+    authreq_responded: bool,
+    new_password: []const u8,
 };
 
 var xorg_pid: std.posix.pid_t = 0;
@@ -41,7 +44,15 @@ pub fn sessionSignalHandler(sig: std.posix.SIG) callconv(.c) void {
     if (child_pid > 0) _ = std.c.kill(child_pid, sig);
 }
 
-pub fn authenticate(allocator: std.mem.Allocator, io: std.Io, log_file: *LogFile, options: AuthOptions, current_environment: Environment, login: []const u8, password: []const u8) !void {
+pub fn authenticate(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    log_file: *LogFile,
+    options: AuthOptions,
+    current_environment: Environment,
+    login: []const u8,
+    password: []const u8,
+) !void {
     var tty_buffer: [3]u8 = undefined;
     const tty_str = try std.fmt.bufPrint(&tty_buffer, "{d}", .{options.tty});
 
@@ -58,6 +69,9 @@ pub fn authenticate(allocator: std.mem.Allocator, io: std.Io, log_file: *LogFile
     var credentials: PamAppdata = .{
         .username = login,
         .password = password,
+        .authreq_requested = false,
+        .authreq_responded = false,
+        .new_password = "",
     };
 
     const conv = interop.pam.pam_conv{
@@ -83,6 +97,11 @@ pub fn authenticate(allocator: std.mem.Allocator, io: std.Io, log_file: *LogFile
 
     try log_file.info(io, "auth/pam", "validating account", .{});
     status = interop.pam.pam_acct_mgmt(handle, 0);
+    if (status == interop.pam.PAM_NEW_AUTHTOK_REQD) {
+        // credentials.authreq_requested = true;
+        // credentials.new_password = "";
+        // status = interop.pam.pam_chauthtok(handle, interop.pam.PAM_CHANGE_EXPIRED_AUTHTOK);
+    }
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     try log_file.info(io, "auth/pam", "setting credentials", .{});
@@ -314,7 +333,15 @@ fn loginConv(
                 response[i].resp = username.?;
             },
             interop.pam.PAM_PROMPT_ECHO_OFF => {
-                password = allocator.dupeZ(u8, data.password) catch {
+                var pass = data.password;
+                if (data.authreq_requested) {
+                    if (data.authreq_responded) {
+                        pass = data.new_password;
+                    }
+                    data.authreq_responded = true;
+                }
+
+                password = allocator.dupeZ(u8, pass) catch {
                     status = interop.pam.PAM_BUF_ERR;
                     break :set_credentials;
                 };
