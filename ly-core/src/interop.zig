@@ -265,7 +265,7 @@ fn PlatformStruct() type {
                 const dev_name = buf[0 .. len - 1];
 
                 if (std.mem.startsWith(u8, dev_name, "ttyv")) {
-                    return try std.fmt.parseInt(u8, dev_name[dev_name.len - 1 ..], 16);
+                    return try std.fmt.parseInt(u8, dev_name[dev_name.len - 1 ..], 16) + 1;
                 }
 
                 return error.NoTtyFound;
