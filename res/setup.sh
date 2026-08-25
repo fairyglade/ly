@@ -70,25 +70,6 @@ if [ "$XDG_SESSION_TYPE" = "x11" ]; then
         done
     fi
 
-    # Load Xsession scripts
-    # OPTIONFILE, USERXSESSION, USERXSESSIONRC and ALTUSERXSESSION are required
-    # by the scripts to work
-    xsessionddir="$CONFIG_DIRECTORY"/X11/Xsession.d
-    export OPTIONFILE="$CONFIG_DIRECTORY"/X11/Xsession.options
-    export USERXSESSION="$HOME"/.xsession
-    export USERXSESSIONRC="$HOME"/.xsessionrc
-    export ALTUSERXSESSION="$HOME"/.Xsession
-
-    if [ -d "$xsessionddir" ]; then
-        for i in $(ls "$xsessionddir"); do
-            script="$xsessionddir/$i"
-            echo "Loading X session script $script"
-            if [ -r "$script" ] && [ -f "$script" ] && expr "$i" : '^[[:alnum:]_-]\+$' > /dev/null; then
-                . "$script"
-            fi
-        done
-    fi
-
     if [ -f "$USERXSESSION" ]; then
         . "$USERXSESSION"
     fi
@@ -102,6 +83,28 @@ if [ "$XDG_SESSION_TYPE" = "x11" ]; then
     fi
     [ -f "$HOME"/.Xresources ] && xrdb -merge "$HOME"/.Xresources
     [ -f "$XDG_CONFIG_HOME"/X11/Xresources ] && xrdb -merge "$XDG_CONFIG_HOME"/X11/Xresources
+
+    # Load Xsession scripts
+    # OPTIONFILE, USERXSESSION, USERXSESSIONRC and ALTUSERXSESSION are required
+    # by the scripts to work
+    xsessionddir="$CONFIG_DIRECTORY"/X11/Xsession.d
+    export OPTIONFILE="$CONFIG_DIRECTORY"/X11/Xsession.options
+    export USERXSESSION="$HOME"/.xsession
+    export USERXSESSIONRC="$HOME"/.xsessionrc
+    export ALTUSERXSESSION="$HOME"/.Xsession
+    # Some distributions have an Xsession script containing "exec $STARTUP",
+    # this makes sure to set the variable to what we actually want to launch
+    export STARTUP="$@"
+
+    if [ -d "$xsessionddir" ]; then
+        for i in $(ls "$xsessionddir"); do
+            script="$xsessionddir/$i"
+            echo "Loading X session script $script"
+            if [ -r "$script" ] && [ -f "$script" ] && expr "$i" : '^[[:alnum:]_-]\+$' > /dev/null; then
+                . "$script"
+            fi
+        done
+    fi
 fi
 
 exec "$@"
