@@ -1,0 +1,491 @@
+-- This is an example function you can use on any option supporting colors
+-- to use a random color instead.
+function getRandomColor()
+    math.randomseed()
+
+    local r = math.random(0, 255)
+    local g = math.random(0, 255)
+    local b = math.random(0, 255)
+
+    local col = b
+    col = bit.bor(col, bit.lshift(g, 8))
+    col = bit.bor(col, bit.lshift(r, 16))
+
+    return col
+end
+
+ly = {
+    -- Ly supports 24-bit true color with styling, which means each color is a 32-bit value.
+    -- The format is 0xSSRRGGBB, where SS is the styling, RR is red, GG is green, and BB is blue.
+    -- Here are the possible styling options:
+    -- TB_BOLD      0x01000000
+    -- TB_UNDERLINE 0x02000000
+    -- TB_REVERSE   0x04000000
+    -- TB_ITALIC    0x08000000
+    -- TB_BLINK     0x10000000
+    -- TB_HI_BLACK  0x20000000
+    -- TB_BRIGHT    0x40000000
+    -- TB_DIM       0x80000000
+    -- Programmatically, you'd apply them using the bitwise OR operator (|), and
+    -- in Lua, you can use the bit.bor(x, y) function to compute x | y.
+    -- Note that, if you want to use the default color value of the terminal, you can use the
+    -- special value 0x00000000. This means that, if you want to use black, you *must* use
+    -- the styling option TB_HI_BLACK (the RGB values are ignored when using this option).
+
+    -- Allow empty password or not when authenticating
+    allow_empty_password = true,
+
+    -- The active animation
+    -- none     -> Nothing
+    -- doom     -> PSX DOOM fire
+    -- matrix   -> CMatrix
+    -- colormix -> Color mixing shader
+    -- gameoflife -> John Conway's Game of Life
+    -- dur -> .dur file format (https://github.com/cmang/durdraw/tree/master)
+    -- lua -> user-made animation written in LuaJIT
+    animation = "none",
+
+    -- Delay between each animation frame in milliseconds
+    animation_frame_delay = 5,
+
+    -- Stop the animation after some time
+    -- 0 -> Run forever
+    -- 1..2e12 -> Stop the animation after this many seconds
+    animation_timeout_sec = 0,
+
+    -- The character used to mask the password
+    -- You can either type it directly as a UTF-8 character (like *), or use a UTF-32
+    -- codepoint (for example 0x2022 for a bullet point)
+    -- If null, the password will be hidden
+    -- Note: you can use a # by escaping it like so: \#
+    asterisk = '*',
+
+    -- The number of failed authentications before a special animation is played... ;)
+    -- If set to 0, the animation will never be played
+    auth_fails = 10,
+
+    -- Automatic login configuration
+    -- This feature allows Ly to automatically log in a user without password prompt.
+    -- IMPORTANT: Both auto_login_user and auto_login_session must be set for this to work.
+    -- Autologin only happens once at startup - it won't re-trigger after logout.
+
+    -- PAM service name to use for automatic login
+    -- The default service (ly-autologin) uses pam_permit to allow login without password
+    -- The appropriate platform-specific PAM configuration (ly-autologin) will be used automatically
+    auto_login_service = "ly-autologin",
+
+    -- Session name to launch automatically
+    -- To find available session names, check the .desktop files in:
+    --   - /usr/share/xsessions/ (for X11 sessions)
+    --   - /usr/share/wayland-sessions/ (for Wayland sessions)
+    -- Use the filename without .desktop extension, the Name field inside the file or the value of the DesktopNames field
+    -- Examples: "i3", "sway", "gnome", "plasma", "xfce"
+    -- If null, automatic login is disabled
+    auto_login_session = nil,
+
+    -- Username to automatically log in
+    -- Must be a valid user on the system
+    -- If null, automatic login is disabled
+    auto_login_user = nil,
+
+    -- Identifier for battery whose charge to display at top left
+    -- Primary battery is usually BAT0 or BAT1
+    -- If set to null, battery status won't be shown
+    -- Unused on FreeBSD (a sysctl is used there)
+    battery_id = nil,
+
+    -- Background color id
+    bg = 0x00000000,
+
+    -- Change the state and language of the big clock
+    -- none -> Disabled (default)
+    -- en   -> English
+    -- fa   -> Farsi
+    bigclock = "none",
+
+    -- Set bigclock to 12-hour notation.
+    bigclock_12hr = false,
+
+    -- Set bigclock to show the seconds.
+    bigclock_seconds = false,
+
+    -- Blank main box background
+    -- Setting to false will make it transparent
+    blank_box = true,
+
+    -- Border foreground color id
+    border_fg = 0x00FFFFFF,
+
+    -- Relative horizontal position from the end of the screen
+    -- default: 0.5
+    box_position_h = 0.5,
+
+    -- Relative vertical position from the bottom of the screen
+    -- default: 0.5
+    box_position_v = 0.5,
+
+    -- Title to show at the top of the main box
+    -- If set to null, none will be shown
+    box_title = nil,
+
+    -- Brightness decrease command
+    brightness_down_cmd = "$PREFIX_DIRECTORY/bin/brightnessctl -q -n s 10%-",
+
+    -- Brightness decrease key combination
+    -- If null, the keybind is disabled and isn't shown
+    brightness_down_key = "F5",
+
+    -- Brightness increase command
+    brightness_up_cmd = "$PREFIX_DIRECTORY/bin/brightnessctl -q -n s +10%",
+
+    -- Brightness increase key combination
+    -- If null, the keybind is disabled and isn't shown
+    brightness_up_key = "F6",
+
+    -- Erase password input on failure
+    clear_password = false,
+
+    -- Format string for clock in top right corner (see strftime specification). Example: %c
+    -- If null, the clock won't be shown
+    clock = nil,
+
+    -- CMatrix animation foreground color id
+    cmatrix_fg = 0x0000FF00,
+
+    -- CMatrix animation character string head color id
+    cmatrix_head_col = 0x01FFFFFF,
+
+    -- CMatrix animation minimum codepoint. It uses a 16-bit integer
+    -- For Japanese characters for example, you can use 0x3000 here
+    cmatrix_min_codepoint = 0x21,
+
+    -- CMatrix animation maximum codepoint. It uses a 16-bit integer
+    -- For Japanese characters for example, you can use 0x30FF here
+    cmatrix_max_codepoint = 0x7B,
+
+    -- Color mixing animation first color id
+    colormix_col1 = 0x00FF0000,
+
+    -- Color mixing animation second color id
+    colormix_col2 = 0x000000FF,
+
+    -- Color mixing animation third color id
+    colormix_col3 = 0x20000000,
+
+    -- Screen corners customization
+    -- Keywords:
+    -- shutdown -> Shutdown key
+    -- restart  -> Restart key
+    -- britup   -> Brightness up key
+    -- britdown -> Brightness down key
+    -- password -> Toggle password key
+    -- clock    -> Clock (format defined by 'clock' option)
+    -- tty      -> Active TTY number
+    -- battery  -> Battery percentage
+    -- version  -> Ly version string
+    -- numlock  -> Numlock state
+    -- capslock -> Capslock state
+    -- labels   -> All custom info labels (lbl:)
+    -- binds    -> All custom keybind hints (cmd:)
+    -- lbl:name -> Specific custom info label
+    -- cmd:key  -> Specific custom keybind hint
+    --
+    -- If using a keyword that groups multiple labels into one (e.g. labels, binds),
+    -- they'll be placed horizontally
+    --
+    -- Also, the order defines the vertical stack (first item is at the edge)
+    -- If items are separted by commas, they'll be placed horizontally
+    -- It is possible to have both horizontal and vertical items on the same corner
+
+    -- Bottom left
+    corner_bottom_left = "version",
+
+    -- Bottom right
+    corner_bottom_right = "labels",
+
+    -- Top left
+    corner_top_left = "shutdown,restart,britup,britdown,password battery",
+
+    -- Top right
+    corner_top_right = "clock numlock,capslock",
+
+    -- For custom binds: the horizontal limit in characters for each
+    -- line of custom binds before moving on to the next.
+    -- If null, defaults to the width of the terminal instead.
+    custom_bind_width = nil,
+
+    -- Custom sessions directory
+    -- You can specify multiple directories,
+    -- e.g. $CONFIG_DIRECTORY/ly/custom-sessions:$PREFIX_DIRECTORY/share/custom-sessions
+    custom_sessions = "$CONFIG_DIRECTORY/ly/custom-sessions",
+
+    -- Input box active by default on startup
+    -- Available inputs: info_line, session, login, password
+    default_input = "login",
+
+    -- DOOM animation fire height (1 thru 9)
+    doom_fire_height = 6,
+
+    -- DOOM animation fire spread (0 thru 4)
+    doom_fire_spread = 2,
+
+    -- DOOM animation custom top color (low intensity flames)
+    doom_top_color = 0x009F2707,
+
+    -- DOOM animation custom middle color (medium intensity flames)
+    doom_middle_color = 0x00C78F17,
+
+    -- DOOM animation custom bottom color (high intensity flames)
+    doom_bottom_color = 0x00FFFFFF,
+
+    -- Dur file path
+    dur_file_path = "$CONFIG_DIRECTORY/ly/example.dur",
+
+    -- Dur file alignment
+    -- The dur file can be aligned with a direction and centered easily with the flags below
+    -- Available inputs: topleft, topcenter, topright, centerleft, center, centerright, bottomleft, bottomcenter, bottomright
+    dur_offset_alignment = "center",
+
+    -- Dur offset x direction (value is added to the current position determined by alignment, negatives are supported)
+    dur_x_offset = 0,
+
+    -- Dur offset y direction (value is added to the current position determined by alignment, negatives are supported)
+    dur_y_offset = 0,
+
+    -- Set margin to the edges of the DM (useful for curved monitors)
+    edge_margin = 0,
+
+    -- Error background color id
+    error_bg = 0x00000000,
+
+    -- Error foreground color id
+    -- Default is red and bold
+    error_fg = 0x01FF0000,
+
+    -- Foreground color id
+    fg = 0x00FFFFFF,
+
+    -- Render true colors (if supported)
+    -- If false, output will be in eight-color mode
+    -- All eight-color mode color codes:
+    -- TB_DEFAULT              0x0000
+    -- TB_BLACK                0x0001
+    -- TB_RED                  0x0002
+    -- TB_GREEN                0x0003
+    -- TB_YELLOW               0x0004
+    -- TB_BLUE                 0x0005
+    -- TB_MAGENTA              0x0006
+    -- TB_CYAN                 0x0007
+    -- TB_WHITE                0x0008
+    -- If full color is off, the styling options still work. The colors are
+    -- always 32-bit values with the styling in the most significant byte.
+    -- Note: If using the dur_file animation option and the dur file's color range
+    -- is saved as 256 with this option disabled, the file will not be drawn.
+    full_color = true,
+
+    -- Game of Life entropy interval (0 = disabled, >0 = add entropy every N generations),
+    -- 0 -> Pure Conway's Game of Life (will eventually stabilize)
+    -- 10 -> Add entropy every 10 generations (recommended for continuous activity)
+    -- 50+ -> Less frequent entropy for more natural evolution
+    gameoflife_entropy_interval = 10,
+
+    -- Game of Life animation foreground color id
+    gameoflife_fg = 0x0000FF00,
+
+    -- Game of Life frame delay (lower = faster animation, higher = slower),
+    -- 1-3 -> Very fast animation
+    -- 6 -> Default smooth animation speed
+    -- 10+ -> Slower, more contemplative speed
+    gameoflife_frame_delay = 6,
+
+    -- Game of Life initial cell density (0.0 to 1.0)
+    -- 0.1 -> Sparse, minimal activity
+    -- 0.4 -> Balanced activity (recommended)
+    -- 0.7+ -> Dense, chaotic patterns
+    gameoflife_initial_density = 0.4,
+
+    -- Sets the multiple amounts of neighbors needed for a cell to be born.
+    -- Each numerical digit from 0 to 8 inclusive in this string becomes
+    -- one of the targets required for this cell to be born.
+    -- Example: a string of "3" makes the cell be born on 3 neighbors
+    gameoflife_param_birth = "3",
+
+    -- Sets the multiple amounts of neighbors needed for a cell to survive.
+    -- Each numerical digit from 0 to 8 inclusive in this string becomes
+    -- one of the targets required for this cell to survive.
+    -- Example: a string of "23" makes the cell survive on 2 or 3 neighbors
+    gameoflife_param_survival = "23",
+
+    -- Sets the TTY on which to always grab focus on.
+    -- This is useful if you want to have deterministic behavior when starting
+    -- Ly on multiple TTYs simultaneously.
+    -- If null, Ly will always try to grab focus on the TTY it is launched on,
+    -- even if multiple instances are launched.
+    grab_focus_tty = nil,
+
+    -- Remove main box borders
+    hide_borders = false,
+
+    -- Command executed when no input is detected for a certain time
+    -- If null, no command will be executed
+    inactivity_cmd = nil,
+
+    -- Executes a command after a certain amount of seconds
+    inactivity_delay = 0,
+
+    -- Initial text to show on the info line
+    -- If set to null, the info line defaults to the hostname
+    initial_info_text = nil,
+
+    -- Input boxes length
+    input_len = 34,
+
+    -- Active language
+    -- Available languages are found in $CONFIG_DIRECTORY/ly/lang/
+    lang = "en",
+
+    -- Command executed when logging in
+    -- If null, no command will be executed
+    -- Important: the code itself must end with `exec "$@"` in order to launch the session!
+    -- You can also set environment variables in there, they'll persist until logout
+    login_cmd = nil,
+
+    -- Path for login.defs file (used for listing all local users on the system on
+    -- Linux)
+    login_defs_path = "/etc/login.defs",
+
+    -- Command executed when logging out
+    -- If null, no command will be executed
+    -- Important: the session will already be terminated when this command is executed, so
+    -- no need to add `exec "$@"` at the end
+    logout_cmd = nil,
+
+    -- The file pointing to the Lua file to be used when using the Lua animation option
+    lua_animation_file = "$CONFIG_DIRECTORY/ly/example.lua",
+
+    -- General log file path
+    -- If null, syslog will be used instead
+    ly_log = "/var/log/ly.log",
+
+    -- Main box horizontal margin
+    margin_box_h = 2,
+
+    -- Main box vertical margin
+    margin_box_v = 1,
+
+    -- Set numlock on/off at startup
+    numlock = false,
+
+    -- Default path
+    -- If null, ly doesn't set a path
+    path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+
+    -- Specifies the key combination used for restart
+    -- If null, the keybind is disabled and isn't shown
+    restart_key = "F2",
+
+    -- Absolute directory for the save file
+    -- If null, current desktop & login won't be saved nor loaded
+    save_file_dir = "$CONFIG_DIRECTORY/ly",
+
+    -- Service name (set to ly to use the provided pam config file)
+    service_name = "ly",
+
+    -- Session log file path
+    -- This will contain stdout and stderr of Wayland sessions
+    -- By default it's saved in the user's home directory
+    -- Important: due to technical limitations, X11, shell sessions as well as
+    -- launching session via KMSCON aren't supported, which means you won't get any
+    -- logs from those sessions.
+    -- If null, no session log will be created
+    session_log = ".local/state/ly-session.log",
+
+    -- Setup command
+    setup_cmd = "$CONFIG_DIRECTORY/ly/setup.sh",
+
+    -- Show the shell session in the session list
+    -- If false, the shell session will be hidden
+    shell = true,
+
+    -- Specifies the key combination used for showing the password
+    -- If null, the keybind is disabled and isn't shown
+    show_password_key = "F7",
+
+    -- Specifies the key combination used for shutdown
+    -- If null, the keybind is disabled and isn't shown
+    shutdown_key = "F1",
+
+    -- Command executed when starting Ly (before the TTY is taken control of)
+    -- See file at path below for an example of changing the default TTY colors
+    start_cmd = "$CONFIG_DIRECTORY/ly/startup.sh",
+
+    -- Center the session name.
+    text_in_center = false,
+
+    -- If true, user will need to manually type username instead of selecting from the list
+    -- of discovered users
+    type_username = false,
+
+    -- Default vi mode
+    -- normal   -> normal mode
+    -- insert   -> insert mode
+    vi_default_mode = "normal",
+
+    -- Enable vi keybindings
+    vi_mode = false,
+
+    -- Wayland desktop environments
+    -- You can specify multiple directories,
+    -- e.g. $PREFIX_DIRECTORY/share/wayland-sessions:$PREFIX_DIRECTORY/local/share/wayland-sessions
+    -- If null, Wayland sessions will not be shown
+    waylandsessions = "$PREFIX_DIRECTORY/share/wayland-sessions",
+
+    -- Xorg server command
+    -- Add the -quiet argument to hide startup logs from the server
+    x_cmd = "$PREFIX_DIRECTORY/bin/X",
+
+    -- Xorg virtual terminal number
+    -- Mostly useful for FreeBSD where choosing the current TTY causes issues
+    -- If null, the current TTY will be chosen
+    x_vt = nil,
+
+    -- Xorg xauthority edition tool
+    xauth_cmd = "$PREFIX_DIRECTORY/bin/xauth",
+
+    -- xinitrc
+    -- If null, the xinitrc session will be hidden
+    xinitrc = "~/.xinitrc",
+
+    -- Xorg desktop environments
+    -- You can specify multiple directories,
+    -- e.g. $PREFIX_DIRECTORY/share/xsessions:$PREFIX_DIRECTORY/local/share/xsessions
+    -- If null, X11 sessions will not be shown
+    xsessions = "$PREFIX_DIRECTORY/share/xsessions",
+
+    -- Custom Commands and Labels:
+    -- The following examples below give an outline for setting up custom commands and labels.
+    -- Unless specified as optional, an option is mandatory.
+
+    -- Comments preceding with '-- --' are for documentation.
+    -- Comments preceding with '--' comment out the example code.
+
+    -- custom_commands = {
+    --     -- Declare a command with the F8 binding.
+    --     binding = "F8",
+    --     -- The name of the command to show up in Ly.
+    --     -- Note: "$" in "$brightness_up" fetches the appropriate string from the specified locale file
+    --     -- and is replaced with the value representing "brightness_up".
+    --     -- You can see the list of keys in any locale file in $CONFIG_DIRECTORY/ly/lang.name = "custom command $brightness_up",
+    --     cmd = "touch /tmp/ly.gaming",
+    -- },
+
+    -- custom_labels = {
+    --     -- Declare a label with an ID. This ID should be unique across all labels.
+    --     label = "kernel",
+    --     cmd = "uname -srn",
+    --     -- Optional, defaulting to 0.
+    --     -- In frames, the time to re-run the command and update the label.
+    --     -- If 0, only run once and do not refresh afterwards
+    --     refresh = 0,
+    -- }
+}

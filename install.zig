@@ -126,19 +126,16 @@ fn installLy(allocator: std.mem.Allocator, io: std.Io, patch_map: PatchMap, inst
         var config_dir = std.Io.Dir.cwd().openDir(io, ly_config_directory, .{}) catch unreachable;
         defer config_dir.close(io);
 
-        if (install_config) {
-            const patched_config = try patchFile(allocator, io, "res/config.ini", patch_map);
-            defer allocator.free(patched_config);
+        const patched_config = try patchFile(allocator, io, "res/config.lua", patch_map);
+        defer allocator.free(patched_config);
 
-            try installText(io, patched_config, config_dir, ly_config_directory, "config.ini", .{});
+        if (install_config) {
+            try installText(io, patched_config, config_dir, ly_config_directory, "config.lua", .{});
 
             try installFile(io, "res/startup.sh", config_dir, ly_config_directory, "startup.sh", .{ .permissions = .fromMode(0o755) });
         }
 
-        const patched_example_config = try patchFile(allocator, io, "res/config.ini", patch_map);
-        defer allocator.free(patched_example_config);
-
-        try installText(io, patched_example_config, config_dir, ly_config_directory, "config.ini.example", .{});
+        try installText(io, patched_config, config_dir, ly_config_directory, "config.lua.example", .{});
 
         const patched_setup = try patchFile(allocator, io, "res/setup.sh", patch_map);
         defer allocator.free(patched_setup);

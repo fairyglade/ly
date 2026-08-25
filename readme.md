@@ -27,8 +27,6 @@ Join us on Matrix over at [#ly-dm:matrix.org](https://matrix.to/#/#ly-dm:matrix.
 
   - xorg-xauth
 
-  - shutdown
-
   - brightnessctl
 
 ### Debian
@@ -99,7 +97,7 @@ Every environment that works on other login managers also should work on Ly.
 
 - If Xorg sessions don't work then check if your distro compiles Ly with Xorg.
 
-Logs are defined by `/etc/ly/config.ini`:
+Logs are defined by `/etc/ly/config.lua` or `/etc/ly/config.ini`:
 
 - The session log is located at `~/.local/state/ly-session.log` by default.
 
@@ -180,9 +178,10 @@ On non-systemd systems, you can change the TTY Ly will run on by editing the cor
 
 ```
 # zig build installexe -Dinit_system=runit
-# rm /var/service/lightdm
+# unlink /var/service/lightdm
 # ln -s /etc/sv/ly /var/service/
-# rm /var/service/agetty-tty2
+# touch /etc/sv/agetty-tty2/down
+# unlink /var/service/agetty-tty2
 ```
 
 ### s6
@@ -250,12 +249,14 @@ You can, of course, still select the init system of your choice when using this 
 
 ## Configuration
 
-You can find all the configuration in `/etc/ly/config.ini`. The file is fully commented, and includes the default values.
+You can find all the configuration in `/etc/ly/config.lua`. The file is fully commented, and includes the default values.
+
+It uses the Lua language, which means you can make the configuration dynamic. You could, for example, choose a random animation each time Ly starts up.
 
 You may also check the validity of your configuration file (i.e. if there are any errors in it) with the following command:
 
 ```
-$ ly --validate-config /etc/ly/config.ini
+$ ly --validate-config /etc/ly/config.lua
 ```
 
 ## Controls

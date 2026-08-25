@@ -21,6 +21,13 @@ pub fn build(b: *std.Build) void {
     const zigini = b.dependency("zigini", .{ .target = target, .optimize = optimize });
     mod.addImport("zigini", zigini.module("zigini"));
 
+    const zlua = b.dependency("zlua", .{
+        .target = target,
+        .optimize = optimize,
+        .lang = .luajit,
+    });
+    mod.addImport("zlua", zlua.module("zlua"));
+
     const translate_c = b.dependency("translate_c", .{
         .target = target,
     });

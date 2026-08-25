@@ -19,9 +19,12 @@ const interop = ly_core.interop;
 const UidRange = ly_core.UidRange;
 const LogFile = ly_core.LogFile;
 const SharedError = ly_core.SharedError;
+const Parser = ly_core.Parser;
 const IniParser = ly_core.IniParser;
+const LuaParser = ly_core.LuaParser;
 const ini = ly_core.ini;
 const Ini = ini.Ini;
+const custom = ly_core.custom;
 
 const Cascade = @import("animations/Cascade.zig");
 const ColorMix = @import("animations/ColorMix.zig");
@@ -39,7 +42,6 @@ const Lang = @import("config/Lang.zig");
 const migrator = @import("config/migrator.zig");
 const OldSave = @import("config/OldSave.zig");
 const SavedUsers = @import("config/SavedUsers.zig");
-const custom = @import("config/custom.zig");
 const DisplayServer = @import("enums.zig").DisplayServer;
 const Environment = @import("Environment.zig");
 const Entry = Environment.Entry;
@@ -126,6 +128,7 @@ const UiState = struct {
     bigclock_buf: [32:0]u8,
     custom_binds: std.ArrayList(CustomBindLabel),
     custom_info: std.ArrayList(CustomInfoLabel),
+    tty_cache: [std.math.maxInt(u8)]?u8,
 };
 
 var shutdown = false;
@@ -134,6 +137,7 @@ var restart = false;
 pub fn main(init: std.process.Init) !void {
     var state: UiState = undefined;
 
+    state.tty_cache = @splat(null);
     state.io = init.io;
 
     var stderr_buffer: [128]u8 = undefined;
@@ -149,8 +153,11 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    var gpa = std.heap.DebugAllocator(.{}).init;
-    defer _ = gpa.deinit();
+    var gpa: std.heap.DebugAllocator(.{
+        .never_unmap = builtin.mode == .Debug,
+        .retain_metadata = builtin.mode == .Debug,
+    }) = .init;
+    defer if (gpa.deinit() == .leak) std.log.err("attention please, memory has been leaked!", .{});
 
     state.allocator = gpa.allocator();
 
@@ -188,7 +195,7 @@ pub fn main(init: std.process.Init) !void {
         if (res.args.help != 0) {
             try clap.help(stderr, clap.Help, &params, .{});
 
-            std.log.info("note: if you want to configure Ly, please check the config file, which is located at " ++ build_options.config_directory ++ "/ly/config.ini.", .{});
+            std.log.info("note: if you want to configure Ly, please check the config file, which is located at " ++ build_options.config_directory ++ "/ly/config.lua or " ++ build_options.config_directory ++ "/ly/config.ini.", .{});
             std.process.exit(0);
         }
         if (res.args.version != 0) {
@@ -198,22 +205,28 @@ pub fn main(init: std.process.Init) !void {
         if (res.args.config) |path| config_parent_path = path;
         if (res.args.@"use-kmscon-vt" != 0) state.use_kmscon_vt = true;
         if (res.args.@"validate-config") |path| {
-            var parser = try IniParser(Config).init(
-                state.allocator,
-                state.io,
-                path,
-                migrator.configFieldHandler,
-            );
+            var parser: Parser(Config) = blk: {
+                if (std.mem.endsWith(u8, path, ".ini")) {
+                    break :blk .{ .ini = try IniParser(Config).init(
+                        state.allocator,
+                        state.io,
+                        path,
+                        migrator.configFieldHandler,
+                    ) };
+                } else {
+                    break :blk .{ .lua = try LuaParser(Config).init(state.allocator, path) };
+                }
+            };
             defer parser.deinit();
 
-            for (parser.errors.items) |err| {
+            for (parser.errors().items) |err| {
                 std.log.err(
                     "failed to convert value '{s}' of option '{s}' to type '{s}': {s}",
                     .{ err.value, err.key, err.type_name, err.error_name },
                 );
             }
 
-            if (parser.maybe_load_error) |err| {
+            if (parser.maybe_load_error()) |err| {
                 std.log.err("failed to load config file: {s}", .{@errorName(err)});
                 std.process.exit(1);
             }
@@ -229,12 +242,29 @@ pub fn main(init: std.process.Init) !void {
         state.allocator.free(state.old_save_path);
     };
 
-    const config_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.ini" });
+    // Test for presence of Lua config file first
+    // If it fails, fall back to ini
+    var config_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.lua" });
+    std.Io.Dir.accessAbsolute(state.io, config_path, .{}) catch {
+        state.allocator.free(config_path);
+        config_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "config.ini" });
+    };
     defer state.allocator.free(config_path);
 
     custom.binds = .empty;
     custom.labels = .empty;
-    var config_parser = try IniParser(Config).init(state.allocator, state.io, config_path, migrator.configFieldHandler);
+    var config_parser: Parser(Config) = blk: {
+        if (std.mem.endsWith(u8, config_path, ".ini")) {
+            break :blk .{ .ini = try IniParser(Config).init(
+                state.allocator,
+                state.io,
+                config_path,
+                migrator.configFieldHandler,
+            ) };
+        } else {
+            break :blk .{ .lua = try LuaParser(Config).init(state.allocator, config_path) };
+        }
+    };
     defer config_parser.deinit();
     defer if (!shutdown or !restart) {
         var iter = custom.binds.iterator();
@@ -253,7 +283,7 @@ pub fn main(init: std.process.Init) !void {
         custom.labels.deinit(temporary_allocator);
     };
 
-    state.config = config_parser.structure;
+    state.config = config_parser.structure();
 
     var lang_buffer: [16]u8 = undefined;
     const lang_file = try std.fmt.bufPrint(&lang_buffer, "{s}.ini", .{state.config.lang});
@@ -271,7 +301,7 @@ pub fn main(init: std.process.Init) !void {
         state.old_save_path = try std.Io.Dir.path.join(state.allocator, &[_][]const u8{ config_parent_path, "save.ini" });
     }
 
-    if (config_parser.maybe_load_error == null) {
+    if (config_parser.maybe_load_error() == null and config_parser == .ini) {
         migrator.lateConfigFieldHandler(&state.config, state.lang);
     }
 
@@ -316,7 +346,8 @@ pub fn main(init: std.process.Init) !void {
         }
 
         while (reader.seek < reader.buffer.len) {
-            const line = reader.takeDelimiterInclusive('\n') catch break;
+            var line = reader.takeDelimiterInclusive('\n') catch break;
+            if (std.mem.startsWith(u8, line, "ly/tty")) continue;
 
             var user = std.mem.splitScalar(u8, line[0..(line.len - 1)], ':');
             const username = user.next() orelse continue;
@@ -331,19 +362,8 @@ pub fn main(init: std.process.Init) !void {
                 .allocated_username = true,
             });
         }
-    }
 
-    // If no save file previously existed, fill it up with all usernames
-    // TODO: Add new username with existing save file
-    if (state.config.save_file_dir != null and state.saved_users.user_list.items.len == 0) {
-        for (usernames.items) |user| {
-            try state.saved_users.user_list.append(state.allocator, .{
-                .username = user,
-                .session_index = 0,
-                .first_run = true,
-                .allocated_username = false,
-            });
-        }
+        updateTtyCache(&state, .{ .usernames = usernames.items }) catch break :read_save_file;
     }
 
     var log_file_buffer: [1024]u8 = undefined;
@@ -556,6 +576,7 @@ pub fn main(init: std.process.Init) !void {
         null,
         state.buffer.fg,
         state.buffer.bg,
+        state.config.bigclock_outline_fg,
         switch (state.config.bigclock) {
             .none, .en => .en,
             .fa => .fa,
@@ -640,7 +661,7 @@ pub fn main(init: std.process.Init) !void {
         );
     }
 
-    if (config_parser.maybe_load_error) |load_error| {
+    if (config_parser.maybe_load_error()) |load_error| {
         // We can't localize this since the config failed to load so we'd fallback to the default language anyway
         try state.info_line.addMessage(
             "unable to parse config file",
@@ -654,7 +675,7 @@ pub fn main(init: std.process.Init) !void {
             .{@errorName(load_error)},
         );
 
-        for (config_parser.errors.items) |err| {
+        for (config_parser.errors().items) |err| {
             try state.log_file.err(
                 state.io,
                 "conf",
@@ -986,7 +1007,10 @@ pub fn main(init: std.process.Init) !void {
         );
         break :no_tty_found build_options.fallback_tty;
     };
-    if (!state.use_kmscon_vt) {
+    if (!state.use_kmscon_vt) switch_tty: {
+        if (state.config.grab_focus_tty) |tty| {
+            if (tty != state.active_tty) break :switch_tty;
+        }
         interop.switchTty(state.active_tty) catch |err| {
             try state.info_line.addMessage(
                 state.lang.err_switch_tty,
@@ -1060,10 +1084,12 @@ pub fn main(init: std.process.Init) !void {
                 &state.animate,
                 state.config.animation_timeout_sec,
                 state.config.animation_frame_delay,
+                state.config.gameoflife_param_survival,
+                state.config.gameoflife_param_birth,
             );
             animation = game_of_life.widget();
         },
-        .dur_file => {
+        .dur => {
             var dur = try DurFile.init(
                 state.allocator,
                 state.io,
@@ -1118,6 +1144,8 @@ pub fn main(init: std.process.Init) !void {
     // Skip if autologin is active to prevent overriding autologin session
     var default_input = state.config.default_input;
 
+    const min_session_index = state.session.label.list.items.len - 1;
+
     if (state.config.save_file_dir != null and !state.is_autologin) {
         if (state.login_text) |box| {
             if (state.saved_username) |username| {
@@ -1129,16 +1157,23 @@ pub fn main(init: std.process.Init) !void {
 
                 for (state.saved_users.user_list.items) |user| {
                     if (std.mem.eql(u8, username, user.username)) {
-                        state.session.label.current = @min(user.session_index, state.session.label.list.items.len - 1);
+                        state.session.label.current = @min(user.session_index, min_session_index);
                         break;
                     }
                 }
             }
-        } else if (state.saved_users.last_username_index) |index| load_last_user: {
-            // If the saved index isn't valid, bail out
-            if (index >= state.saved_users.user_list.items.len) break :load_last_user;
+        } else if (state.tty_cache[state.active_tty]) |user_index| {
+            const user_session_index = state.login.?.label.list.items[user_index].session_index.*;
 
-            const user = state.saved_users.user_list.items[index];
+            state.login.?.label.current = user_index;
+            state.session.label.current = @min(user_session_index, min_session_index);
+        } else if (state.saved_users.last_username_index) |last_user_index| load_last_user: {
+            const saved_users = state.saved_users.user_list.items;
+
+            // If the saved index isn't valid, bail out
+            if (last_user_index >= saved_users.len) break :load_last_user;
+
+            const user = saved_users[last_user_index];
 
             // Find user with saved name, and switch over to it
             // If it doesn't exist (anymore), we don't change the value
@@ -1151,7 +1186,7 @@ pub fn main(init: std.process.Init) !void {
 
             default_input = .password;
 
-            state.session.label.current = @min(user.session_index, state.session.label.list.items.len - 1);
+            state.session.label.current = @min(user.session_index, min_session_index);
         }
     }
 
@@ -1459,23 +1494,6 @@ fn authenticate(ptr: *anyopaque) !bool {
             state.config.error_bg,
             state.config.error_fg,
         );
-        if (!state.is_autologin) {
-            state.info_line.clearRendered(state.allocator) catch |err| {
-                try state.info_line.addMessage(
-                    state.lang.err_alloc,
-                    state.config.error_bg,
-                    state.config.error_fg,
-                );
-                try state.log_file.err(
-                    state.io,
-                    "tui",
-                    "failed to clear info line: {s}",
-                    .{@errorName(err)},
-                );
-            };
-            state.info_line.label.draw();
-            try TerminalBuffer.presentBuffer();
-        }
         return false;
     }
 
@@ -1513,28 +1531,51 @@ fn authenticate(ptr: *anyopaque) !bool {
             .{},
         ) catch {};
 
-        var file = std.Io.Dir.cwd().createFile(state.io, state.save_path, .{}) catch |err| {
+        const current: u8 = @intCast(state.login.?.label.current);
+        const login_users = state.login.?.label.list.items;
+
+        // Try to update the local tty cache before overwriting,
+        // since multiple instances can be running
+        updateTtyCache(state, .{ .user_list = login_users }) catch |err| {
             state.log_file.err(
                 state.io,
                 "sys",
-                "failed to create save file: {s}",
+                "failed to update cache: {s}",
                 .{@errorName(err)},
+            ) catch {};
+        };
+
+        var save_file = std.Io.Dir.cwd().createFile(state.io, state.save_path, .{}) catch |err| {
+            state.log_file.err(
+                state.io,
+                "sys",
+                "failed to create save file: {s} {s}",
+                .{ @errorName(err), state.save_path },
             ) catch break :save_last_settings;
             break :save_last_settings;
         };
-        defer file.close(state.io);
+        defer save_file.close(state.io);
 
         var file_buffer: [256]u8 = undefined;
-        var file_writer = file.writer(state.io, &file_buffer);
+        var file_writer = save_file.writer(state.io, &file_buffer);
         var writer = &file_writer.interface;
 
         if (state.login_text) |box| {
             try writer.print("0-{s}\n", .{box.text.items});
         } else {
-            try writer.print("{d}\n", .{state.login.?.label.current});
+            try writer.print("{d}\n", .{current});
         }
-        for (state.saved_users.user_list.items) |user| {
-            try writer.print("{s}:{d}\n", .{ user.username, user.session_index });
+        for (login_users) |user| {
+            try writer.print("{s}:{d}\n", .{ user.name, user.session_index.* });
+        }
+
+        state.tty_cache[state.active_tty] = current;
+        for (state.tty_cache, 0..) |maybe_user_index, tty_num| {
+            if (maybe_user_index) |user_index| {
+                // Posix usernames can't contain a '/'
+                // And, well, if your username is this string...
+                try writer.print("ly/tty{d}:{s}\n", .{ tty_num, login_users[user_index].name });
+            }
         }
         try writer.flush();
 
@@ -2256,7 +2297,8 @@ fn positionWidgets(ptr: *anyopaque) !void {
     const clock_text_len = TerminalBuffer.strWidth(state.bigclock_label.text) * (BigLabel.CHAR_WIDTH + 1);
 
     if (state.config.bigclock != .none) {
-        bb_height += BigLabel.CHAR_HEIGHT + 2;
+        const gap: usize = if (state.config.bigclock_outline_fg != null) 3 else 2;
+        bb_height += BigLabel.CHAR_HEIGHT + gap;
         bb_width = @max(bb_width, clock_text_len);
     }
 
@@ -2406,7 +2448,12 @@ fn crawl(session: *Session, io: std.Io, lang: Lang, path: []const u8, display_se
             for (desktop_names) |*c| {
                 if (c.* == ';') c.* = ':';
             }
-            maybe_xdg_desktop_names = desktop_names;
+
+            if (desktop_names[desktop_names.len - 1] == ':') {
+                maybe_xdg_desktop_names = desktop_names[0 .. desktop_names.len - 1];
+            } else {
+                maybe_xdg_desktop_names = desktop_names;
+            }
         } else if (display_server != .custom) {
             // If DesktopNames is empty, and this isn't a custom session entry,
             // we'll take the name of the session file
@@ -2573,4 +2620,47 @@ fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
         error.PamAbort => lang.err_pam_abort,
         else => @errorName(err),
     };
+}
+
+// Updates the UiState's tty_cache using the save file.
+// Matched against the current truthful user list to ensure it's a valid index.
+fn updateTtyCache(state: *UiState, real_users: union(enum) { user_list: []UserList.User, usernames: [][]const u8 }) !void {
+    var save_file = try std.Io.Dir.cwd().openFile(state.io, state.save_path, .{});
+    defer save_file.close(state.io);
+
+    var file_buffer: [256]u8 = undefined;
+    var file_reader = save_file.reader(state.io, &file_buffer);
+    var reader = &file_reader.interface;
+
+    while (reader.seek < reader.buffer.len) {
+        var line = reader.takeDelimiterInclusive('\n') catch break;
+        if (!std.mem.startsWith(u8, line, "ly/tty")) continue;
+
+        line = line["ly/tty".len..];
+        var entry = std.mem.splitScalar(u8, line[0..(line.len - 1)], ':');
+        const tty_num_str = entry.next() orelse continue;
+        const saved_username = entry.next() orelse continue;
+
+        const tty_num = std.fmt.parseInt(usize, tty_num_str, 10) catch continue;
+        if (tty_num >= std.math.maxInt(u8)) continue;
+
+        switch (real_users) {
+            .usernames => |usernames| {
+                for (usernames, 0..) |username, u_index| {
+                    if (std.mem.eql(u8, username, saved_username)) {
+                        state.tty_cache[tty_num] = @intCast(u_index);
+                        break;
+                    }
+                }
+            },
+            .user_list => |user_list| {
+                for (user_list, 0..) |user, u_index| {
+                    if (std.mem.eql(u8, user.name, saved_username)) {
+                        state.tty_cache[tty_num] = @intCast(u_index);
+                        break;
+                    }
+                }
+            },
+        }
+    }
 }

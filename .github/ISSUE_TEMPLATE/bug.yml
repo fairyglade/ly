@@ -73,7 +73,7 @@ body:
     attributes:
       label: Relevant logs
       description: |
-        Please copy and paste (or attach) any relevant logs, error messages or any other output. This will be automatically formatted into code, so no need for backticks. Screenshots are accepted if they make life easier for you. The log files (located as specified by `/etc/ly/config.ini`) usually contain relevant information about the problem:
+        Please copy and paste (or attach) any relevant logs, error messages or any other output. This will be automatically formatted into code, so no need for backticks. Screenshots are accepted if they make life easier for you. The log files (located as specified by `/etc/ly/config.lua` or `/etc/ly/config.ini`) usually contain relevant information about the problem:
          - The session log is located at `~/.local/state/ly-session.log` by default.
          - The system log is located at `/var/log/ly.log` by default.
       render: shell

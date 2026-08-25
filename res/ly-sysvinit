@@ -13,7 +13,7 @@
 #
 
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
-DAEMON=/usr/bin/ly
+DAEMON=$PREFIX_DIRECTORY/bin/ly
 TTY=/dev/tty$DEFAULT_TTY
 PIDFILE=/var/run/ly.pid
 NAME=ly

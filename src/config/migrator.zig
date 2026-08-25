@@ -18,7 +18,7 @@ const Config = @import("Config.zig");
 const Lang = @import("Lang.zig");
 const OldSave = @import("OldSave.zig");
 const SavedUsers = @import("SavedUsers.zig");
-const custom = @import("custom.zig");
+const custom = ly_core.custom;
 
 const color_properties = [_][]const u8{
     "bg",
@@ -74,16 +74,27 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
     }
 
     if (std.mem.eql(u8, field.key, "animation")) {
-        // The option now uses a string (which then gets converted into an enum) instead of an integer
-        // It also combines the previous "animate" and "animation" options
-        const animation = std.fmt.parseInt(u8, field.value, 10) catch return field;
+        string_conversion: {
+            // The option now uses a string (which then gets converted into an enum) instead of an integer
+            // It also combines the previous "animate" and "animation" options
+            const animation = std.fmt.parseInt(u8, field.value, 10) catch break :string_conversion;
+            var mapped_field = field;
+
+            mapped_field.value = switch (animation) {
+                0 => "doom",
+                1 => "matrix",
+                else => "none",
+            };
+
+            return mapped_field;
+        }
+
+        // 'dur_file' was renamed to 'dur'
         var mapped_field = field;
 
-        mapped_field.value = switch (animation) {
-            0 => "doom",
-            1 => "matrix",
-            else => "none",
-        };
+        if (std.mem.eql(u8, mapped_field.value, "dur_file")) {
+            mapped_field.value = "dur";
+        }
 
         return mapped_field;
     }

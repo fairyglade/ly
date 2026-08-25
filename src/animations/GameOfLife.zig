@@ -39,6 +39,11 @@ animation_frame_delay: u16,
 dead_cell: Cell,
 width: usize,
 height: usize,
+// Where N is the amount of neighbors, determines if the cell can survive/be born
+// by checking if the Nth bit (where if N == 0, it is the least significant bit,
+// or 2 to the power of 0) is set to 1.
+cell_survival: u9,
+cell_birth: u9,
 
 pub fn init(
     allocator: Allocator,
@@ -50,6 +55,8 @@ pub fn init(
     animate: *bool,
     timeout_sec: u12,
     animation_frame_delay: u16,
+    string_cell_survival: []const u8,
+    string_cell_birth: []const u8,
 ) !GameOfLife {
     const width = terminal_buffer.width;
     const height = terminal_buffer.height;
@@ -77,6 +84,16 @@ pub fn init(
         .dead_cell = .{ .ch = DEAD_CHAR, .fg = @intCast(TerminalBuffer.Color.DEFAULT), .bg = terminal_buffer.bg },
         .width = width,
         .height = height,
+        .cell_birth = 0,
+        .cell_survival = 0,
+    };
+    for (string_cell_survival) |c| switch (c) {
+        '0'...'8' => game.cell_survival |= (@as(u9, 1) << @truncate(@as(u9, c - '0'))),
+        else => {},
+    };
+    for (string_cell_birth) |c| switch (c) {
+        '0'...'8' => game.cell_birth |= (@as(u9, 1) << @truncate(@as(u9, c - '0'))),
+        else => {},
     };
 
     // Initialize grid
@@ -173,11 +190,10 @@ fn updateGeneration(self: *GameOfLife) void {
             const is_alive = self.current_grid[index];
 
             // Optimized rule application
-            self.next_grid[index] = switch (neighbors) {
-                2 => is_alive,
-                3 => true,
-                else => false,
-            };
+            self.next_grid[index] = if (is_alive)
+                self.cell_survival & (@as(u9, 1) << @truncate(neighbors)) != 0
+            else
+                self.cell_birth & (@as(u9, 1) << @truncate(neighbors)) != 0;
         }
     }
 

@@ -19,6 +19,12 @@ pub const CHAR_SIZE = CHAR_WIDTH * CHAR_HEIGHT;
 pub const X: u32 = if (ly_core.interop.supportsUnicode()) 0x2593 else '#';
 pub const O: u32 = 0;
 
+const OUTLINE_DIRS = [_][2]i8{
+    .{ -1, -1 }, .{ -1, 0 }, .{ -1, 1 },
+    .{ 0, -1 },  .{ 0, 1 },  .{ 1, -1 },
+    .{ 1, 0 },   .{ 1, 1 },
+};
+
 // zig fmt: off
 pub const LocaleChars = struct {
     ZERO:   [CHAR_SIZE]u21,
@@ -51,6 +57,7 @@ text: []const u8,
 max_width: ?usize,
 fg: u32,
 bg: u32,
+outline_fg: ?u32 = null,
 locale: BigLabelLocale,
 update_fn: ?*const fn (*BigLabel, *anyopaque) anyerror!void,
 calculate_timeout_fn: ?*const fn (*BigLabel, *anyopaque) anyerror!?usize,
@@ -63,6 +70,7 @@ pub fn init(
     max_width: ?usize,
     fg: u32,
     bg: u32,
+    outline_fg: ?u32,
     locale: BigLabelLocale,
     update_fn: ?*const fn (*BigLabel, *anyopaque) anyerror!void,
     calculate_timeout_fn: ?*const fn (*BigLabel, *anyopaque) anyerror!?usize,
@@ -75,6 +83,7 @@ pub fn init(
         .max_width = max_width,
         .fg = fg,
         .bg = bg,
+        .outline_fg = outline_fg,
         .locale = locale,
         .update_fn = update_fn,
         .calculate_timeout_fn = calculate_timeout_fn,
@@ -152,21 +161,69 @@ pub fn childrenPosition(self: BigLabel) Position {
 
 fn draw(self: *BigLabel) void {
     for (self.text, 0..) |c, i| {
-        const clock_cell = clockCell(
-            c,
-            self.fg,
-            self.bg,
-            self.locale,
-        );
+        const x = self.component_pos.x + i * (CHAR_WIDTH + 1);
+        const y = self.component_pos.y;
+
+        if (self.outline_fg) |outline_fg| {
+            drawDigitOutline(self, c, x, y, outline_fg);
+        }
 
         alphaBlit(
-            self.component_pos.x + i * (CHAR_WIDTH + 1),
-            self.component_pos.y,
+            x,
+            y,
             self.buffer.width,
             self.buffer.height,
-            clock_cell,
+            clockCell(c, self.fg, self.bg, self.locale),
         );
     }
+}
+
+fn drawDigitOutline(
+    self: *BigLabel,
+    char: u8,
+    base_x: usize,
+    base_y: usize,
+    outline_fg: u32,
+) void {
+    const pattern = toBigNumber(char, self.locale);
+    const stroke = Cell.init(X, outline_fg, TerminalBuffer.Color.DEFAULT);
+
+    for (0..CHAR_HEIGHT) |y| {
+        for (0..CHAR_WIDTH) |x| {
+            if (pattern[y * CHAR_WIDTH + x] == O) continue;
+
+            for (OUTLINE_DIRS) |dir| {
+                if (offsetBy(x, dir[0])) |nx| {
+                    if (offsetBy(y, dir[1])) |ny| {
+                        if (nx < CHAR_WIDTH and ny < CHAR_HEIGHT and
+                            pattern[ny * CHAR_WIDTH + nx] != O)
+                        {
+                            continue;
+                        }
+                    }
+                }
+
+                const sx = offsetBy(base_x + x, dir[0]) orelse continue;
+                const sy = offsetBy(base_y + y, dir[1]) orelse continue;
+                if (sx >= self.buffer.width or
+                    sy >= self.buffer.height)
+                {
+                    continue;
+                }
+
+                stroke.put(sx, sy) catch {};
+            }
+        }
+    }
+}
+
+fn offsetBy(pos: usize, delta: i8) ?usize {
+    if (delta < 0) {
+        const abs: usize = @intCast(-delta);
+        if (pos < abs) return null;
+        return pos - abs;
+    }
+    return pos + @as(usize, @intCast(delta));
 }
 
 fn update(self: *BigLabel, context: *anyopaque) !void {
