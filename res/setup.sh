@@ -70,6 +70,16 @@ if [ "$XDG_SESSION_TYPE" = "x11" ]; then
         done
     fi
 
+    if [ -d "$CONFIG_DIRECTORY"/X11/Xresources ]; then
+        for i in "$CONFIG_DIRECTORY"/X11/Xresources/*; do
+            [ -f "$i" ] && xrdb -merge "$i"
+        done
+    elif [ -f "$CONFIG_DIRECTORY"/X11/Xresources ]; then
+        xrdb -merge "$CONFIG_DIRECTORY"/X11/Xresources
+    fi
+    [ -f "$HOME"/.Xresources ] && xrdb -merge "$HOME"/.Xresources
+    [ -f "$XDG_CONFIG_HOME"/X11/Xresources ] && xrdb -merge "$XDG_CONFIG_HOME"/X11/Xresources
+
     # Load Xsession scripts
     # OPTIONFILE, USERXSESSION, USERXSESSIONRC and ALTUSERXSESSION are required
     # by the scripts to work
@@ -78,6 +88,9 @@ if [ "$XDG_SESSION_TYPE" = "x11" ]; then
     export USERXSESSION="$HOME"/.xsession
     export USERXSESSIONRC="$HOME"/.xsessionrc
     export ALTUSERXSESSION="$HOME"/.Xsession
+    # Some distributions have an Xsession script containing "exec $STARTUP",
+    # this makes sure to set the variable to what we actually want to launch
+    export STARTUP="$@"
 
     if [ -d "$xsessionddir" ]; then
         for i in $(ls "$xsessionddir"); do
@@ -92,16 +105,6 @@ if [ "$XDG_SESSION_TYPE" = "x11" ]; then
     if [ -f "$USERXSESSION" ]; then
         . "$USERXSESSION"
     fi
-
-    if [ -d "$CONFIG_DIRECTORY"/X11/Xresources ]; then
-        for i in "$CONFIG_DIRECTORY"/X11/Xresources/*; do
-            [ -f "$i" ] && xrdb -merge "$i"
-        done
-    elif [ -f "$CONFIG_DIRECTORY"/X11/Xresources ]; then
-        xrdb -merge "$CONFIG_DIRECTORY"/X11/Xresources
-    fi
-    [ -f "$HOME"/.Xresources ] && xrdb -merge "$HOME"/.Xresources
-    [ -f "$XDG_CONFIG_HOME"/X11/Xresources ] && xrdb -merge "$XDG_CONFIG_HOME"/X11/Xresources
 fi
 
 exec "$@"
