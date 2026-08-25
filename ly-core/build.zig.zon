@@ -5,7 +5,7 @@
     .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .zigini = .{
-            .url = "git+https://github.com/AnErrupTion/zigini?ref=zig-0.17.0#29b30ec37efccb022a57e7acda83d63fa5832dd8",
+            .url = "git+https://github.com/AshAmetrine/zigini?ref=main#085badbf90e25016f4609b5bde334689cdb41c5c",
             .hash = "zigini-0.6.0-BSkB7UtYAAB6b6HEm3Pjj5WIy-uiuBYsNTNCUENVwL1t",
         },
         .translate_c = .{
