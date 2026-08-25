@@ -326,7 +326,7 @@ fn loginConv(
     for (0..message_count) |i| set_credentials: {
         switch (messages[i].?.msg_style) {
             interop.pam.PAM_PROMPT_ECHO_ON => {
-                username = allocator.dupeZ(u8, data.username) catch {
+                username = allocator.dupeSentinel(u8, data.username, 0) catch {
                     status = interop.pam.PAM_BUF_ERR;
                     break :set_credentials;
                 };
@@ -341,7 +341,7 @@ fn loginConv(
                     data.authreq_responded = true;
                 }
 
-                password = allocator.dupeZ(u8, pass) catch {
+                password = allocator.dupeSentinel(u8, pass, 0) catch {
                     status = interop.pam.PAM_BUF_ERR;
                     break :set_credentials;
                 };

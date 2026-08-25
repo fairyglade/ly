@@ -28,9 +28,7 @@ pub fn build(b: *std.Build) void {
     });
     mod.addImport("zlua", zlua.module("zlua"));
 
-    const translate_c = b.dependency("translate_c", .{
-        .target = target,
-    });
+    const translate_c = b.dependency("translate_c", .{});
 
     addCImport(b, mod, translate_c, target, optimize, "pam", "#include <security/pam_appl.h>");
     addCImport(b, mod, translate_c, target, optimize, "utmp", "#include <utmpx.h>");

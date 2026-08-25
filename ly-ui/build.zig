@@ -28,9 +28,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const translate_c_dep = b.dependency("translate_c", .{
-        .target = target,
-    });
+    const translate_c_dep = b.dependency("translate_c", .{});
 
     const termbox2: Translator = .init(translate_c_dep, .{
         .c_source_file = termbox_dep.path("termbox2.h"),

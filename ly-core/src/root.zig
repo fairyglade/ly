@@ -131,13 +131,11 @@ pub fn LuaParser(comptime Struct: type) type {
             var arena = std.heap.ArenaAllocator.init(allocator);
             const arena_alloc = arena.allocator();
 
-            var maybe_load_error: ?anyerror = null;
-            errdefer |err| maybe_load_error = err;
-
             const data = parseLua(arena_alloc, path) catch load_error: {
                 break :load_error Struct{};
             };
 
+            var maybe_load_error: ?anyerror = null;
             if (global_errors.items.len != 0) {
                 maybe_load_error = error.InvalidConfig;
             }
@@ -176,8 +174,8 @@ pub fn LuaParser(comptime Struct: type) type {
                     defer lua.pop(1); // pop ly table
                     if (ly_type == .nil) return error.MissingLyTable;
 
-                    inline for (struc.fields) |field| {
-                        try setField(allocator, lua, field, &data);
+                    inline for (struc.field_names, struc.field_types) |name, ftype| {
+                        try setField(allocator, lua, name, ftype, &data);
                     }
                 },
                 else => @compileError("Expected a struct."),
@@ -188,21 +186,47 @@ pub fn LuaParser(comptime Struct: type) type {
             return data;
         }
 
-        pub fn setField(allocator: std.mem.Allocator, lua: *Lua, comptime field: std.builtin.Type.StructField, data: *Struct) !void {
-            const type_info = @typeInfo(field.type);
+        pub fn setField(
+            allocator: std.mem.Allocator,
+            lua: *Lua,
+            comptime field_name: [:0]const u8,
+            field_type: type,
+            data: *Struct,
+        ) !void {
+            return setFieldInner(
+                allocator,
+                lua,
+                field_name,
+                field_type,
+                data,
+            ) catch |err| {
+                const value = lua.toString(-1) catch "";
+                const duped = allocator.dupe(u8, value) catch "";
+                errorHandler(@typeName(field_type), field_name, duped, err);
+            };
+        }
+
+        fn setFieldInner(
+            allocator: std.mem.Allocator,
+            lua: *Lua,
+            comptime field_name: [:0]const u8,
+            field_type: type,
+            data: *Struct,
+        ) !void {
+            const type_info = @typeInfo(field_type);
             const actual_type, const is_optional = blk: {
                 if (type_info == .optional) {
                     break :blk .{ type_info.optional.child, true };
                 }
-                break :blk .{ field.type, false };
+                break :blk .{ field_type, false };
             };
             // push value to top of stack
-            _ = lua.getField(-1, field.name);
+            _ = lua.getField(-1, field_name);
             defer lua.pop(1);
 
             // handle null, i.e. undefined fields
             if (is_optional and lua.isNil(-1)) {
-                @field(data, field.name) = null;
+                @field(data, field_name) = null;
                 return;
             }
 
@@ -212,17 +236,11 @@ pub fn LuaParser(comptime Struct: type) type {
             }
             const actual_type_info = @typeInfo(actual_type);
 
-            errdefer |err| {
-                const value = lua.toString(-1) catch "";
-                const duped = allocator.dupe(u8, value) catch "";
-                errorHandler(@typeName(field.type), field.name, duped, err);
-            }
-
             // dispatch depending on type
             if (actual_type_info == .int and is_optional) {
                 if (lua.isNumber(-1)) {
                     const value = try lua.toNumber(-1);
-                    @field(data, field.name) = @trunc(value);
+                    @field(data, field_name) = @trunc(value);
                 } else {
                     const str = try lua.toString(-1);
 
@@ -233,13 +251,13 @@ pub fn LuaParser(comptime Struct: type) type {
 
                     if (iter.nextCodepoint() != null) return error.ExpectedSingleCharacter;
 
-                    @field(data, field.name) = if (codepoint) |cp| @intCast(cp) else null;
+                    @field(data, field_name) = if (codepoint) |cp| @intCast(cp) else null;
                 }
                 // non null integer
             } else if (actual_type_info == .int) {
                 if (lua.isNumber(-1)) {
                     const value = try lua.toNumber(-1);
-                    @field(data, field.name) = @trunc(value);
+                    @field(data, field_name) = @trunc(value);
                 } else {
                     const str = try lua.toString(-1);
 
@@ -250,27 +268,27 @@ pub fn LuaParser(comptime Struct: type) type {
 
                     if (iter.nextCodepoint() != null) return error.ExpectedSingleCharacter;
 
-                    @field(data, field.name) = @intCast(codepoint);
+                    @field(data, field_name) = @intCast(codepoint);
                 }
             } else if (actual_type_info == .float) { // all floats
                 const value = try lua.toNumber(-1);
-                @field(data, field.name) = @floatCast(value);
+                @field(data, field_name) = @floatCast(value);
             } else if (actual_type_info == .bool) {
                 if (!lua.isBoolean(-1)) return error.ExpectedBoolean;
                 const value = lua.toBoolean(-1);
-                @field(data, field.name) = value;
+                @field(data, field_name) = value;
             } else if (actual_type == []const u8) {
                 const value = try lua.toString(-1);
                 const duped = try allocator.dupe(u8, value);
-                @field(data, field.name) = duped;
+                @field(data, field_name) = duped;
             } else if (actual_type == [:0]const u8) {
                 const value = try lua.toString(-1);
                 const duped = try allocator.dupeSentinel(u8, value, 0);
-                @field(data, field.name) = duped;
+                @field(data, field_name) = duped;
             } else if (actual_type_info == .@"enum") {
                 const value = try lua.toString(-1);
                 const variant = std.meta.stringToEnum(actual_type, value) orelse return error.InvalidVariant;
-                @field(data, field.name) = variant;
+                @field(data, field_name) = variant;
             } else unreachable;
         }
 

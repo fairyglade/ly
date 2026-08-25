@@ -422,7 +422,7 @@ pub fn getNextUsernameEntry() ?UsernameEntry {
 }
 
 pub fn getUsernameEntry(allocator: std.mem.Allocator, username: []const u8) ?UsernameEntry {
-    const username_z = allocator.dupeZ(u8, username) catch return null;
+    const username_z = allocator.dupeSentinel(u8, username, 0) catch return null;
     defer allocator.free(username_z);
 
     const entry = pwd.getpwnam(username_z);

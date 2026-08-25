@@ -154,8 +154,8 @@ pub fn main(init: std.process.Init) !void {
     }
 
     var gpa: std.heap.DebugAllocator(.{
-        .never_unmap = builtin.mode == .Debug,
-        .retain_metadata = builtin.mode == .Debug,
+        .never_unmap = builtin.mode == .debug,
+        .retain_metadata = builtin.mode == .debug,
     }) = .init;
     defer if (gpa.deinit() == .leak) std.log.err("attention please, memory has been leaked!", .{});
 
