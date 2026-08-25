@@ -2447,7 +2447,12 @@ fn crawl(session: *Session, io: std.Io, lang: Lang, path: []const u8, display_se
             for (desktop_names) |*c| {
                 if (c.* == ';') c.* = ':';
             }
-            maybe_xdg_desktop_names = desktop_names;
+
+            if (desktop_names[desktop_names.len - 1] == ':') {
+                maybe_xdg_desktop_names = desktop_names[0 .. desktop_names.len - 1];
+            } else {
+                maybe_xdg_desktop_names = desktop_names;
+            }
         } else if (display_server != .custom) {
             // If DesktopNames is empty, and this isn't a custom session entry,
             // we'll take the name of the session file
