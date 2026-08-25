@@ -1494,23 +1494,6 @@ fn authenticate(ptr: *anyopaque) !bool {
             state.config.error_bg,
             state.config.error_fg,
         );
-        if (!state.is_autologin) {
-            state.info_line.clearRendered(state.allocator) catch |err| {
-                try state.info_line.addMessage(
-                    state.lang.err_alloc,
-                    state.config.error_bg,
-                    state.config.error_fg,
-                );
-                try state.log_file.err(
-                    state.io,
-                    "tui",
-                    "failed to clear info line: {s}",
-                    .{@errorName(err)},
-                );
-            };
-            state.info_line.label.draw();
-            try TerminalBuffer.presentBuffer();
-        }
         return false;
     }
 
