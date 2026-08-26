@@ -232,9 +232,7 @@ pub fn configFieldHandler(_: std.mem.Allocator, field: ini.IniField) ?ini.IniFie
     //      on the progress of said interface, only to find out afterwards
     //      that you have PROCRASTINATED on the efforts meant to enhance
     //      configuration. Thus the requirement for this reminder larger
-    //      compared to the two reminders regarding better methods of
-    //      X termination detection and new usernames with existing
-    //      save files.
+    //      compared to the one regarding better methods of X termination.
     //
     //      Thus is my que to leave this TODO at thy request,
     //
