@@ -207,9 +207,7 @@ pub fn LuaParser(comptime Struct: type) type {
             }
 
             // handle missing required fields
-            if (lua.isNil(-1)) {
-                return error.MissingRequiredField;
-            }
+            if (lua.isNil(-1)) return;
             const actual_type_info = @typeInfo(actual_type);
 
             errdefer |err| {
