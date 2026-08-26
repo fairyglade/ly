@@ -1,5 +1,5 @@
 //
-// NOTE: After editing this file, please run `/res/lang/normalize_lang_files.py`
+// NOTE: After editing this file, please run `res/lang/normalize_lang_files.py`
 //       to update all the language files accordingly.
 //
 
@@ -38,7 +38,6 @@ err_pam_abort: []const u8 = "pam transaction aborted",
 err_pam_acct_expired: []const u8 = "account expired",
 err_pam_auth: []const u8 = "authentication error",
 err_pam_authinfo_unavail: []const u8 = "failed to get user info",
-err_pam_authok_reqd: []const u8 = "token expired",
 err_pam_buf: []const u8 = "memory buffer error",
 err_pam_cred_err: []const u8 = "failed to set credentials",
 err_pam_cred_expired: []const u8 = "credentials expired",
@@ -82,6 +81,7 @@ shell: [:0]const u8 = "shell",
 shutdown: []const u8 = "shutdown",
 sleep: []const u8 = "sleep",
 toggle_password: []const u8 = "toggle password",
+token_expired: []const u8 = "password expired, please reset",
 wayland: []const u8 = "wayland",
 x11: []const u8 = "x11",
 xinitrc: [:0]const u8 = "xinitrc",

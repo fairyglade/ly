@@ -113,6 +113,7 @@ const UiState = struct {
     login_text: ?*Text,
     password: *Text,
     password_widget: *Widget,
+    maybe_old_password: ?[]const u8,
     insert_mode: bool,
     edge_margin: Position,
     config: Config,
@@ -889,6 +890,9 @@ pub fn main(init: std.process.Init) !void {
     );
     defer state.password_label.deinit();
 
+    state.maybe_old_password = null;
+    defer if (state.maybe_old_password) |pass| state.allocator.free(pass);
+
     state.insert_mode = !state.config.vi_mode or state.config.vi_default_mode == .insert;
 
     state.password = try Text.init(
@@ -1633,7 +1637,8 @@ fn authenticate(ptr: *anyopaque) !bool {
                 auth_options,
                 current_environment,
                 if (state.login_text) |box| box.text.items else state.login.?.getCurrentUsername(),
-                password_text,
+                if (state.maybe_old_password) |pass| pass else password_text,
+                if (state.maybe_old_password != null) password_text else null,
             ) catch |err| {
                 shared_err.writeError(err);
 
@@ -1645,12 +1650,19 @@ fn authenticate(ptr: *anyopaque) !bool {
             std.process.exit(0);
         }
 
-        var session_status: c_int = undefined;
-        _ = std.posix.system.waitpid(session_pid, &session_status, 0);
-        // HACK: It seems like the session process is not exiting immediately after the waitpid call.
-        // This is a workaround to ensure the session process has exited before re-initializing the TTY.
-        state.io.sleep(.fromSeconds(1), .real) catch {};
-        session_pid = -1;
+        if (state.maybe_old_password) |pass| {
+            state.allocator.free(pass);
+            state.maybe_old_password = null;
+        }
+
+        if (session_pid != -1) {
+            var session_status: c_int = undefined;
+            _ = std.posix.system.waitpid(session_pid, &session_status, 0);
+            // HACK: It seems like the session process is not exiting immediately after the waitpid call.
+            // This is a workaround to ensure the session process has exited before re-initializing the TTY.
+            state.io.sleep(.fromSeconds(1), .real) catch {};
+            session_pid = -1;
+        }
 
         try state.log_file.reinit(state.io);
     }
@@ -1658,7 +1670,20 @@ fn authenticate(ptr: *anyopaque) !bool {
     try state.buffer.reclaim();
 
     const auth_err = shared_err.readError();
-    if (auth_err) |err| {
+    if (auth_err) |err| handle_error: {
+        if (err == error.PamNewAuthTokenRequired) {
+            try state.info_line.addMessage(
+                state.lang.token_expired,
+                state.config.bg,
+                state.config.fg,
+            );
+
+            state.maybe_old_password = try state.allocator.dupe(u8, state.password.text.items);
+            state.password.clear();
+            state.is_autologin = false;
+            break :handle_error;
+        }
+
         state.auth_fails += 1;
         state.buffer.setActiveWidget(state.password_widget);
 
@@ -2611,7 +2636,6 @@ fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
         error.PamCredentialsInsufficient => lang.err_pam_cred_insufficient,
         error.PamCredentialsUnavailable => lang.err_pam_cred_unavail,
         error.PamMaximumTries => lang.err_pam_maxtries,
-        error.PamNewAuthTokenRequired => lang.err_pam_authok_reqd,
         error.PamPermissionDenied => lang.err_pam_perm_denied,
         error.PamSessionError => lang.err_pam_session,
         error.PamSystemError => lang.err_pam_sys,

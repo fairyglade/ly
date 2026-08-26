@@ -29,7 +29,7 @@ pub const AuthOptions = struct {
 const PamAppdata = struct {
     username: []const u8,
     password: []const u8,
-    authreq_requested: bool,
+    new_authtok_requested: bool,
     authreq_responded: bool,
     new_password: []const u8,
 };
@@ -52,6 +52,7 @@ pub fn authenticate(
     current_environment: Environment,
     login: []const u8,
     password: []const u8,
+    maybe_new_password: ?[]const u8,
 ) !void {
     var tty_buffer: [3]u8 = undefined;
     const tty_str = try std.fmt.bufPrint(&tty_buffer, "{d}", .{options.tty});
@@ -69,7 +70,7 @@ pub fn authenticate(
     var credentials: PamAppdata = .{
         .username = login,
         .password = password,
-        .authreq_requested = false,
+        .new_authtok_requested = false,
         .authreq_responded = false,
         .new_password = "",
     };
@@ -98,9 +99,11 @@ pub fn authenticate(
     try log_file.info(io, "auth/pam", "validating account", .{});
     status = interop.pam.pam_acct_mgmt(handle, 0);
     if (status == interop.pam.PAM_NEW_AUTHTOK_REQD) {
-        // credentials.authreq_requested = true;
-        // credentials.new_password = "";
-        // status = interop.pam.pam_chauthtok(handle, interop.pam.PAM_CHANGE_EXPIRED_AUTHTOK);
+        if (maybe_new_password) |new_passwsord| {
+            credentials.new_authtok_requested = true;
+            credentials.new_password = new_passwsord;
+            status = interop.pam.pam_chauthtok(handle, interop.pam.PAM_CHANGE_EXPIRED_AUTHTOK);
+        }
     }
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
@@ -334,7 +337,7 @@ fn loginConv(
             },
             interop.pam.PAM_PROMPT_ECHO_OFF => {
                 var pass = data.password;
-                if (data.authreq_requested) {
+                if (data.new_authtok_requested) {
                     if (data.authreq_responded) {
                         pass = data.new_password;
                     }
