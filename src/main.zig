@@ -1614,6 +1614,7 @@ fn authenticate(ptr: *anyopaque) !bool {
                 .xauth_cmd = state.config.xauth_cmd,
                 .setup_cmd = state.config.setup_cmd,
                 .login_cmd = state.config.login_cmd,
+                .faillock_tally_dir = state.config.faillock_tally_dir,
                 .x_cmd = state.config.x_cmd,
                 .x_vt = state.config.x_vt,
                 .session_pid = session_pid,
@@ -2641,6 +2642,7 @@ fn getAuthErrorMsg(err: anyerror, lang: Lang) []const u8 {
         error.PamSystemError => lang.err_pam_sys,
         error.PamUserUnknown => lang.err_pam_user_unknown,
         error.PamAbort => lang.err_pam_abort,
+        error.AccountLocked => lang.err_acc_locked,
         else => @errorName(err),
     };
 }

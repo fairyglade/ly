@@ -20,6 +20,7 @@ pub const AuthOptions = struct {
     xauth_cmd: []const u8,
     setup_cmd: []const u8,
     login_cmd: ?[]const u8,
+    faillock_tally_dir: []const u8,
     x_cmd: []const u8,
     x_vt: ?u8,
     session_pid: std.posix.pid_t,
@@ -32,6 +33,18 @@ const PamAppdata = struct {
     new_authtok_requested: bool,
     authreq_responded: bool,
     new_password: []const u8,
+};
+
+//https://github.com/linux-pam/linux-pam/blob/master/modules/pam_faillock/faillock.h#L55
+const PamFaillockEntry = extern struct {
+    pub const STATUS_VALID: usize = 0x1;
+    pub const STATUS_RHOST: usize = 0x2;
+    pub const STATUS_TTY: usize = 0x4;
+
+    source: [52]u8,
+    reserved: u16,
+    status: u16,
+    time: u64,
 };
 
 var xorg_pid: std.posix.pid_t = 0;
@@ -54,6 +67,11 @@ pub fn authenticate(
     password: []const u8,
     maybe_new_password: ?[]const u8,
 ) !void {
+    var faillock_entries: usize = 0;
+    if (try dirExists(io, options.faillock_tally_dir)) {
+        faillock_entries = try getFaillockEntries(allocator, io, login, options.faillock_tally_dir);
+    }
+
     var tty_buffer: [3]u8 = undefined;
     const tty_str = try std.fmt.bufPrint(&tty_buffer, "{d}", .{options.tty});
 
@@ -94,6 +112,13 @@ pub fn authenticate(
     // Do the PAM routine
     try log_file.info(io, "auth/pam", "authenticating", .{});
     status = interop.pam.pam_authenticate(handle, 0);
+    if (status == interop.pam.PAM_AUTH_ERR and try dirExists(io, options.faillock_tally_dir)) {
+        const new_faillock_entries = try getFaillockEntries(allocator, io, login, options.faillock_tally_dir);
+
+        if (faillock_entries == new_faillock_entries) {
+            return error.AccountLocked;
+        }
+    }
     if (status != interop.pam.PAM_SUCCESS) return pamDiagnose(status);
 
     try log_file.info(io, "auth/pam", "validating account", .{});
@@ -186,6 +211,46 @@ pub fn authenticate(
     removeUtmpEntry(&entry);
 
     if (shared_err.readError()) |err| return err;
+}
+
+fn dirExists(io: std.Io, path: []const u8) !bool {
+    var dir = std.Io.Dir.openDirAbsolute(io, path, .{}) catch |err| {
+        if (err == error.FileNotFound) return false;
+        return err;
+    };
+    defer dir.close(io);
+
+    return true;
+}
+
+fn getFaillockEntries(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    username: []const u8,
+    tally_dir: []const u8,
+) !usize {
+    const path = try std.fs.path.join(allocator, &.{ tally_dir, username });
+    defer allocator.free(path);
+
+    var file = try std.Io.Dir.openFileAbsolute(io, path, .{});
+    defer file.close(io);
+
+    var buffer: [1024]u8 = undefined;
+    var reader = file.reader(io, &buffer);
+    var count: usize = 0;
+
+    while (!reader.atEnd()) {
+        const entry = reader.interface.takeStruct(PamFaillockEntry, .little) catch |err| {
+            if (err == error.EndOfStream) break;
+            return err;
+        };
+
+        if (entry.status & PamFaillockEntry.STATUS_VALID != 0) {
+            count += 1;
+        }
+    }
+
+    return count;
 }
 
 fn startSession(

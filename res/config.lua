@@ -262,6 +262,13 @@ ly = {
     -- Default is red and bold
     error_fg = 0x01FF0000,
 
+    -- Tally directory for the pam_faillock module (if present)
+    -- Used for getting if an account is locked or not after too many failed
+    -- login attempts
+    -- If directory doesn't exist, lock status won't be checked when
+    -- authenticating
+    faillock_tally_dir = "/var/run/faillock",
+
     -- Foreground color id
     fg = 0x00FFFFFF,
 
