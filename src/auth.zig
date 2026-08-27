@@ -67,9 +67,12 @@ pub fn authenticate(
     password: []const u8,
     maybe_new_password: ?[]const u8,
 ) !void {
+    const lock_path = try std.fs.path.join(allocator, &.{ options.faillock_tally_dir, login });
+    defer allocator.free(lock_path);
+
     var faillock_entries: usize = 0;
-    if (try dirExists(io, options.faillock_tally_dir)) {
-        faillock_entries = try getFaillockEntries(allocator, io, login, options.faillock_tally_dir);
+    if (try fileExists(io, lock_path)) {
+        faillock_entries = try getFaillockEntries(io, lock_path);
     }
 
     var tty_buffer: [3]u8 = undefined;
@@ -112,8 +115,8 @@ pub fn authenticate(
     // Do the PAM routine
     try log_file.info(io, "auth/pam", "authenticating", .{});
     status = interop.pam.pam_authenticate(handle, 0);
-    if (status == interop.pam.PAM_AUTH_ERR and try dirExists(io, options.faillock_tally_dir)) {
-        const new_faillock_entries = try getFaillockEntries(allocator, io, login, options.faillock_tally_dir);
+    if (status == interop.pam.PAM_AUTH_ERR and try fileExists(io, lock_path)) {
+        const new_faillock_entries = try getFaillockEntries(io, lock_path);
 
         if (faillock_entries == new_faillock_entries) {
             return error.AccountLocked;
@@ -213,25 +216,17 @@ pub fn authenticate(
     if (shared_err.readError()) |err| return err;
 }
 
-fn dirExists(io: std.Io, path: []const u8) !bool {
-    var dir = std.Io.Dir.openDirAbsolute(io, path, .{}) catch |err| {
+fn fileExists(io: std.Io, path: []const u8) !bool {
+    var file = std.Io.Dir.openFileAbsolute(io, path, .{}) catch |err| {
         if (err == error.FileNotFound) return false;
         return err;
     };
-    defer dir.close(io);
+    defer file.close(io);
 
     return true;
 }
 
-fn getFaillockEntries(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    username: []const u8,
-    tally_dir: []const u8,
-) !usize {
-    const path = try std.fs.path.join(allocator, &.{ tally_dir, username });
-    defer allocator.free(path);
-
+fn getFaillockEntries(io: std.Io, path: []const u8) !usize {
     var file = try std.Io.Dir.openFileAbsolute(io, path, .{});
     defer file.close(io);
 
