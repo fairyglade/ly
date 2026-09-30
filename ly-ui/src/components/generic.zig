@@ -140,6 +140,7 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
         fn goLeft(ptr: *anyopaque) !bool {
             var self: *Self = @ptrCast(@alignCast(ptr));
 
+            if (self.list.items.len == 0) return false;
             self.current = if (self.current == 0) self.list.items.len - 1 else self.current - 1;
 
             if (self.change_item_fn) |change_item_fn| {
@@ -156,6 +157,7 @@ pub fn CyclableLabel(comptime ItemType: type, comptime ChangeItemType: type) typ
         fn goRight(ptr: *anyopaque) !bool {
             var self: *Self = @ptrCast(@alignCast(ptr));
 
+            if (self.list.items.len == 0) return false;
             self.current = if (self.current == self.list.items.len - 1) 0 else self.current + 1;
 
             if (self.change_item_fn) |change_item_fn| {

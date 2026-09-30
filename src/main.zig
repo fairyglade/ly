@@ -1148,7 +1148,7 @@ pub fn main(init: std.process.Init) !void {
     // Skip if autologin is active to prevent overriding autologin session
     var default_input = state.config.default_input;
 
-    const min_session_index = state.session.label.list.items.len - 1;
+    const min_session_index = if (state.session.label.list.items.len == 0) 0 else state.session.label.list.items.len - 1;
 
     if (state.config.save_file_dir != null and !state.is_autologin) {
         if (state.login_text) |box| {
