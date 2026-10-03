@@ -384,7 +384,7 @@ fn installText(
     destination_directory: std.Io.Dir,
     destination_directory_path: []const u8,
     destination_file: []const u8,
-    options: std.Io.File.CreateFlags,
+    options: std.Io.Dir.CreateFileOptions,
 ) !void {
     var file = try destination_directory.createFile(io, destination_file, options);
     defer file.close(io);

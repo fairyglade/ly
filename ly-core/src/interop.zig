@@ -355,7 +355,7 @@ pub fn setNumlock(val: bool) !void {
 }
 
 pub fn setUserContext(allocator: std.mem.Allocator, entry: UsernameEntry) !void {
-    const username_z = try allocator.dupeZ(u8, entry.username.?);
+    const username_z = try allocator.dupeSentinel(u8, entry.username.?, 0);
     defer allocator.free(username_z);
 
     return platform_struct.setUserContextImpl(username_z.ptr, entry);
@@ -371,10 +371,10 @@ pub fn setUserShell(entry: *UsernameEntry) void {
 }
 
 pub fn setEnvironmentVariable(allocator: std.mem.Allocator, name: []const u8, value: []const u8, replace: bool) !void {
-    const name_z = try allocator.dupeZ(u8, name);
+    const name_z = try allocator.dupeSentinel(u8, name, 0);
     defer allocator.free(name_z);
 
-    const value_z = try allocator.dupeZ(u8, value);
+    const value_z = try allocator.dupeSentinel(u8, value, 0);
     defer allocator.free(value_z);
 
     const status = stdlib.setenv(name_z.ptr, value_z.ptr, @intFromBool(replace));

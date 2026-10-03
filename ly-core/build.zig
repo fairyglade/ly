@@ -21,9 +21,7 @@ pub fn build(b: *std.Build) void {
     const zigini = b.dependency("zigini", .{ .target = target, .optimize = optimize });
     mod.addImport("zigini", zigini.module("zigini"));
 
-    const translate_c = b.dependency("translate_c", .{
-        .target = target,
-    });
+    const translate_c = b.dependency("translate_c", .{});
 
     addCImport(b, mod, translate_c, target, optimize, "pam", "#include <security/pam_appl.h>");
     addCImport(b, mod, translate_c, target, optimize, "utmp", "#include <utmpx.h>");
