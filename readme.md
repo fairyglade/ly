@@ -20,7 +20,7 @@ Join us on Matrix over at
 
 ### Compile-time
 
-- zig 0.16.x (you must use a **release version** of zig; check that `zig
+- zig 0.17.x (you must use a **release version** of zig; check that `zig
   version` does not have a `-dev*` suffix)
 
 - libc
@@ -49,16 +49,6 @@ Join us on Matrix over at
 
 ```console
 # dnf install kernel-devel pam-devel libxcb-devel zig xorg-x11-xauth xorg-x11-server brightnessctl
-```
-
-#### Nix
-
-You can use the flake to automatically install all dependencies inside a
-reproducible environment:
-
-```console
-$ git clone https://codeberg.org/fairyglade/ly.git && cd ly
-$ nix build
 ```
 
 > [!WARNING]
@@ -99,6 +89,17 @@ $ nix build
 ```console
 # pkg install ca_root_nss libxcb git xorg xauth
 ```
+
+#### Nix
+
+Enter a development shell with all dependencies:
+
+```console
+$ git clone https://codeberg.org/fairyglade/ly.git && cd ly
+$ nix develop
+```
+
+Then follow [Manually building](#manually-building) from the `zig build` step.
 
 ## Availability
 

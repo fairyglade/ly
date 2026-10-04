@@ -21,7 +21,7 @@
         {
           default = pkgs.mkShell {
             packages = with pkgs; [
-              zig
+              zig_0_17
               pam
               libxcb
             ];
