@@ -314,7 +314,6 @@ pub fn LuaParser(comptime Struct: type) type {
                     if (binding_type != .string) continue;
                     const binding = lua.toString(-1) catch continue;
                     const bindingZ = temporary_allocator.dupe(u8, binding) catch "";
-                    std.debug.print("{s}", .{bindingZ});
                     lua.pop(1); // binding value
 
                     if (!custom.binds.contains(bindingZ)) {

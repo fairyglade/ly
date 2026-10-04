@@ -204,7 +204,7 @@ ly = {
     corner_bottom_right = "labels",
 
     -- Top left
-    corner_top_left = "shutdown,restart,britup,britdown,password battery",
+    corner_top_left = "shutdown,restart,britup,britdown,password battery binds",
 
     -- Top right
     corner_top_right = "clock numlock,capslock",
@@ -476,23 +476,28 @@ ly = {
     -- Comments preceding with '-- --' are for documentation.
     -- Comments preceding with '--' comment out the example code.
 
-    -- custom_commands = {
-    --     -- Declare a command with the F8 binding.
-    --     binding = "F8",
-    --     -- The name of the command to show up in Ly.
-    --     -- Note: "$" in "$brightness_up" fetches the appropriate string from the specified locale file
-    --     -- and is replaced with the value representing "brightness_up".
-    --     -- You can see the list of keys in any locale file in $CONFIG_DIRECTORY/ly/lang.name = "custom command $brightness_up",
-    --     cmd = "touch /tmp/ly.gaming",
-    -- },
+    custom_commands = {
+        {
+            -- Declare a command with the F8 binding.
+            binding = "F8",
+            -- The name of the command to show up in Ly.
+            -- Note: "$" in "$brightness_up" fetches the appropriate string from the specified locale file
+            -- and is replaced with the value representing "brightness_up".
+            -- You can see the list of keys in any locale file in $CONFIG_DIRECTORY/ly/lang.
+            name = "custom command $brightness_up",
+            cmd = "touch /tmp/ly.gaming",
+        },
+    },
 
     -- custom_labels = {
-    --     -- Declare a label with an ID. This ID should be unique across all labels.
-    --     label = "kernel",
-    --     cmd = "uname -srn",
-    --     -- Optional, defaulting to 0.
-    --     -- In frames, the time to re-run the command and update the label.
-    --     -- If 0, only run once and do not refresh afterwards
-    --     refresh = 0,
+    --     {
+    --         -- Declare a label with an ID. This ID should be unique across all labels.
+    --         label = "kernel",
+    --         cmd = "uname -srn",
+    --         -- Optional, defaulting to 0.
+    --         -- In frames, the time to re-run the command and update the label.
+    --         -- If 0, only run once and do not refresh afterwards
+    --         refresh = 0,
+    --     },
     -- }
 }
