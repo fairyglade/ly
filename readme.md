@@ -51,6 +51,16 @@ Join us on Matrix over at
 # dnf install kernel-devel pam-devel libxcb-devel zig xorg-x11-xauth xorg-x11-server brightnessctl
 ```
 
+#### Nix
+
+You can use the flake to automatically install all dependencies inside a
+reproducible environment:
+
+```console
+$ git clone https://codeberg.org/fairyglade/ly.git && cd ly
+$ nix build
+```
+
 > [!WARNING]
 >
 > Distributions using SELinux such as Fedora and openSUSE Tumbleweed may
