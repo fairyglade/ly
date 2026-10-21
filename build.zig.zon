@@ -12,8 +12,8 @@
             .hash = "clap-0.12.0-oBajB4XpAQCF1WRKnD5KOKPsnwwT_NNdAJ7Ww3irYJac",
         },
         .zlua = .{
-            .url = "git+https://github.com/AnErrupTion/ziglua?ref=almost-there#5ff4bcc7b56661125dd93ad81addd473cebbcd14",
-            .hash = "zlua-0.1.0-hGRpC9eYBQDYOfd1aKlHG8hy8eTgKiaAdIyQEQgLREpI",
+            .url = "git+https://github.com/natecraddock/ziglua?ref=master#ce59a325718d00c4b24364d482f9efa370a9bf09",
+            .hash = "zlua-0.1.0-hGRpCwmZBQDixqie-LjxX4vsguYaVT77Hd17csjHvQ5Y",
         },
     },
     .paths = .{
