@@ -1961,7 +1961,7 @@ fn updateBigClock(self: *BigLabel, ptr: *anyopaque) !void {
             "%M",
             if (state.config.bigclock_seconds) separator else "",
             if (state.config.bigclock_seconds) "%S" else "",
-            if (state.config.bigclock_12hr) "%P" else "",
+            if (state.config.bigclock_12hr) "%p" else "",
         },
         0,
     );
